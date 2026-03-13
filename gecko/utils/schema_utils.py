@@ -1,10 +1,3 @@
-"""
-Schema Utilities - Tools for processing OpenAPI schemas.
-
-This module provides utilities for resolving schema references, extracting
-parameter descriptions, and formatting schema information for LLM prompts.
-"""
-
 from typing import Any, Dict, List
 
 

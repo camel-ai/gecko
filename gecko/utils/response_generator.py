@@ -1,10 +1,3 @@
-"""
-Response Generator - Generates mock API responses based on OpenAPI schemas.
-
-This module uses LLM to generate realistic API responses that conform to OpenAPI
-schemas while validating against the current system state.
-"""
-
 import json
 import logging
 from datetime import datetime
@@ -16,13 +9,14 @@ from fastapi import Request
 
 from .request_details import RequestDetails
 from .config_updater import update_state
+from .config_updater import classify_tool_call_status
 from .schema_utils import (
     resolve_refs,
     extract_parameter_descriptions,
     extract_response_descriptions,
     extract_toolkit_info,
 )
-from utils.model_utils import create_model
+from utils.model_utils import create_model, sanitize_llm_json_text
 import json_repair
 
 logger = logging.getLogger(__name__)
@@ -31,19 +25,29 @@ logger = logging.getLogger(__name__)
 RESPONSE_SYSTEM_PROMPT = """
 You are an API simulation engine that generates JSON responses strictly following OpenAPI 3.1 schemas.
 
-CORE PRINCIPLES:
+CORE PRINCIPLES (in priority order):
 
-1. **Schema Adherence** — Always match the schema exactly (structure, names, types, formats, required fields).
+**1. MANDATORY Brevity — Hard Output Limit** — This is a simulation, not a real service.
+  - Every string value: at most 15 characters. No exceptions.
+  - Biological sequences (DNA, RNA, protein, amino acids): always return exactly a short sample like "ATCGATCGATCG" or "MVLSPADKTN" regardless of requested length.
+  - Any other generated blob (code, logs, text, documents, binary): return a very short placeholder.
+  - **Arrays/lists: return exactly 2 items maximum, even if the schema says "length = N years", "one per year", "one per item", or similar. You are simulating, not producing real data. Ignore any array length hints in descriptions.**
+  - For numeric metadata fields that describe size (length, count, sequence_length, etc.): set them to the value the REQUEST asked for, NOT the length of your truncated output.
+  - NEVER expand content to match a requested length/count. The request may say length=500 or years=20 — you still output at most 2 array items and at most 15 characters per string.
 
-2. **System State Validation** — Validate all operations against the current System State (including toolkit-specific runtime_state). If requirements are not met, return an error.
+**2. Schema Adherence** — Match the schema exactly (structure, names, types, formats, required fields).
 
-3. **Semantic Validation** — Referenced entities must exist, be accessible, and be valid for the requested operation.
+**3. No Extra Rules** — Do not invent constraints beyond the tool definition.
+"""
 
-4. **Reasonable Defaults** — If schema-required values are missing from System State, synthesize realistic values (UUIDs, ISO 8601 timestamps, tokens, etc.) that do not contradict System State.
+STATE_FOLLOWING_SYSTEM_PROMPT = """
+**System State Validation** — Validate all operations against the current System State (including toolkit-specific runtime_state). If requirements are not met, return an error.
 
-5. **State Consistency** — Reflect mutations consistently; subsequent operations must observe prior successful changes.
+**Semantic Validation** — Referenced entities must exist, be accessible, and be valid for the requested operation.
 
-6. **No Extra Rules** — Do not invent constraints beyond the tool definition and System State.
+**Reasonable Defaults** — If schema-required values are missing from System State, synthesize realistic values (UUIDs, ISO 8601 timestamps, tokens, etc.) that do not contradict System State.
+
+**State Consistency** — Reflect mutations consistently; subsequent operations must observe prior successful changes.
 
 STATE PRIORITY RULES:
 
@@ -60,26 +64,26 @@ STATE PRIORITY RULES:
 
 VALIDATION GUIDELINES:
 
-7. **Exact Matching** — Entity names, identifiers, and paths must match EXACTLY. Similar names are NOT the same (e.g., 'user_123' ≠ 'user_124', 'notes.md' ≠ 'note.md').
+8. **Exact Matching** — Entity names, identifiers, and paths must match EXACTLY. Similar names are NOT the same (e.g., 'user_123' ≠ 'user_124').
 
-8. **Navigating Nested Structures** — When checking if an entity exists in a nested structure:
+9. **Navigating Nested Structures** — When checking if an entity exists in a nested structure:
    a) Identify the relevant path/location from runtime_state (may be nested under runtime_state.toolkits.<ToolkitName> or flat)
    b) Parse the path into components if needed
    c) Navigate step-by-step through the structure, following the nesting pattern (e.g., parent → .contents → child → .contents)
    d) Check existence at the final level only - do not assume entities from parent/sibling/child levels
 
-9. **Scope Boundaries** — Operations with scope constraints (e.g., "current directory", "active workspace", "selected items") can ONLY access direct members of that scope, not nested or related scopes.
+10. **Scope Boundaries** — Operations with scope constraints (e.g., "current directory", "active workspace", "selected items") can ONLY access direct members of that scope, not nested or related scopes.
 
-10. **Case Sensitivity** — All identifiers, names, and keys are case-sensitive unless explicitly stated otherwise in the tool definition.
+11. **Case Sensitivity** — All identifiers, names, and keys are case-sensitive unless explicitly stated otherwise in the tool definition.
 
-11. **Schema Branch Selection** — If the response schema uses oneOf/anyOf, choose EXACTLY ONE branch and output a concrete instance of that branch. Never output the schema itself (no oneOf/anyOf/type/properties/description in the response).
-12. **Condition Evaluation Discipline** — Treat validation rules as executable conditions:
+12. **Schema Branch Selection** — If the response schema uses oneOf/anyOf, choose EXACTLY ONE branch and output a concrete instance of that branch. Never output the schema itself (no oneOf/anyOf/type/properties/description in the response).
+13. **Condition Evaluation Discipline** — Treat validation rules as executable conditions:
    - Trigger an error branch only when the condition is positively true from request + state + schema defaults.
    - If a condition is not provably true, do not assume failure.
    - If all known failure conditions are false, prefer the success branch.
-13. **Use Called-Method Static Data** — When x-default-state provides called_method_static_data/static_data (e.g., canonical lists, lookup tables), use it as authoritative for validations instead of guessing.
-14. **Auth/Login Continuity** — After a successful auth/login response, treat the toolkit as authenticated for subsequent operations unless a later explicit logout/failure changes that state.
-15. **Write Success Consistency** — For successful write operations, ensure response semantics are consistent with persisted canonical state mutations (e.g., created records are retrievable by returned IDs).
+14. **Use Called-Method Static Data** — When x-default-state provides called_method_static_data/static_data (e.g., canonical lists, lookup tables), use it as authoritative for validations instead of guessing.
+15. **Auth/Login Continuity** — After a successful auth/login response, treat the toolkit as authenticated for subsequent operations unless a later explicit logout/failure changes that state.
+16. **Write Success Consistency** — For successful write operations, ensure response semantics are consistent with persisted canonical state mutations (e.g., created records are retrievable by returned IDs).
 
 Example: For a file system toolkit with current directory "/root/alex/workspace/Projects", checking if "notes.md" exists:
 - Navigate: GorillaFileSystem.root → alex.contents → workspace.contents → Projects.contents
@@ -100,6 +104,8 @@ Your role:
 Key principles:
 - Prefer canonical top-level toolkit state for business fields; use runtime_state only for transient context.
 - If top-level and runtime_state conflict on business fields (e.g., authenticated flags, counters, records), treat top-level as authoritative.
+- For file-system existence checks, enforce cwd strictly: if an argument is a local name (no path separators), it must exist as a direct child of the current working directory; existence only in descendant subdirectories does NOT count.
+  Example: if cwd is `/workspace`, `report.csv` exists only at `/workspace/data/report.csv`, and the call uses local name `report.csv`, then treat it as NOT existing in cwd (invalid for current-directory-only operations).
 - For operations that access/modify resources, identify those resources' current state
 - For operations with source/destination, check BOTH locations
 - Always specify if collections/directories are EMPTY or list their contents
@@ -111,10 +117,7 @@ Output format:
 [Extracted configuration relevant to this operation]
 
 ## Operation Constraints
-[Any constraints or rules from the operation description]
-
-## State Analysis
-[Your analysis of the current state relevant to this operation]
+[Any constraints or rules from the operation description and whether they are satisfied by the current state]
 
 Be thorough but concise. Extract ONLY what's needed for this specific operation.
 """
@@ -123,16 +126,34 @@ Be thorough but concise. Extract ONLY what's needed for this specific operation.
 class ResponseGenerator:
     """Generates mock responses based on OpenAPI schema using LLM."""
 
-    def __init__(self, response_model: str = "gpt-5-mini", state_model: str = "gpt-5-mini"):
+    def __init__(
+        self,
+        response_model: str = "gpt-4.1-mini",
+        state_model: Optional[str] = "gpt-4.1-mini",
+        validation_model: str = "gpt-4.1-mini",
+    ):
         """Initialize the response generator with configurable models.
 
         Args:
-            response_model: LLM model for response generation (default: gpt-5-mini)
-            state_model: LLM model for state update (default: gpt-5-mini)
+            response_model: LLM model for response generation (default: gpt-4.1-mini)
+            state_model: LLM model for state update (default: gpt-4.1-mini)
+            validation_model: LLM model for request validation (also used by context extractor)
         """
         self.response_model = response_model
-        self.state_model = state_model
-        self.system_prompt = RESPONSE_SYSTEM_PROMPT
+        if isinstance(state_model, str) and state_model.strip().lower() in {"none", "null", ""}:
+            self.state_model = None
+        else:
+            self.state_model = state_model
+        self.validation_model = validation_model
+        if self.state_model is None:
+            self.system_prompt = RESPONSE_SYSTEM_PROMPT
+        else:
+            self.system_prompt = (
+                RESPONSE_SYSTEM_PROMPT.rstrip()
+                + "\n\n"
+                + STATE_FOLLOWING_SYSTEM_PROMPT.strip()
+            )
+        self.response_timeout_seconds = 60.0
 
     @staticmethod
     def extract_toolkit_runtime_state(config: Dict[str, Any], schema: Dict[str, Any]) -> Dict[str, Any]:
@@ -406,7 +427,7 @@ IMPORTANT: You will receive the relevant system state in the user message. Base 
 
             result = self._parse_response(response_str)
 
-            if len(state_history) > 0:
+            if len(state_history) > 0 and self.state_model is not None:
                 tool_descriptions = self._build_tool_descriptions(
                     operation,
                     tool_definition,
@@ -414,7 +435,6 @@ IMPORTANT: You will receive the relevant system state in the user message. Base 
                     schema=schema,
                 )
                 tool_calls = self._build_tool_calls(operation, request_info, request, result)
-
                 previous_state = effective_state if isinstance(effective_state, dict) else (
                     state_history[-1] if len(state_history) > 0 else {}
                 )
@@ -425,6 +445,8 @@ IMPORTANT: You will receive the relevant system state in the user message. Base 
                     session_id=session_id,
                     state_model=self.state_model,
                 )
+            elif len(state_history) > 0:
+                logger.debug("[STATE UPDATE] Skipped in response generator because state_model is disabled")
 
             return result
 
@@ -469,6 +491,23 @@ IMPORTANT: You will receive the relevant system state in the user message. Base 
         schema_default_state: Dict[str, Any],
         session_id: Optional[str],
     ) -> str:
+        if self.state_model is None:
+            if not current_state:
+                if schema_default_state:
+                    return (
+                        "## Relevant System State\n"
+                        "(State model disabled; runtime state unavailable. Use Schema Default State below as fallback constraints)\n"
+                    )
+                return "## Relevant System State\n(State model disabled; no runtime state constraints)\n"
+            try:
+                state_text = json.dumps(current_state, indent=2, ensure_ascii=False)
+            except Exception:
+                state_text = str(current_state)
+            logger.debug(
+                "[CTX_EXTRACTOR] Skipped because state_model is disabled; using raw state snapshot"
+            )
+            return f"## Relevant System State\n{state_text}\n"
+
         if not current_state:
             if schema_default_state:
                 return (
@@ -482,7 +521,7 @@ IMPORTANT: You will receive the relevant system state in the user message. Base 
             request_info=request_info,
             toolkit_info=toolkit_info,
             schema=schema,
-            model=self.response_model,
+            model=self.validation_model,
             session_id=session_id,
         )
 
@@ -524,10 +563,11 @@ IMPORTANT: You will receive the relevant system state in the user message. Base 
             {request_info.get('body', '{}')}
 
 
-Return a pure JSON object matching the response schema.
-
 ## Expected Response Schema
 {json.dumps(resolved_schema, indent=2)}
+
+Return a pure JSON object matching the response schema above.
+REMEMBER: strings ≤15 chars, arrays ≤2 items. Ignore any "length = N" hints in descriptions. Put the requested size in numeric metadata fields only.
 """
 
     def _call_response_llm(
@@ -538,11 +578,21 @@ Return a pure JSON object matching the response schema.
     ) -> str:
         agent = ChatAgent(
             enhanced_system_prompt,
-            model=create_model(self.response_model, max_tokens=16384, temperature=0.001),
+            model=create_model(
+                self.response_model,
+                max_tokens=4096,
+                temperature=0.001,
+                timeout=self.response_timeout_seconds,
+            ),
+            step_timeout=self.response_timeout_seconds,
         )
 
         _rt0 = datetime.now()
-        logger.debug("[RESPONSE] LLM START (model=%s)", self.response_model)
+        logger.debug(
+            "[RESPONSE] LLM START (model=%s timeout=%.1fs)",
+            self.response_model,
+            self.response_timeout_seconds,
+        )
         response = agent.step(user_message)
         _rt1 = datetime.now()
         logger.debug(
@@ -573,15 +623,7 @@ Return a pure JSON object matching the response schema.
         return self._strip_wrappers(response_str)
 
     def _strip_wrappers(self, response_str: str) -> str:
-        if response_str.startswith("```json"):
-            response_str = response_str[len("```json"):]
-        if response_str.endswith("```"):
-            response_str = response_str[:-len("```")]
-        if response_str.startswith("\n") and response_str.endswith("\n"):
-            response_str = response_str[1:-1]
-        if "</think>" in response_str:
-            response_str = response_str.split("</think>")[-1]
-        return response_str
+        return sanitize_llm_json_text(response_str)
 
     def _parse_response(self, response_str: str) -> Any:
         """Parse model output as generic JSON value (object/null/string/etc.)."""
@@ -638,13 +680,16 @@ Return a pure JSON object matching the response schema.
             return []
         canonical_name = self._canonical_operation_name(operation, request)
         arguments = self._extract_arguments(request_info)
-        return [
-            {
-                "name": canonical_name,
-                "arguments": arguments,
-                "result": result,
-            }
-        ]
+        status, reason = classify_tool_call_status(result)
+        tool_call: Dict[str, Any] = {
+            "name": canonical_name,
+            "arguments": arguments,
+            "result": result,
+            "execution_status": status,
+        }
+        if reason:
+            tool_call["error_reason"] = reason
+        return [tool_call]
 
     def _canonical_operation_name(self, operation: Dict[str, Any], request: Request) -> str:
         operation_id = operation.get("operationId")
@@ -738,7 +783,11 @@ Provide a clear, structured summary of the relevant state. DO NOT generate a res
 
             model_name = model or self.response_model
             extract_model = create_model(model_name, max_tokens=16384, temperature=0.001)
-            extract_agent = ChatAgent(CONTEXT_EXTRACTION_SYSTEM_PROMPT, model=extract_model)
+            extract_agent = ChatAgent(
+                CONTEXT_EXTRACTION_SYSTEM_PROMPT,
+                model=extract_model,
+                step_timeout=self.response_timeout_seconds,
+            )
             response = extract_agent.step(extraction_query)
             extracted_context = response.msg.content
             try:
@@ -761,6 +810,13 @@ Provide a clear, structured summary of the relevant state. DO NOT generate a res
                 lines = extracted_context.split('\n')
                 extracted_context = '\n'.join(lines[1:-1] if lines[-1] == "```" else lines[1:])
 
+            op_id = operation.get("operationId", "unknown") if isinstance(operation, dict) else "unknown"
+            logger.warning(
+                "[CTX_EXTRACTOR_OUTPUT] op=%s session=%s\n%s",
+                op_id,
+                session_id or "<none>",
+                extracted_context,
+            )
             return extracted_context
 
         except Exception as e:

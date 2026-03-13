@@ -14,7 +14,7 @@ class RouteMiddleware(BaseHTTPMiddleware):
     """Middleware for handling API routing and request processing."""
     
     def __init__(self, app, schema_loader: SchemaLoader,
-                 response_model: str = "gpt-5-mini", state_model: str = "gpt-5-mini", validation_model: str = "gpt-5-mini"):
+                 response_model: str = "gpt-4.1-mini", state_model: str = "gpt-4.1-mini", validation_model: str = "gpt-4.1-mini"):
         """Initialize the route middleware.
         
         Args:

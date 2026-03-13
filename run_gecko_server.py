@@ -37,28 +37,26 @@ def main() -> None:
     parser.add_argument(
         "--response-model",
         type=str,
-        default="gpt-5-mini",
-        help="LLM model for response generation (default: gpt-5-mini)",
+        default="gpt-4.1-mini",
+        help="LLM model for response generation (default: gpt-4.1-mini)",
     )
     parser.add_argument(
         "--state-model",
         type=str,
-        default="gpt-5-mini",
-        help="LLM model for state update (default: gpt-5-mini)",
+        default="gpt-4.1-mini",
+        help="LLM model for state update (default: gpt-4.1-mini)",
     )
     parser.add_argument(
         "--validation-model",
         type=str,
-        default="gpt-5-mini",
-        help="LLM model for request validation (default: gpt-5-mini)",
+        default="gpt-4.1-mini",
+        help="LLM model for request validation (default: gpt-4.1-mini)",
     )
 
     args = parser.parse_args()
 
     state_model = args.state_model.strip()
     validation_model = args.validation_model.strip()
-    if state_model.lower() in {"none", "null", ""}:
-        parser.error("--state-model cannot be none/null/empty")
     if validation_model.lower() in {"none", "null", ""}:
         parser.error("--validation-model cannot be none/null/empty")
 

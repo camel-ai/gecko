@@ -1,10 +1,3 @@
-"""
-Config Updater - Updates system configuration based on tool execution results.
-
-This module handles tracking state changes from tool calls and maintaining
-consistent configuration across the session.
-"""
-
 import json
 import logging
 import re
@@ -12,7 +5,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from camel.agents import ChatAgent
-from utils.model_utils import create_model
+from utils.model_utils import create_model, sanitize_llm_json_text
 from .global_config import get_state_model
 import json_repair
 
@@ -342,13 +335,89 @@ def _build_fc_tools():
 
 def _result_indicates_error(result: Any) -> bool:
     """Heuristic: determine whether a tool-call result indicates failure."""
+    status, _ = classify_tool_call_status(result)
+    return status == "error"
+
+
+def classify_tool_call_status(result: Any) -> Tuple[str, Optional[str]]:
+    """Classify tool call outcome from result payload.
+
+    Returns:
+        (status, reason)
+        - status: "success" | "error"
+        - reason: optional textual error reason
+    """
     if isinstance(result, dict):
-        if "error" in result:
-            return True
+        err = result.get("error")
+        if err:
+            return "error", str(err)
+
+        if result.get("success") is False:
+            msg = result.get("message") or "success=false"
+            return "error", str(msg)
+
         detail = result.get("detail")
-        if isinstance(detail, str) and detail:
-            return True
-    return False
+        if isinstance(detail, dict):
+            em = detail.get("error_message")
+            if em:
+                return "error", str(em)
+        elif isinstance(detail, str) and detail:
+            return "error", detail
+
+    if isinstance(result, str) and "error" in result.lower():
+        return "error", result
+
+    return "success", None
+
+
+def _has_error_state_effects(
+    tool_name: str,
+    tool_descriptions: Optional[Dict[str, Any]],
+) -> bool:
+    """Whether schema hints explicitly allow state changes on error for this tool."""
+    if not isinstance(tool_descriptions, dict):
+        return False
+    desc_entry = tool_descriptions.get(tool_name)
+    if not isinstance(desc_entry, dict):
+        return False
+    state_hints = desc_entry.get("state_hints")
+    if not isinstance(state_hints, dict):
+        return False
+
+    error_effects = state_hints.get("state_effects_on_error")
+    always_effects = state_hints.get("state_effects_always")
+    return bool(error_effects) or bool(always_effects)
+
+
+def _prepare_tool_calls_for_state_update(
+    tool_calls: List[Dict[str, Any]],
+    tool_descriptions: Optional[Dict[str, Any]],
+) -> Tuple[List[Dict[str, Any]], int]:
+    """Normalize tool-call status and filter out unsupported error calls."""
+    prepared: List[Dict[str, Any]] = []
+    skipped_error_calls = 0
+
+    for call in tool_calls or []:
+        if not isinstance(call, dict):
+            continue
+        call_name = str(call.get("name") or call.get("function") or "").strip()
+        if not call_name:
+            continue
+
+        status, reason = classify_tool_call_status(call.get("result"))
+        normalized = dict(call)
+        normalized.setdefault("execution_status", status)
+        if reason and "error_reason" not in normalized:
+            normalized["error_reason"] = reason
+
+        # Default: error calls should not mutate state unless explicitly modeled.
+        if status == "error" and not _has_error_state_effects(call_name, tool_descriptions):
+            skipped_error_calls += 1
+            continue
+
+        prepared.append(normalized)
+
+    return prepared, skipped_error_calls
 
 
 def _extract_required_state_effects(
@@ -377,19 +446,29 @@ def _extract_required_state_effects(
             continue
 
         # Prefer branch-aware success effects; fall back to legacy state_effects.
+        # Also include always-effects on successful calls.
         success_effects = state_hints.get("state_effects_on_success")
+        always_effects = state_hints.get("state_effects_always")
         if isinstance(success_effects, list) and success_effects:
-            state_effects = success_effects
+            state_effects = list(success_effects)
         else:
-            state_effects = state_hints.get("state_effects")
+            fallback_effects = state_hints.get("state_effects")
+            state_effects = list(fallback_effects) if isinstance(fallback_effects, list) else []
+        if isinstance(always_effects, list) and always_effects:
+            state_effects.extend(always_effects)
         if not isinstance(state_effects, list) or not state_effects:
             continue
 
-        normalized_effects = [
-            " ".join(effect.split())
-            for effect in state_effects
-            if isinstance(effect, str) and effect.strip()
-        ]
+        normalized_effects: List[str] = []
+        seen_effects: set[str] = set()
+        for effect in state_effects:
+            if not isinstance(effect, str) or not effect.strip():
+                continue
+            normalized = " ".join(effect.split())
+            if normalized in seen_effects:
+                continue
+            seen_effects.add(normalized)
+            normalized_effects.append(normalized)
         if not normalized_effects:
             continue
 
@@ -409,6 +488,23 @@ def _extract_required_state_effects(
         )
 
     return requirements
+
+
+def _extract_fc_request_names(fc_requests: List[Any]) -> List[str]:
+    """Extract function-call tool names from FC requests."""
+    req_names: List[str] = []
+    for req in fc_requests:
+        if hasattr(req, "tool_name") and isinstance(req.tool_name, str):
+            req_names.append(req.tool_name)
+        elif isinstance(req, dict):
+            func = req.get("function")
+            if isinstance(func, dict) and isinstance(func.get("name"), str):
+                req_names.append(func["name"])
+            elif isinstance(req.get("tool_name"), str):
+                req_names.append(req["tool_name"])
+            elif isinstance(req.get("name"), str):
+                req_names.append(req["name"])
+    return req_names
 
 
 def _parse_counter_delta(effect: str) -> Optional[Tuple[str, int]]:
@@ -578,6 +674,35 @@ def _find_cwd_prefix(running: Dict[str, Any]) -> Optional[List[str]]:
     return None
 
 
+def _collapse_redundant_root_suffix(path_str: str) -> str:
+    """Collapse duplicated toolkit-root suffixes in malformed logical paths.
+
+    Example:
+    ``GorillaFileSystem/root/workspace/root/workspace`` ->
+    ``GorillaFileSystem/root/workspace``
+    """
+    segments = [s for s in path_str.strip("/").split("/") if s]
+    if len(segments) < 5:
+        return path_str
+
+    # Expected shape starts with "<toolkit>/<root>/..."
+    root_idx = 1
+    if len(segments) <= root_idx:
+        return path_str
+    root_key = segments[root_idx]
+
+    # Detect: <toolkit>/<root>/<A...>/<root>/<A...>
+    for split in range(root_idx + 2, len(segments)):
+        if segments[split] != root_key:
+            continue
+        left = segments[root_idx + 1 : split]
+        right = segments[split + 1 :]
+        if left and left == right:
+            return "/".join(segments[:split])
+
+    return path_str
+
+
 def _resolve_entry_path(running: Dict[str, Any], raw_path: str) -> str:
     """Resolve a potentially ambiguous path to a full logical path.
 
@@ -601,12 +726,19 @@ def _resolve_entry_path(running: Dict[str, Any], raw_path: str) -> str:
     if prefix is None:
         return raw_path
 
-    toolkit_root = prefix[:2]  # [toolkit_name, root_key]
+    toolkit_name, root_key = prefix[:2]
+    toolkit_root = [toolkit_name, root_key]
 
     # Build candidate paths from most specific to least specific.
     candidates: List[Tuple[str, List[str]]] = []
     if segments:
-        candidates.append(("cwd_relative", prefix + segments))
+        # If path starts at toolkit root key (e.g. "root/workspace/..."),
+        # treat it as toolkit-root absolute instead of CWD-relative.
+        if segments[0] == root_key:
+            candidates.append(("toolkit_root_absolute", [toolkit_name] + segments))
+            candidates.append(("cwd_relative", prefix + segments))
+        else:
+            candidates.append(("cwd_relative", prefix + segments))
         candidates.append(("root_relative", toolkit_root + segments))
     else:
         # Empty path = CWD itself.
@@ -741,9 +873,32 @@ def _fc_calls_to_patch(
                 raise ValueError("[FC STATE] _fc_add_entry requires non-empty 'name'")
             parent_pointer, parent_node = resolve_logical_path(running, parent_path)
             if not isinstance(parent_node, (dict, list)):
-                raise FileNotFoundError(
-                    f"[FC STATE] _fc_add_entry parent path not found: '{parent_path}'"
+                fallback_path = _collapse_redundant_root_suffix(parent_path)
+                if fallback_path != parent_path:
+                    fallback_pointer, fallback_node = resolve_logical_path(running, fallback_path)
+                    if isinstance(fallback_node, (dict, list)):
+                        logger.debug(
+                            "[FC PATH] repaired duplicated-root path: '%s' -> '%s'",
+                            parent_path,
+                            fallback_path,
+                        )
+                        parent_path = fallback_path
+                        parent_pointer, parent_node = fallback_pointer, fallback_node
+            if not isinstance(parent_node, (dict, list)):
+                logger.warning(
+                    "[FC STATE] _fc_add_entry parent path not found: '%s' (pointer=%s), auto-creating empty object",
+                    parent_path,
+                    parent_pointer,
                 )
+                running = apply_json_patch(
+                    running,
+                    [{"op": "add", "path": parent_pointer, "value": {}}],
+                )
+                parent_pointer, parent_node = resolve_logical_path(running, parent_path)
+                if not isinstance(parent_node, (dict, list)):
+                    raise FileNotFoundError(
+                        f"[FC STATE] _fc_add_entry parent path not found after auto-create: '{parent_path}'"
+                    )
             value_json = args.get("value_json", "{}")
             if isinstance(value_json, str):
                 try:
@@ -888,6 +1043,7 @@ def _update_state_via_fc(
         _FC_SYSTEM_PROMPT,
         model=create_model(state_model, max_tokens=4096, temperature=0.001),
         external_tools=fc_tools,
+        step_timeout=60.0,
     )
 
     # Build user query — identical structure to the freeform path.
@@ -928,6 +1084,23 @@ def _update_state_via_fc(
     info = getattr(state_response, "info", None) or {}
     fc_requests = info.get("external_tool_call_requests") or []
 
+    if required_state_effects:
+        req_names = _extract_fc_request_names(fc_requests)
+        if req_names and all(name == "_fc_no_state_change" for name in req_names):
+            correction = (
+                "CORRECTION: Required state effects were provided for successful calls. "
+                "You MUST realize those effects with concrete domain-state mutations "
+                "(_fc_add_entry/_fc_replace_entry/_fc_move_entry/_fc_remove_entry as appropriate). "
+                "Do NOT use _fc_no_state_change for these calls."
+            )
+            logger.warning(
+                "[FC STATE] Retrying because model returned only _fc_no_state_change "
+                "despite required successful state effects."
+            )
+            state_response = state_agent.step(f"{state_query}\n\n{correction}")
+            info = getattr(state_response, "info", None) or {}
+            fc_requests = info.get("external_tool_call_requests") or []
+
     if not fc_requests:
         raise RuntimeError("[FC STATE] No function-call requests returned by state model")
 
@@ -943,14 +1116,12 @@ def _update_state_via_fc(
         state_result = apply_json_patch(_copy.deepcopy(previous_state), patch_ops)
         logger.info(f"[FC STATE] Applied {len(patch_ops)} patch ops from {len(fc_requests)} tool calls")
     else:
-        req_names: List[str] = []
-        for req in fc_requests:
-            if hasattr(req, "tool_name") and isinstance(req.tool_name, str):
-                req_names.append(req.tool_name)
-            elif isinstance(req, dict):
-                func = req.get("function")
-                if isinstance(func, dict) and isinstance(func.get("name"), str):
-                    req_names.append(func["name"])
+        req_names = _extract_fc_request_names(fc_requests)
+        if required_state_effects and req_names and all(name == "_fc_no_state_change" for name in req_names):
+            raise RuntimeError(
+                "[FC STATE] Required state effects were provided for successful calls, "
+                "but model still returned _fc_no_state_change with no patch ops."
+            )
         if not req_names or not all(name == "_fc_no_state_change" for name in req_names):
             raise RuntimeError(
                 "[FC STATE] Model returned function calls but produced no patch ops "
@@ -1289,6 +1460,7 @@ def bootstrap_state(
     bootstrap_agent = ChatAgent(
         _BOOTSTRAP_SYSTEM_PROMPT,
         model=create_model(state_model, max_tokens=16384, temperature=0.001),
+        step_timeout=60.0,
     )
 
     _t0 = datetime.now()
@@ -1299,8 +1471,7 @@ def bootstrap_state(
     logger.info(f"[BOOTSTRAP] LLM END (elapsed={elapsed:.3f}s)")
 
     response_str = response.msg.content if getattr(response, "msg", None) else "{}"
-    if "</think>" in response_str:
-        response_str = response_str.split("</think>")[-1]
+    response_str = sanitize_llm_json_text(response_str)
 
     payload = json_repair.loads(response_str)
 
@@ -1357,10 +1528,27 @@ def update_state(
     """
     if state_model is None:
         state_model = get_state_model()
+    if state_model is None:
+        logger.info("[STATE UPDATE] state_model is disabled; skipping state update")
+        return previous_state.copy() if isinstance(previous_state, dict) else previous_state
+
+    prepared_calls, skipped_error_calls = _prepare_tool_calls_for_state_update(
+        tool_calls=tool_calls,
+        tool_descriptions=tool_descriptions,
+    )
+    if skipped_error_calls > 0:
+        logger.info(
+            "[STATE UPDATE] Skipped %d error tool calls with no explicit error-state effects",
+            skipped_error_calls,
+        )
+
+    if not prepared_calls:
+        logger.info("[STATE UPDATE] No tool calls eligible for state update; state unchanged")
+        return previous_state.copy() if isinstance(previous_state, dict) else previous_state
 
     return _update_state_via_fc(
         previous_state=previous_state,
-        tool_calls=tool_calls,
+        tool_calls=prepared_calls,
         task=task,
         execution_results=execution_results,
         tool_descriptions=tool_descriptions,
@@ -1414,6 +1602,15 @@ def update_state_from_real_tool(
         logger.warning("No tool calls provided, returning previous state unchanged")
         return previous_state.copy() if isinstance(previous_state, dict) else previous_state
 
+    def _normalize_real_arguments(raw_args: Any) -> Dict[str, Any]:
+        """Normalize real-tool arguments to a flat mapping."""
+        if not isinstance(raw_args, dict):
+            return {}
+        nested = raw_args.get("kwargs")
+        if isinstance(nested, dict):
+            return dict(nested)
+        return dict(raw_args)
+
     # Normalize tool call format (handle 'function' vs 'name', 'args' vs 'arguments')
     formatted_calls = []
     for idx, tc in enumerate(raw_tool_calls):
@@ -1422,10 +1619,18 @@ def update_state_from_real_tool(
             function_name = tc.get('name') or tc.get('function') or tc.get('function_name') or ''
 
             # Extract arguments (support multiple key names)
-            arguments = tc.get('arguments') or tc.get('args') or {}
+            raw_arguments = tc.get('arguments') or tc.get('args') or {}
+            arguments = _normalize_real_arguments(raw_arguments)
+
+            # Recover function name from envelope payload when needed.
+            if not function_name and isinstance(raw_arguments, dict):
+                nested_name = raw_arguments.get("_tool_name")
+                if isinstance(nested_name, str) and nested_name.strip():
+                    function_name = nested_name.strip()
 
             # Extract result
             result = tc.get('result')
+            status, reason = classify_tool_call_status(result)
 
             if not function_name:
                 logger.warning(f"Tool call {idx} missing function name, skipping")
@@ -1434,7 +1639,9 @@ def update_state_from_real_tool(
             formatted_calls.append({
                 'name': function_name,
                 'arguments': arguments,
-                'result': result
+                'result': result,
+                'execution_status': status,
+                'error_reason': reason,
             })
         except Exception as e:
             logger.error(f"Error formatting tool call {idx}: {e}")

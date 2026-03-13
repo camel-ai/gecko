@@ -111,15 +111,25 @@ class SessionHandler:
             
             body = await request.json()
             state = body.get("state")
+            bootstrap_mode = body.get("bootstrap_mode", "auto")
             # Allow empty dict {}, but not None
             if state is None:
                 return JSONResponse(
                     status_code=400,
                     content={"error": "Missing state in request body"}
                 )
+            if bootstrap_mode not in ("auto", "skip", "force"):
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "bootstrap_mode must be one of: auto, skip, force"}
+                )
 
             # Bootstrap runtime_state on first state set
-            enriched_state = self._maybe_bootstrap(session_id, state)
+            enriched_state = self._maybe_bootstrap(
+                session_id=session_id,
+                state=state,
+                bootstrap_mode=bootstrap_mode,
+            )
             self.add_to_state(session_id, enriched_state)
             return JSONResponse(
                 content={
@@ -266,7 +276,7 @@ class SessionHandler:
 
             logger.info("[UPDATE STATE FROM REAL] Received %s tool calls", len(calls_to_process))
 
-            # Use update_state_from_real_tool directly for batch efficiency
+            # Use update_state_from_real_tool directly for batch efficiency.
             try:
                 from ..utils.config_updater import update_state_from_real_tool
                 from ..utils.global_config import get_state_model
@@ -283,7 +293,19 @@ class SessionHandler:
                     list(updated_state.keys()) if isinstance(updated_state, dict) else type(updated_state),
                 )
             except Exception as e:
-                logger.exception("Failed to update state from real tools: %s", e)
+                tool_names = []
+                for tc in calls_to_process:
+                    if isinstance(tc, dict):
+                        tool_names.append(str(tc.get("name")))
+                    else:
+                        tool_names.append(type(tc).__name__)
+                logger.exception(
+                    "Failed to update state from real tools (session=%s, calls=%d, tool_names=%s): %s",
+                    session_id,
+                    len(calls_to_process),
+                    tool_names,
+                    e,
+                )
                 raise HTTPException(status_code=500, detail=f"State update failed: {str(e)}")
 
             # Optional: Record real tool calls in history for debugging
@@ -349,7 +371,12 @@ class SessionHandler:
         )
         conn.commit()
     
-    def _maybe_bootstrap(self, session_id: str, state: Dict[str, Any]) -> Dict[str, Any]:
+    def _maybe_bootstrap(
+        self,
+        session_id: str,
+        state: Dict[str, Any],
+        bootstrap_mode: str = "auto",
+    ) -> Dict[str, Any]:
         """Bootstrap runtime_state on first state set for a session.
 
         If the session has no prior state entries, uses LLM to infer runtime
@@ -357,10 +384,40 @@ class SessionHandler:
         definitions and the initial state. Returns the enriched state
         or the original state if bootstrap is skipped/fails.
         """
-        # Only bootstrap on first state set (empty state list).
-        existing = self.get_session_state(session_id)
-        if existing:
+        mode = str(bootstrap_mode or "auto").lower()
+        if mode not in {"auto", "skip", "force"}:
+            logger.warning(
+                "[BOOTSTRAP] Invalid bootstrap_mode=%s for session %s, fallback to auto",
+                bootstrap_mode,
+                session_id,
+            )
+            mode = "auto"
+
+        if mode == "skip":
+            logger.info("[BOOTSTRAP] bootstrap_mode=skip for session %s", session_id)
             return state
+
+        # Only bootstrap on first state set (empty state list), unless force mode.
+        existing = self.get_session_state(session_id)
+        if existing and mode != "force":
+            return state
+
+        if mode == "auto":
+            # If caller already provides runtime context, treat it as authoritative.
+            # This covers states produced by Gecko itself in previous turns/sessions.
+            runtime_state = state.get("runtime_state") if isinstance(state, dict) else None
+            if isinstance(runtime_state, dict):
+                nested_toolkits = runtime_state.get("toolkits")
+                has_nested_runtime = isinstance(nested_toolkits, dict) and bool(nested_toolkits)
+                has_flat_runtime = any(
+                    k != "toolkits" for k in runtime_state.keys()
+                )
+                if has_nested_runtime or has_flat_runtime:
+                    logger.info(
+                        "[BOOTSTRAP] Runtime state already present for session %s, skipping bootstrap",
+                        session_id,
+                    )
+                    return state
 
         # Need schemas to extract toolkit summaries
         schema_loader = get_global_schema_loader()

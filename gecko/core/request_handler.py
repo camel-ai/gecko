@@ -13,7 +13,7 @@ class RequestHandler:
     """Handles the processing of incoming requests and generation of responses."""
     
     def __init__(self, schema: Dict[str, Any],
-                 response_model: str = "gpt-5-mini", state_model: str = "gpt-5-mini", validation_model: str = "gpt-5-mini"):
+                 response_model: str = "gpt-4.1-mini", state_model: str = "gpt-4.1-mini", validation_model: str = "gpt-4.1-mini"):
         """Initialize the request handler with an OpenAPI schema.
         Args:
             schema: Loaded OpenAPI schema
@@ -23,7 +23,11 @@ class RequestHandler:
         """
         self.schema = schema
         self.validator = RequestValidator(schema, validation_model=validation_model)
-        self.response_generator = ResponseGenerator(response_model=response_model, state_model=state_model)
+        self.response_generator = ResponseGenerator(
+            response_model=response_model,
+            state_model=state_model,
+            validation_model=validation_model,
+        )
         self.response_validator = ResponseValidator(schema)
     
     async def handle_request(self, request: Request, matching_path: str, operation: Dict[str, Any], api_name: str) -> JSONResponse:

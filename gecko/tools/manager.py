@@ -1,5 +1,3 @@
-"""Tool schema loader and lightweight function execution facade."""
-
 from __future__ import annotations
 
 import json

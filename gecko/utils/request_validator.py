@@ -11,11 +11,11 @@ import re
 class RequestValidator:
     """Validates requests against OpenAPI schemas using openapi_core."""
     
-    def __init__(self, schema: Dict[str, Any], validation_model: str = "gpt-5-mini"):
+    def __init__(self, schema: Dict[str, Any], validation_model: str = "gpt-4.1-mini"):
         """Initialize the validator with an OpenAPI schema.
         Args:
             schema: OpenAPI schema dict
-            validation_model: LLM model for request validation (default: gpt-5-mini)
+            validation_model: LLM model for request validation (default: gpt-4.1-mini)
         """
         self.schema = schema
         self.validation_model = validation_model
@@ -310,36 +310,32 @@ class RequestValidator:
                 if request_body:
                     args.update(request_body)
             
-            # Only collect schemas for parameters that are actually in the args
+            # Collect full schema-visible parameters (not only args-present fields)
+            # so semantic validation can detect misplaced information.
             params_schema = []
-            param_names_in_args = set(args.keys())
             
             # Process query, path, header, cookie parameters
             for param in operation.get("parameters", []):
                 if param.get("deprecated", False):
                     continue
                 name = param["name"]
-                # Only include if the parameter is in args
-                if name in param_names_in_args:
-                    desc = param.get("description", "")
-                    location = param["in"]
-                    param_schema = param.get("schema", {})
-                    param_schema["name"] = f"{name}"
-                    param_schema["description"] = desc or f"{name} in {location}"
-                    params_schema.append(param_schema)
+                desc = param.get("description", "")
+                location = param["in"]
+                param_schema = copy.deepcopy(param.get("schema", {}))
+                param_schema["name"] = f"{name}"
+                param_schema["description"] = desc or f"{name} in {location}"
+                params_schema.append(param_schema)
 
             # Process request body parameters if they exist
-            if "requestBody" in operation and request_body:
+            if "requestBody" in operation:
                 body_content = operation["requestBody"].get("content", {})
                 json_schema = body_content.get("application/json", {}).get("schema", {})
                 if "properties" in json_schema:
                     for k, v in json_schema["properties"].items():
-                        # Only include if the parameter is in args (from request body)
-                        if k in param_names_in_args:
-                            param_schema = copy.deepcopy(v)
-                            param_schema["name"] = k
-                            param_schema["description"] = v.get("description", f"Field {k} in request body")
-                            params_schema.append(param_schema)
+                        param_schema = copy.deepcopy(v)
+                        param_schema["name"] = k
+                        param_schema["description"] = v.get("description", f"Field {k} in request body")
+                        params_schema.append(param_schema)
 
             # Validate only schema-defined parameters and ignore extra fields.
             schema_param_names = {param.get("name") for param in params_schema}
@@ -375,7 +371,7 @@ def validate_params(
     args: Dict,
     temperature: float = 0.001,
     session_id: Optional[str] = None,
-    validation_model: str = "gpt-5-mini"
+    validation_model: str = "gpt-4.1-mini"
 ) -> Tuple[bool, str]:
     validate_params_prompt = """
 Please validate the given function call arguments against their parameter schemas.
@@ -389,16 +385,19 @@ Please validate the given function call arguments against their parameter schema
 2. **Semantic Checks**  
    - Validate according to the parameter description, examples, enums, or format requirements.  
    - If examples are provided (e.g. "full-time, part-time"), treat them as semantic categories. Any value in the same category (e.g. "internship", "contract") is valid.  
-   - If the description specifies a format (e.g. `YYYY-MM-DD`), enforce that exact pattern.  
+   - If the description specifies a format (e.g. `YYYY-MM-DD`), enforce that exact pattern. However, if the argument is 'format', any format that matches the semantic meaning is valid (e.g. `format` in date tools can be `YYYY-MM-DD` or `YYYY`). 
    - Use common sense to ensure values are within a reasonable range (e.g. interest rate ∈ [0,1]; clock hour ∈ [0,12]).  
    - Detect redundant/overlapping information across arguments (e.g. `item="large pizza"` and `size="large"` → overlap).  
-   - Do NOT reject arguments based on dynamic runtime-state predicates that are not provided in args (e.g., "must exist in user_map", "must be logged in", "record must already exist"). Those are checked during tool execution, not request-shape validation.  
-   - If uncertain about validity, default to considering the argument valid.
+   - Do NOT reject arguments based on dynamic runtime-state predicates that are not provided in args (e.g., "must exist in user_map", "must be logged in", "record must already exist"). Those are checked during tool execution, not request-shape validation.
+   - **Mandatory misplacement rule (hard fail)**: For free-form fields, if text contains semantics that belong to another dedicated structured parameter in schema, and that parameter is missing/empty in args, you MUST mark invalid.
+   - **Uncertainty policy (strict)**: "Default to valid when uncertain" applies ONLY when no dedicated structured parameter can represent the detected semantics. If such a parameter exists, do NOT default to valid.
 
 3. **Error Messages**  
    - Concise, precise, and human-readable.  
    - Do not include or suggest correct values.  
    - Only state which argument is invalid and why.
+   - For semantic misplacement, use this template:
+     `"<free_form_arg> contains semantics that must be provided via <structured_arg>; semantic misplacement."`
 
 **Output Format**:
 ```
@@ -414,12 +413,24 @@ valid=\<true|false> error\_message="\<if false, list each invalid argument and r
   `{"location": "London", "date": "01/01/2024"}`
 - **Output**  
   `valid=false error_message="location not in required format (should include city and country); date not in required format (YYYY-MM-DD)"`
+
+**Few-shot (semantic misplacement)**:
+- **params_schema**
+  `[{"name":"text","type":"string","description":"Free-form message body."},{"name":"labels","type":"array","description":"List of labels prefixed with #."}]`
+- **args**
+  `{"text":"release update #urgent"}`
+- **Output**
+  `valid=false error_message="text contains semantics that must be provided via labels; semantic misplacement."`
 """
  
     # Use create_model utility for all models
     from utils.model_utils import create_model as create_camel_model
     model = create_camel_model(validation_model, max_tokens=16384, temperature=temperature)
-    validate_params_assistant = ChatAgent(validate_params_prompt, model=model)
+    validate_params_assistant = ChatAgent(
+        validate_params_prompt,
+        model=model,
+        step_timeout=60.0,
+    )
     # Compose message using JSON only (no braces-escaping needed)
     message_payload = {
         "params_schema": params_schema,

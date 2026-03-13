@@ -1,5 +1,3 @@
-"""Utilities for config transformation, validation, and comparison."""
-
 from __future__ import annotations
 
 import logging

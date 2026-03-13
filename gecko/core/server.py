@@ -14,16 +14,16 @@ class GeckoServer:
     def __init__(
         self,
         schemas_dir: str = "data/openapi",
-        response_model: str = "gpt-5-mini",
-        state_model: str = "gpt-5-mini",
-        validation_model: str = "gpt-5-mini",
+        response_model: str = "gpt-4.1-mini",
+        state_model: str = "gpt-4.1-mini",
+        validation_model: str = "gpt-4.1-mini",
     ):
         """Initialize Gecko with a directory containing OpenAPI schemas.
         Args:
             schemas_dir: Directory containing OpenAPI schemas
-            response_model: LLM model for response generation (default: gpt-5-mini)
-            state_model: LLM model for state update (default: gpt-5-mini)
-            validation_model: LLM model for request validation (default: gpt-5-mini)
+            response_model: LLM model for response generation (default: gpt-4.1-mini)
+            state_model: LLM model for state update (default: gpt-4.1-mini)
+            validation_model: LLM model for request validation (default: gpt-4.1-mini)
         """
         self.app = FastAPI()
         # Support providing multiple schema roots via list (from state/CLI settings).

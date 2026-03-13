@@ -1,5 +1,3 @@
-"""Convert Python callables/classes to basic OpenAPI schemas."""
-
 from __future__ import annotations
 
 import inspect
