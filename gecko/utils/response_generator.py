@@ -28,12 +28,12 @@ You are an API simulation engine that generates JSON responses strictly followin
 CORE PRINCIPLES (in priority order):
 
 **1. MANDATORY Brevity — Hard Output Limit** — This is a simulation, not a real service.
-  - Every string value: at most 15 characters. No exceptions.
+  - Every string value: at most 200 characters. No exceptions.
   - Biological sequences (DNA, RNA, protein, amino acids): always return exactly a short sample like "ATCGATCGATCG" or "MVLSPADKTN" regardless of requested length.
   - Any other generated blob (code, logs, text, documents, binary): return a very short placeholder.
-  - **Arrays/lists: return exactly 2 items maximum, even if the schema says "length = N years", "one per year", "one per item", or similar. You are simulating, not producing real data. Ignore any array length hints in descriptions.**
+  - **Arrays/lists: return exactly 10 items maximum, even if the schema says "length = N years", "one per year", "one per item", or similar. You are simulating, not producing real data. Ignore any array length hints in descriptions.**
   - For numeric metadata fields that describe size (length, count, sequence_length, etc.): set them to the value the REQUEST asked for, NOT the length of your truncated output.
-  - NEVER expand content to match a requested length/count. The request may say length=500 or years=20 — you still output at most 2 array items and at most 15 characters per string.
+  - NEVER expand content to match a requested length/count. The request may say length=500 or years=20 — you still output at most 10 array items and at most 200 characters per string.
 
 **2. Schema Adherence** — Match the schema exactly (structure, names, types, formats, required fields).
 
@@ -111,6 +111,11 @@ Key principles:
 - Always specify if collections/directories are EMPTY or list their contents
 - Include any constraints or validation rules from the operation description
 - Focus on what EXISTS vs what DOESN'T EXIST in the relevant scope
+- **Validation Rule Semantics** — Each validation_rule in x-default-state has a "condition" and a "result".
+  The "condition" is an ERROR TRIGGER: when the condition evaluates to TRUE, the operation MUST FAIL with the error in "result".
+  Example: {"condition": "not (file_name in self._current_dir.contents)", "result": {"error": "No such file"}}
+  means: IF file_name does NOT exist in current directory → the operation FAILS with "No such file".
+  Evaluate each validation rule against the current state and request parameters. Clearly state whether each error condition is triggered.
 
 Output format:
 ## Relevant System State
@@ -118,6 +123,9 @@ Output format:
 
 ## Operation Constraints
 [Any constraints or rules from the operation description and whether they are satisfied by the current state]
+
+## Validation Rule Evaluation
+[For each validation_rule, state: the condition, whether it is TRUE or FALSE given current state, and the consequence]
 
 Be thorough but concise. Extract ONLY what's needed for this specific operation.
 """
@@ -153,7 +161,8 @@ class ResponseGenerator:
                 + "\n\n"
                 + STATE_FOLLOWING_SYSTEM_PROMPT.strip()
             )
-        self.response_timeout_seconds = 60.0
+        from .global_config import get_response_timeout
+        self.response_timeout_seconds = get_response_timeout()
 
     @staticmethod
     def extract_toolkit_runtime_state(config: Dict[str, Any], schema: Dict[str, Any]) -> Dict[str, Any]:
@@ -330,6 +339,14 @@ class ResponseGenerator:
         if not isinstance(defaults, dict) or not defaults:
             return current_state
 
+        # Collect runtime_state values for this toolkit (may have better
+        # bootstrap-inferred values than raw schema defaults).
+        runtime_toolkit = (
+            current_state.get("runtime_state", {})
+            .get("toolkits", {})
+            .get(toolkit_name, {})
+        )
+
         existing = current_state.get(toolkit_name)
         if isinstance(existing, dict):
             merged = deepcopy(current_state)
@@ -339,7 +356,13 @@ class ResponseGenerator:
                 return merged
             for key, value in defaults.items():
                 if key not in toolkit_state:
-                    toolkit_state[key] = deepcopy(value)
+                    # Prefer runtime_state value over raw default when available
+                    if isinstance(runtime_toolkit, dict) and key in runtime_toolkit:
+                        toolkit_state[key] = deepcopy(runtime_toolkit[key])
+                    else:
+                        toolkit_state[key] = deepcopy(value)
+            # Recompute derived fields from actual state
+            self._recompute_derived_fields(toolkit_state, defaults)
             return merged
 
         merged = deepcopy(current_state)
@@ -349,6 +372,29 @@ class ResponseGenerator:
             toolkit_name,
         )
         return merged
+
+    @staticmethod
+    def _recompute_derived_fields(
+        toolkit_state: Dict[str, Any],
+        defaults: Dict[str, Any],
+    ) -> None:
+        door_status = toolkit_state.get("doorStatus")
+        if (
+            isinstance(door_status, dict)
+            and "remainingUnlockedDoors" in toolkit_state
+            and "remainingUnlockedDoors" in defaults
+        ):
+            unlocked = sum(
+                1 for s in door_status.values()
+                if isinstance(s, str) and s != "locked"
+            )
+            if toolkit_state["remainingUnlockedDoors"] != unlocked:
+                logger.debug(
+                    "[MATERIALIZE] Recomputed remainingUnlockedDoors: %d -> %d",
+                    toolkit_state["remainingUnlockedDoors"],
+                    unlocked,
+                )
+                toolkit_state["remainingUnlockedDoors"] = unlocked
 
     @staticmethod
     def _format_schema_default_state(schema_default_state: Dict[str, Any]) -> str:
@@ -567,7 +613,6 @@ IMPORTANT: You will receive the relevant system state in the user message. Base 
 {json.dumps(resolved_schema, indent=2)}
 
 Return a pure JSON object matching the response schema above.
-REMEMBER: strings ≤15 chars, arrays ≤2 items. Ignore any "length = N" hints in descriptions. Put the requested size in numeric metadata fields only.
 """
 
     def _call_response_llm(

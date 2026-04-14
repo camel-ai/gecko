@@ -45,6 +45,7 @@ class TaskFeedback:
         system_prompt: Optional[str] = None,
         base_checklist_items: Optional[List[str]] = None,
         checklist_system_prompt: Optional[str] = None,
+        timeout: Optional[float] = None,
     ):
         """
         Initialize TaskFeedback
@@ -56,10 +57,13 @@ class TaskFeedback:
                                  If None, uses default standard checks.
                                  If [], no base items are added.
                                  If list of strings, uses those as base items.
+            timeout: Step timeout in seconds for all internal LLM agents. Defaults to
+                     CAMEL's built-in default (180s) when None.
         """
         self.model_name = model_name
         self.custom_system_prompt = system_prompt
         self.custom_checklist_prompt = checklist_system_prompt
+        self.agent_timeout: float = float(timeout) if timeout is not None else 300.0
 
         # Set base checklist items (default to standard checks for backward compatibility)
         if base_checklist_items is None:
@@ -111,8 +115,8 @@ class TaskFeedback:
                 "output_tokens": 0,
                 "total_tokens": 0,
             }
-            model = create_model(self.model_name, max_tokens=16384, temperature=0.1)
-            agent = ChatAgent(prompt, model=model)
+            model = create_model(self.model_name, max_tokens=16384, temperature=0.01, timeout=self.agent_timeout)
+            agent = ChatAgent(prompt, model=model, step_timeout=self.agent_timeout)
 
             _t0 = datetime.now()
             # print(f"[TIME] TaskFeedback Checklist LLM START { _t0.strftime('%H:%M:%S') } (model={self.model_name})")
@@ -285,11 +289,9 @@ class TaskFeedback:
         Returns:
             Checklist with base items appended
         """
-        # If the generator returned no items, treat this as "no actionable request"
-        # (e.g., user says "thank you"). In that case we should NOT append base
-        # checklist items, so that downstream evaluation can completely skip the
-        # judge for this turn.
         if not checklist:
+            if self.base_checklist_items:
+                return [{"description": desc} for desc in self.base_checklist_items]
             return []
 
         # Create a copy to avoid modifying the original
@@ -354,8 +356,8 @@ Policy text:
 """.strip()
 
         try:
-            model = create_model(self.model_name, max_tokens=4096, temperature=0.01)
-            agent = ChatAgent(prompt, model=model)
+            model = create_model(self.model_name, max_tokens=4096, temperature=0.01, timeout=self.agent_timeout)
+            agent = ChatAgent(prompt, model=model, step_timeout=self.agent_timeout)
             response = agent.step("Extract the policy excerpt now.")
             if not response or not getattr(response, "msg", None) or not getattr(response.msg, "content", ""):
                 raise RuntimeError("Policy extractor returned empty response")
@@ -920,9 +922,11 @@ OUTPUT FORMAT (JSON only, no extra text):
                 tools = [FunctionTool(memory_store.get_memory)]
             agent = ChatAgent(
                 prompt,
-                model=create_model(self.model_name, max_tokens=16384),
+                model=create_model(self.model_name, max_tokens=16384, timeout=self.agent_timeout),
                 tools=tools,
                 max_iteration=25,
+                step_timeout=self.agent_timeout,
+                tool_execution_timeout=self.agent_timeout,
             )
             _jt0 = datetime.now()
             attempt_str = f" [Attempt {attempt}]" if attempt is not None else ""
@@ -1115,7 +1119,7 @@ OUTPUT FORMAT (JSON only, no extra text):
             "judgment_results": judgment_results,
             "critical_responses": critical_responses,
             "score": score,
-            "passed": score >= 0.8  # Consider task passed if score >= 0.8
+            "passed": score >= 1.0
         }
     
  

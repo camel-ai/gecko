@@ -31,7 +31,7 @@ def main() -> None:
         default="data/openapi",
         help="Directory containing OpenAPI schemas",
     )
-    parser.add_argument("--workers", type=int, default=1, help="Number of worker processes")
+    parser.add_argument("--workers", type=int, default=15, help="Number of worker processes")
     parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to bind to")
     parser.add_argument("--port", type=int, default=8000, help="Port to bind to")
     parser.add_argument(
@@ -52,6 +52,18 @@ def main() -> None:
         default="gpt-4.1-mini",
         help="LLM model for request validation (default: gpt-4.1-mini)",
     )
+    parser.add_argument(
+        "--response-timeout",
+        type=float,
+        default=240.0,
+        help="Timeout in seconds for LLM response generation (default: 180)",
+    )
+    parser.add_argument(
+        "--agent-timeout",
+        type=float,
+        default=300.0,
+        help="Timeout in seconds for internal LLM agents (validator, state updater)",
+    )
 
     args = parser.parse_args()
 
@@ -65,6 +77,9 @@ def main() -> None:
     if args.workers > 1:
         with open("app_module.py", "w", encoding="utf-8") as f:
             f.write(
+                "from gecko.utils.global_config import set_response_timeout, set_agent_timeout\n"
+                f"set_response_timeout({args.response_timeout!r})\n"
+                f"set_agent_timeout({args.agent_timeout!r})\n"
                 "from gecko import GeckoServer\n"
                 "app = GeckoServer(\n"
                 f"    schemas_dir={args.schemas_dir!r},\n"
@@ -75,6 +90,10 @@ def main() -> None:
             )
         uvicorn.run("app_module:app", host=args.host, port=args.port, workers=args.workers)
         return
+
+    from gecko.utils.global_config import set_response_timeout, set_agent_timeout
+    set_response_timeout(args.response_timeout)
+    set_agent_timeout(args.agent_timeout)
 
     from gecko import GeckoServer
 

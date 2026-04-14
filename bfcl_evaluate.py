@@ -179,6 +179,37 @@ def load_model_results(result_file: str) -> Tuple[List[Dict], Optional[str]]:
     return results, model_name
 
 
+IRRELEVANCE_CATEGORIES = {"irrelevance", "live_irrelevance", "live_relevance"}
+
+
+def evaluate_irrelevance_result(result: Dict) -> Dict:
+    """Evaluate an irrelevance/relevance task.
+
+    Correct behaviour: agent makes NO tool calls (result == []).
+    Any non-empty tool call list is a failure.
+    """
+    test_id = result.get("id", "unknown")
+    model_output = result.get("result", result.get("response", []))
+
+    if isinstance(model_output, str):
+        try:
+            model_output = json.loads(model_output) if model_output else []
+        except Exception:
+            model_output = []
+
+    # Correct iff the tool-call list is empty
+    is_empty = isinstance(model_output, list) and len(model_output) == 0
+    error_msg = None if is_empty else "Agent made tool calls but should have abstained."
+    return {
+        "id": test_id,
+        "correct": is_empty,
+        "error": error_msg,
+        "error_type": None if is_empty else "irrelevance:unexpected_tool_call",
+        "model_output": model_output,
+        "ground_truth": [],
+    }
+
+
 def evaluate_single_turn_result(result: Dict, test_case: Dict, ground_truth: Dict, 
                                category: str, model_name: str = "unknown") -> Dict:
     """
@@ -507,45 +538,50 @@ def evaluate_category(result_file: str, category: str,
     
     if not ground_truths:
         print(f"  ⚠️  No ground truth available for {category}")
-        return {
-            "category": category,
-            "total": len(results),
-            "evaluated": 0,
-            "correct": 0,
-            "accuracy": 0.0,
-            "message": "No ground truth available"
-        }
-    
+        if category not in IRRELEVANCE_CATEGORIES:
+            return {
+                "category": category,
+                "total": len(results),
+                "evaluated": 0,
+                "correct": 0,
+                "accuracy": 0.0,
+                "message": "No ground truth available"
+            }
+        # Irrelevance categories have no GT file — evaluate by empty-output rule below.
+
     # Evaluate each result
     evaluation_results = []
     error_cases = []
     correct = 0
     total = 0
-    
+
     for result in results:
         test_id = result.get("id", "unknown")
-        
-        # Skip if no ground truth
-        if test_id not in ground_truths:
-            continue
-        
-        ground_truth = ground_truths[test_id]
-        test_case = test_cases.get(test_id, {})
-        
-        # Choose evaluation method based on category
-        if category in MULTI_TURN_CATEGORIES:
-            eval_result = evaluate_multi_turn_result(
-                result, test_case, ground_truth, category, model_name
-            )
+
+        # Irrelevance categories: no GT needed, evaluate directly
+        if category in IRRELEVANCE_CATEGORIES:
+            eval_result = evaluate_irrelevance_result(result)
         else:
-            eval_result = evaluate_single_turn_result(
-                result, test_case, ground_truth, category, model_name
-            )
-        
-        # Add model output and ground truth to eval result for error cases
-        # Keep the original format without double-encoding
-        eval_result["model_output"] = result.get("result", [])
-        eval_result["ground_truth"] = ground_truth.get("ground_truth", ground_truth.get("result", []))
+            # Skip if no ground truth
+            if test_id not in ground_truths:
+                continue
+
+            ground_truth = ground_truths[test_id]
+            test_case = test_cases.get(test_id, {})
+
+            # Choose evaluation method based on category
+            if category in MULTI_TURN_CATEGORIES:
+                eval_result = evaluate_multi_turn_result(
+                    result, test_case, ground_truth, category, model_name
+                )
+            else:
+                eval_result = evaluate_single_turn_result(
+                    result, test_case, ground_truth, category, model_name
+                )
+
+            # Attach raw model output and ground truth for error display
+            eval_result["model_output"] = result.get("result", [])
+            eval_result["ground_truth"] = ground_truth.get("ground_truth", ground_truth.get("result", []))
         
         evaluation_results.append(eval_result)
         total += 1

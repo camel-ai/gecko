@@ -59,13 +59,14 @@ class RouteMatcher:
         """
         import os
 
-        # Get all schema files from the schema directories
+        # Get all schema files from the schema directories (recursive)
         schema_files = []
         for schema_dir in self.schema_loader.schema_dirs:
             if os.path.exists(schema_dir) and os.path.isdir(schema_dir):
-                for filename in os.listdir(schema_dir):
-                    if filename.endswith(('.json', '.yaml', '.yml')):
-                        schema_files.append(os.path.join(schema_dir, filename))
+                for dirpath, _dirnames, filenames in os.walk(schema_dir):
+                    for filename in filenames:
+                        if filename.endswith(('.json', '.yaml', '.yml')):
+                            schema_files.append(os.path.join(dirpath, filename))
 
         # Search each schema for the path
         for schema_file in schema_files:
@@ -270,24 +271,25 @@ class RouteMatcher:
         if schema_path:
             return self.schema_loader.load_schema(schema_path)
 
-        # Method 2: Search all schemas for matching title
+        # Method 2: Search all schemas for matching title (recursive)
         for schema_dir in self.schema_loader.schema_dirs:
             if not os.path.exists(schema_dir) or not os.path.isdir(schema_dir):
                 continue
 
-            for filename in os.listdir(schema_dir):
-                if not filename.endswith(('.json', '.yaml', '.yml')):
-                    continue
+            for dirpath, _dirnames, filenames in os.walk(schema_dir):
+                for filename in filenames:
+                    if not filename.endswith(('.json', '.yaml', '.yml')):
+                        continue
 
-                try:
-                    schema_file = os.path.join(schema_dir, filename)
-                    schema = self.schema_loader.load_schema(schema_file)
-                    schema_title = schema.get('info', {}).get('title', '')
+                    try:
+                        schema_file = os.path.join(dirpath, filename)
+                        schema = self.schema_loader.load_schema(schema_file)
+                        schema_title = schema.get('info', {}).get('title', '')
 
-                    # Match by title (case-insensitive for flexibility)
-                    if schema_title.lower() == api_name.lower():
-                        return schema
-                except Exception:
-                    continue
+                        # Match by title (case-insensitive for flexibility)
+                        if schema_title.lower() == api_name.lower():
+                            return schema
+                    except Exception:
+                        continue
 
         return None 

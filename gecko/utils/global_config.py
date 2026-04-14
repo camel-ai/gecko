@@ -3,6 +3,8 @@ from typing import Optional
 _state_model: Optional[str] = None
 _response_model: Optional[str] = None
 _validation_model: Optional[str] = None
+_response_timeout: float = 300.0
+_agent_timeout: float = 360.0
 _STATE_MODEL_DISABLED = "__STATE_MODEL_DISABLED__"
 
 
@@ -60,9 +62,33 @@ def get_validation_model() -> str:
     return _validation_model or "gpt-4.1-mini"
 
 
+def set_response_timeout(timeout: float) -> None:
+    """Set global response timeout in seconds."""
+    global _response_timeout
+    _response_timeout = timeout
+
+
+def get_response_timeout() -> float:
+    """Get global response timeout in seconds."""
+    return _response_timeout
+
+
+def set_agent_timeout(timeout: float) -> None:
+    """Set global agent step timeout in seconds (used by internal LLM agents)."""
+    global _agent_timeout
+    _agent_timeout = timeout
+
+
+def get_agent_timeout() -> float:
+    """Get global agent step timeout in seconds."""
+    return _agent_timeout
+
+
 def reset_model_config() -> None:
     """Reset global model configuration."""
-    global _state_model, _response_model, _validation_model
+    global _state_model, _response_model, _validation_model, _response_timeout, _agent_timeout
     _state_model = None
     _response_model = None
     _validation_model = None
+    _response_timeout = 300.0
+    _agent_timeout = 360.0

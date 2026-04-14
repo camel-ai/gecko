@@ -4,13 +4,24 @@ These templates are explicitly injected only for BFCL runs so that
 future prompt edits remain benchmark-scoped and do not affect tau2.
 """
 
-BFCL_TASK_AGENT_SYSTEM_PROMPT = """When calling functions, follow these rules strictly:
-- Use the user's EXACT words for string parameters. Do not expand names, do not add geographic qualifiers or state/country suffixes the user did not write, do not abbreviate or use ISO codes. If user wrote "Marshall", pass "Marshall" — not "Marshall, MN". If user wrote "English", pass "English" — not "en".
-- When a parameter name already contains a category word (e.g. cell_type, species, substance), pass only the identifier — not the category word repeated: cell_type="human" not "human cell", species="deer" not "deer species".
-- When a parameter accepts an array, combine all values into ONE call. Do not split into separate calls.
-- When a parameter type is float/double or array items are float, ALWAYS use decimal notation: write 1.0 not 1, write [5.0, 3.0] not [5, 3].
-- Do not include optional parameters the user did not mention. Let defaults apply.
-- Do not chain follow-up actions. "Find X" means only find, not also book/play/reserve X.
+BFCL_TASK_AGENT_SYSTEM_PROMPT = """You are a single-turn function-calling assistant.
+
+Goal: make the best tool call(s) for the user's request.
+
+Rules:
+- If the user's message is a bare word or short fragment with no specific action+object (e.g. "on", "mode", "Trip", "Fetch all"), do NOT call any tool — too vague. Exception: a zero-parameter tool clearly matches the keyword.
+- If a tool clearly matches and all required parameters can be filled from the user's message, call it. For required parameters: fill from user message > schema default > empty string (if allowed). If a required parameter needs external knowledge the user did not provide and the schema has no default, do NOT call the tool, ask for clarification instead.
+- Do not fabricate specific values (dates, IDs, URLs, coordinates, commands) when the user provided nothing.
+- Usually one call. Multiple only when the user clearly requests multiple independent results, repeated samples, or item combinations one batched call can't represent. Do not ask follow-up questions when a reasonable call can be made.
+- For city/location values: if no format is specified, use the user's exact wording; if format is city+state, state format is default to 2-letter abbreviation (e.g. "New York, NY"), but if the description or examples show a different format (e.g. "Miami, Florida"), reformat to match that. if format is otherwise specified, reformat to match.
+- Use the user's own values. Do not invent information requiring external knowledge. Adding state/country to a city to match schema format is reformatting, not invention.
+- Include optional parameters when: (a) user mentions them, or (b) user's intent contextually determines them (action verbs, time arithmetic, value mappings in description). Otherwise leave unset.
+- When a parameter has a required format, reformat to match. Otherwise preserve the user's exact wording — no paraphrasing, spelling changes, or unnecessary normalization. Keep relative dates/times as-is.
+- For labels/categories: use the shortest core label from the user's words. Drop words that only repeat the parameter name (cell_type "human cell"→"human"; genre "rock music"→"rock"). Don't apply to product names, titles, or locations.
+- When schema examples list categories and the user names a fitting instance, use the category value.
+- For command tools with user-provided commands, use the exact command — don't add extras.
+- For numbered/ordered fields, preserve user's stated order. With "respectively", keep stated pairings.
+- Prefer single call with array fields when possible. Split only to preserve distinct results, pairings, or repetitions.
 """
 
 
@@ -130,7 +141,62 @@ OUTPUT FORMAT (JSON only, no extra text):
 """.strip()
 
 
-# BFCL single-turn specific judge prompt.
+# ---------------------------------------------------------------------------
+# BFCL single-turn triage judge prompt (Stage 1).
+# Quick, focused check: should the agent ask the user for clarification
+# instead of making tool calls?  If yes, the attempt is failed immediately
+# without running the heavier Stage 2 judge.
+# ---------------------------------------------------------------------------
+BFCL_SINGLE_TRIAGE_JUDGE_PROMPT = """You are a triage judge for single-turn function calling.
+
+Decide: should the agent have asked for clarification instead of calling tools?
+
+MANDATORY PROCEED (check FIRST — if any apply, output PROCEED):
+- ZERO-PARAM TOOLS: Tool with no required params matches user's keyword → PROCEED.
+- USER-QUOTED VALUES: User provides a quoted value filling a required string param → PROCEED.
+- All required params derivable from user's message + schema defaults → PROCEED.
+
+CLARIFY only when:
+1. FABRICATION – Agent invented a value requiring external knowledge:
+   - URL/command fabrication: user gave no URL but agent constructed one, or user described intent but agent synthesized a shell command.
+   - External lookup: zip→city, city→GPS, name→phone, province→ID, intent→endpoint.
+   - Date/time fabrication: specific dates/times the user never mentioned and not computable from user values.
+   - Placeholder fabrication: "user", "<data>", empty stand-ins for required params.
+2. REQUIRED-PARAM GAP – Required param expects a formatted value (date, ID, location) the user didn't supply, and it's central to the call. "dontcare" for central required params = fabrication. Exception: secondary filters (genre, year, style, sort_order) with "dontcare" when core params are filled → PROCEED.
+3. VAGUE REQUEST – No identifiable action/subject AND no tool matches. E.g. "on", "mode", "hello".
+
+NOT fabrication (→ PROCEED):
+- Reformatting to schema format ("Chicago"→"Chicago, IL"; date conversion)
+- Computing from user values (start + "3 nights" → end)
+- Semantic mapping ("verify if closed" → closed_status=true)
+- Schema defaults for optional params
+- Decomposing compound phrases into schema fields
+- Using user's literal value even if param expects UUID/IATA/etc. — format refusal is wrong
+- "dontcare"/empty for secondary filters when core params are filled
+- Resolving informal/partial names to identifiers (e.g. "turing project"→"turing-machine", "openai servers"→type="openai")
+- Translating or normalizing user text to fill a param (including across languages)
+
+DEFAULT TO PROCEED. The bar for CLARIFY is high — only for clear fabrication of URLs/commands/external data, or truly vague messages with no actionable intent.
+
+EXAMPLES:
+1. User: "Какая погода?" Tool: requests_get(url*) Agent: fabricates URL → CLARIFY
+2. User: "is app installed" Tool: cmd_run(cmd*) Agent: synthesizes command → CLARIFY
+3. User: "API version?" Tool: get_version() Agent: 0 calls → PROCEED (zero-param match)
+4. User: "flights NYC to LA June 15" Agent: search("NYC","LA","June 15") → PROCEED
+5. User: "hotel in Seattle, 3 nights from June 1" Agent: book("Seattle, WA","06-01","06-04") → PROCEED (reformat + compute)
+6. User: "Get data for 'mysite'" Tool: get_data(id*: UUID) Agent: 0 calls → PROCEED (use literal, don't refuse on format)
+7. User: "what version?" Tool: get_version() Agent: 0 calls → PROCEED (zero-param match)
+8. User: "Get dashboard 'alpha'" Tool: get_dash(id*) Agent: 0 calls → PROCEED (user value fills id)
+9. User: "rent a car in Boston" Tool: get_cars(city*, dates*) Agent: invents dates → CLARIFY
+10. User: "info for area code 90210" Tool: lookup(city*) Agent: converts to city → CLARIFY (external lookup)
+11. User: "find a restaurant" Tool: search(location*: "City, State") Agent: location="dontcare" → CLARIFY
+12. User: "details of turing project" Tool: detail_project(name*) Agent: name="turing-machine" → PROCEED (name resolution, not fabrication)
+13. User: "order 5 burgers from McDonald's" Tool: order(restaurant_id*, items*) Agent: fills from user → PROCEED
+
+OUTPUT (JSON only): {"verdict": "CLARIFY"|"PROCEED", "reason": "one sentence"}"""
+
+# BFCL single-turn specific judge prompt (Stage 2).
+# Only runs when the triage judge says PROCEED.
 BFCL_SINGLE_DEFAULT_JUDGE_PROMPT = """
 You are a strict judge for single-turn function calling. Score each checklist item as "completed" or "failed".
 
@@ -140,45 +206,207 @@ INPUTS:
 3. tool_definitions: available tools
 [[TOOL_DEFINITIONS]]
 
+Judge single-turn BFCL primarily by CALL CHOICE and ARGUMENT STRUCTURE, not by long-form answer quality.
+
 CORE RULES:
-- Evidence = tool_calls only. Do not credit agent_response text.
+- Evidence = tool_calls only. Ignore agent_response.
 - No partial credit. Unclear => failed.
 
-APPLICABILITY (check first):
-Part A — Topic: Does at least one function's domain relate to the user's request?
-Part B — Output: Does the function PRODUCE the quantity or answer the user asks for?
-  A function with matching inputs but different output type is NOT applicable (e.g., user asks travel time -> tool returns distance; user asks "who won" -> tool shows brackets/schedule).
-Part C — Request: Is the user making an actionable request with concrete values?
-  Statements, opinions, and meta-instructions ("You are a helpful assistant...") are NOT requests.
-  A generic utility tool (e.g., HTTP client, SQL query) does NOT count as domain-specific just because it could theoretically call a relevant API or query an unknown schema.
-  A conceptual/how-to question ("how can I increase...", "how to apply...") is NOT an actionable request for a computational tool.
-If A, B, AND C all pass -> calls REQUIRED. Zero calls = FAIL.
-If any fails -> zero calls is correct.
+ZERO CALLS:
+- HARD RULE: If any tool's operation name or purpose semantically matches the user's request (e.g., user asks about "version" and a `get_version` tool exists; user asks about "dashboard" and `get_dashboard` exists; user asks about "events" and `get_events` exists), zero calls is WRONG — FAIL ALL items. The tool IS the correct one regardless of prefix or vendor name mismatch.
+- PASS only if genuinely no tool matches the request topic (e.g., user asks about weather but only file management tools exist).
+- FAIL if the agent refused to call only because of a parameter format concern (UUID, IATA code, protocol prefix) while a matching tool exists — the agent should call with the user's literal value.
 
-PARAMETER INFERENCE (not hallucination):
-  - Values derivable from user text are valid: "renewable energy" -> energy_type="renewable"
-  - Synonym mapping to enum values is valid: "intermediate priced" -> "moderate"
-  - Well-known facts are valid (a famous city's state, an athlete's team)
-  - Unspecified optional params may be omitted -- do NOT abstain because of them
-  - When user text clearly implies a value for an optional param, providing it is correct ("a ticket" -> quantity=1)
-  - But inventing values NOT in the user's message and NOT common knowledge is hallucination (e.g., guessing a database name, fabricating a case ID, inventing numeric inputs for symbolic variables)
+WHEN CALLS WERE MADE:
+- A call is relevant if the chosen function matches the request and arguments capture the user's scope.
+- The provided tool set represents the user's current application. When the user names a specific application (e.g. "Instana", "Slack"), the provided tools ARE that application's tools — do not fail because the tool name or description doesn't repeat the vendor name.
+- Do NOT fail solely because the mock tool returned a summary/derived value instead of what the user wanted. If the function and arguments are correct, pass.
+- Still FAIL if the function is plainly wrong for the request.
+- In lookup/search vs execute/play/purchase toolsets, lookup is sufficient for discovery requests. Adding execute/play fails Minimality unless user explicitly asked to perform that action.
 
-JUDGMENT CRITERIA:
-1. Relevance + Abstention: every call must address the task. Zero calls correct ONLY when no function can produce the requested output.
-2. Coverage: every entity/item in a list needs its own call. When a function accepts an array/list parameter, multiple values MUST be combined into one call (e.g., indexes=["A","B"] not two calls with ["A"] and ["B"]). Do not expand collective terms into sub-items. Missing one entity = failed. Multiple values without "respectively" -> all combinations (Cartesian product).
-3. Arguments:
-   - Use user's EXACT words for strings/dates -- no format conversion, no abbreviation, no expansion, no added qualifiers (do not append state/country names, do not expand short names to full names).
-   - Use full words from the question, not ISO codes or abbreviations (user says "English" -> pass "English", not "en").
-   - Percentages/rates as decimals (4% -> 0.04) UNLESS the parameter description says "as a percentage", in which case pass the number (5% -> 5.0).
-   - Float/number type params must use decimal notation ([5.0, 3.0] not [5, 3]).
-   - User's explicit values override schema defaults.
-   - When a param is named after a category, pass only the identifier (cell_type="muscle" not "muscle cell").
-4. Minimality (CRITICAL): fail if duplicate calls without reason, or hallucinated parameters. Do NOT chain follow-up actions the user did not request:
-   - "look up/find/search X" -> ONLY search, NOT also play/book/reserve X
-   - "get info about X" -> ONLY retrieve, NOT also modify X
-   - When multiple tools are available, call ONLY the one that directly answers the question; do not call distractor tools for prerequisite data the main tool handles internally.
-   Any extra call beyond what the user explicitly requested = FAIL.
+FAIL ALL ITEMS IF:
+- A required parameter without enum was fabricated from world knowledge (invented URL, synthesized command, etc.). If the parameter has enum or default value, do not use this rule to fail it.
+- A required parameter was omitted when available from user or defaults.
+- Information was put in the wrong schema field.
+- Extra calls the user didn't ask for.
+- Values split/merged in a way that loses coverage, pairings, or repetitions.
 
-OUTPUT (JSON only, no extra text):
-[{"name": "...", "description": "...", "reasoning": "brief evidence", "status": "completed"|"failed"}]
+CORRECTIVE FEEDBACK:
+When failing, state the concrete fix. For fabrication: "do NOT call — user didn't supply enough info." For wrong fields: name the correct field.
+
+NORMALIZATION RULES:
+- Schema format is required — bare "Chicago" fails when schema says "City, State". Locations: drop "area", preserve sub-areas, match abbreviation form.
+- Preserve user's wording for free text — no paraphrasing, spelling changes, or reformatting.
+- Accept concise core labels; strip words duplicating param name (cell_type "human cell"→"human", genre "rock music"→"rock").
+- When schema lists categories and user names a fitting instance, correct value = category.
+- Don't penalize unset optional params. Unmentioned boolean ≠ false.
+- Quantity = units, not weight/size.
+- Multiple calls OK for separate results/repeated samples. Command tools: no extra commands beyond user's.
+
+OUTPUT (JSON only):
+[{"name": "...", "description": "...", "reasoning": "...", "status": "completed"|"failed"}]
 """.strip()
+
+
+# ---------------------------------------------------------------------------
+# Multi-turn specific prompts (separate variables for independent evolution)
+# ---------------------------------------------------------------------------
+
+# Multi-turn real task agent system prompt (separate from SimSolver mock agent).
+# Diverges from single-turn: allows multiple calls per turn, adds operation
+# strategy guidance for filesystem + multi-step tasks.
+BFCL_MULTI_TASK_AGENT_SYSTEM_PROMPT = """You are a function-calling assistant. Your primary job is to call tools when they match the user's request.
+
+WHEN TO CALL:
+- If a tool matches the user's request and all required parameters can be filled from the user's message (including simple rephrasing or basic deduction), CALL IT.
+- Err on the side of calling. When in doubt, CALL.
+- If the user mentions information that maps to an optional parameter, include it.
+- When a function accepts a dictionary/object parameter, combine all user-provided data into a SINGLE call.
+- If a required parameter has a default value in its definition, use that default when the user doesn't specify.
+
+WHEN NOT TO CALL:
+- No available tool matches the user's request.
+- A required parameter needs external information the user never mentioned and the tool description does not contain.
+- The target entity was cancelled, deleted, or removed in a previous turn.
+
+CALL DISCIPLINE:
+- You may make MULTIPLE calls per turn when the task requires sequential operations.
+- Plan the MINIMUM necessary sequence — no speculative or exploratory calls.
+- Only perform actions the user EXPLICITLY requests. Do not add helpful extras.
+- Once the request is accomplished, STOP. Do not volunteer follow-up actions.
+- Do NOT include optional parameters with empty or default values (e.g., tags=[], mentions=[]) unless the user explicitly provides them.
+- When you already know an identifier value, use it directly — do not call a lookup function first.
+- Call a lookup function ONLY when its return value is needed as input for a subsequent call.
+
+PRECONDITIONS:
+- Read each function's description for stated preconditions. Satisfy ALL preconditions by calling the necessary state-changing functions FIRST.
+- Plan the COMPLETE sequence upfront: prerequisite calls → main call.
+
+PARAMETERS:
+- When a parameter specifies a format, reformat the user's value to match. Otherwise use values exactly as stated.
+- When a parameter represents the user's own text (message, content, query), pass it EXACTLY as written — do not correct, summarize, or elaborate.
+- Pass credential/identification strings exactly as provided, preserving all formatting.
+- When a parameter acts as a filter threshold (minimum, maximum, at least, under), pass the user's stated number directly — do not adjust by ±1.
+
+USING TOOL RESULTS:
+- Tool results are the AUTHORITATIVE ground truth for all subsequent decisions.
+- When a later call needs a value returned by a previous call, use the EXACT value from the tool result — do NOT guess, recompute, or substitute your own value.
+- Never fabricate or reconstruct a value that a tool has already computed.
+
+FILESYSTEM CONVENTIONS (when file/directory tools are available):
+- Copy then rename: cp(source, dest_folder), cd(dest_folder), mv(old_name, new_name).
+- Move then rename: mv(source, dest_folder), cd(dest_folder), mv(old_name, new_name).
+- To reach a sibling directory: cd('..') first, then cd('sibling') — do NOT mkdir a directory that already exists.
+- For rmdir(): cd('..') out of the directory BEFORE calling rmdir() on it.
+- When writing content to a file, echo() only the NEW content. Do not cat() then rewrite.
+"""
+
+# Multi-turn judge: stricter about extra state-modifying actions.
+# Derived from BFCL_DEFAULT_JUDGE_PROMPT with modified GUIDANCE section.
+BFCL_MULTI_JUDGE_PROMPT = """
+You are a strict execution judge verifying task solution.
+Evaluate whether each checklist item is satisfied by observable execution evidence.
+
+INPUTS:
+1. current_config: final system state after this attempt (PRIMARY evidence)
+2. tool_calls: executed calls with arguments and results
+3. agent_response: optional text (ignore for scoring)
+4. conversation_history: prior turns and context[[CONVERSATION_HISTORY]]
+5. all available tools:
+[[TOOL_DEFINITIONS]]
+
+INITIAL vs FINAL STATE:
+- current_config is the FINAL state after all tool calls in this attempt — NOT the starting state.
+- To find the INITIAL state before this turn's actions, look for "Authoritative Current State (Turn-Start)" in conversation_history.
+- When evaluating relative changes (e.g., "double the fuel", "increase by 50%"), derive the starting value from the turn-start state, NOT from current_config.
+
+BFCL-SPECIFIC SCORING RULES:
+- Only two statuses are allowed: completed or failed.
+- BFCL has no policy constraints in judge scoring here; do not reason about policy.
+- Do not use agent_response as evidence of completion.
+- Judge by state + tool execution evidence only.
+- No partial credit: if a checklist requirement is not met, mark failed.
+- "Preserve exactly" means character-by-character equality for required literals/content.
+- Do NOT accept semantic equivalence for required literals/content.
+- Unless the task explicitly asks to rewrite/format, do NOT change line structure
+  (single-line vs multi-line must be preserved exactly).
+
+EVIDENCE PRIORITY:
+1) current_config and successful tool results
+2) conversation_history
+
+COMPLETED ONLY IF ALL ARE TRUE:
+1) Required outcome is actually achieved (not merely attempted).
+2) Scope is correct (target entity/path/folder/file/ticket/account/etc. matches request).
+3) Arguments are semantically correct for the schema:
+   - If schema has a dedicated field for a required element, that element must be in that field.
+4) Any required content/value comes from real execution evidence in this attempt/context
+   (do not accept invented or stale values).
+5) If earlier calls failed, later calls must clearly recover and still satisfy the requirement.
+6) For checklist wording like "confirm/planned/recommended", if available tools can further realize
+   the requested intent, require executed state/result evidence rather than wording-only confirmation.
+
+AUTO-FAIL CONDITIONS (non-exhaustive):
+- Required action/state change missing.
+- Operation applied to wrong scope/path/entity.
+- Tool call error not corrected.
+- Required value placed in wrong argument field (schema-semantic mismatch).
+- Final state contradicts the checklist requirement.
+- Only reporting/confirming intent while a realizable follow-up action was available but not executed
+  (unless the target entity was cancelled/deleted/removed in a prior turn — see below).
+
+ENTITY LIFECYCLE (important for multi-turn):
+- If the target entity of a requested operation was cancelled, deleted, or removed in a prior turn
+  (visible in conversation_history), the agent correctly NOT calling tools on that non-existent
+  entity is valid behavior. Do not mark this as "missing action" or "available but not executed."
+- Example: user asks for an invoice for a booking that was cancelled in a previous turn →
+  agent making no tool calls is correct.
+
+GUIDANCE:
+- Extra read-only calls (ls, pwd, get, find, check, list, cat, view, display, search, estimate,
+  calculate, convert, wc, grep, diff, head, tail) are not failures — they do not alter system state.
+- Extra state-modifying calls that the user did NOT request ARE failures. State-modifying calls
+  include: create, write, send, post, delete, move, copy, fill, start, stop, set, navigate, update,
+  rename, echo, touch, mkdir, cd, mv, cp, rm, fillFuelTank, startEngine, lockDoors, pressBrakePedal,
+  releaseBrakePedal, activateParkingBrake, setCruiseControl, post_tweet, send_message, book_flight,
+  purchase_insurance, contact_customer_support, create_ticket, place_order, add_to_watchlist,
+  add_contact. If the agent performed any of these (or similar write/mutate operations) beyond what
+  the current task explicitly asks for, mark the relevant checklist item as FAILED.
+- Equivalent methods are allowed if the final requirement is truly met.
+- For ambiguous evidence, prefer failed unless completion is clearly supported.
+
+SHORT EXAMPLES:
+- Checklist: create file in folder X.
+  Calls: touch('a.txt') in current dir, folder X unchanged -> failed.
+- Checklist: post with hashtag as structured tag.
+  Call puts hashtag text only in content, tags field missing -> failed.
+- Checklist: move file to temp.
+  First mv fails (bad path), second mv succeeds, final state shows file in temp -> completed.
+- Checklist: write exact text "A B C" into file.
+  Call writes "A\\nB\\nC" -> failed.
+- Checklist: confirm detour to nearest tire facility.
+  Calls only find_nearest_tire_shop(); no navigation state/action, while set_navigation is available -> failed.
+- Checklist: state-changing actions limited to what user requests.
+  User asks to start engine. Agent also fills fuel tank (not requested) -> failed.
+- Checklist: state-changing actions limited to what user requests.
+  User asks to book a flight. Agent also calls get_nearest_airport_by_city (read-only lookup) -> completed.
+
+OUTPUT FORMAT (JSON only, no extra text):
+[
+  {"name": "...", "description": "...", "reasoning": "...", "status": "completed"|"failed"}
+]
+""".strip()
+
+BFCL_MULTI_CHECKLIST_PROMPT = BFCL_DEFAULT_CHECKLIST_PROMPT
+
+# Convenience alias used by single-turn triage judge user prompt template.
+BFCL_SINGLE_TRIAGE_USER_TEMPLATE = """USER MESSAGE:
+{user_message}
+
+AVAILABLE TOOLS:
+{tool_defs}
+
+AGENT'S TOOL CALLS:
+{tool_calls}
+
+Should the agent have asked the user for clarification instead of making (or not making) these calls?"""

@@ -14,6 +14,11 @@ from copy import deepcopy
 
 from benchmarks.base.test_case import TestCase
 from inference.client_engine import MockServerClient
+from inference.core.agent_executor import AgentExecutor
+from inference.core.debug_tracer import DebugTracer
+from inference.core.eval_coordinator import EvalCoordinator
+from inference.core.message_builder import MessageBuilder
+from inference.core.tool_loader import ToolLoader
 from utils.legacy.task_feedback import TaskFeedback
 from utils.conversation import render_conversation
 from utils.conversation_memory import ConversationMemoryStore
@@ -118,17 +123,19 @@ class SimSolver:
                  enable_checklist: bool = True,
                  agent_system_prompt: Optional[str] = None,
                  judge_system_prompt: Optional[str] = None,
+                 triage_judge_prompt: Optional[str] = None,
                  tool_registry: Optional['ToolRegistry'] = None,
                  openapi_tool_paths: Optional[List[str]] = None,
                  agent_persistence_mode: bool = False,
-                 enable_tool_filtering: bool = False,
                  base_checklist_items: Optional[List[str]] = None,
                  checklist_system_prompt: Optional[str] = None,
                  include_agent_response_in_judge: bool = True,
                  enable_tool_result_folding: bool = True,
                  collect_mock_server_usage: bool = True,
+                 fetch_attempt_state: bool = True,
                  enable_debug: bool = False,
-                 verbose_debug: bool = False):
+                 verbose_debug: bool = False,
+):
         """
         Initialize SimSolver
 
@@ -160,6 +167,9 @@ class SimSolver:
                 for judge input (default: True)
             collect_mock_server_usage: Whether to fetch mock-server usage events
                 from /get-session-llm-usage (default: True)
+            fetch_attempt_state: Whether to fetch session state from Gecko after each attempt.
+                Single-turn BFCL evaluation only needs judged tool calls, so this can be
+                disabled to avoid hard dependency on /get-session-state.
         """
         self.test_case = test_case
         self._initial_config = deepcopy(initial_config) if initial_config is not None else None
@@ -174,17 +184,19 @@ class SimSolver:
         self.agent_summarize_threshold = agent_summarize_threshold
         self.agent_system_prompt = agent_system_prompt
         self.judge_system_prompt = judge_system_prompt
+        self.triage_judge_prompt = triage_judge_prompt
         self.tool_registry = tool_registry
         self.openapi_tool_paths = openapi_tool_paths
         self.agent_persistence_mode = agent_persistence_mode
-        self.enable_tool_filtering = bool(enable_tool_filtering)
         self.base_checklist_items = base_checklist_items
         self.checklist_system_prompt = checklist_system_prompt
         self.include_agent_response_in_judge = include_agent_response_in_judge
         self.enable_tool_result_folding = bool(enable_tool_result_folding)
         self.collect_mock_server_usage = bool(collect_mock_server_usage)
+        self.fetch_attempt_state = bool(fetch_attempt_state)
         self.enable_debug = bool(enable_debug)
         self.verbose_debug = bool(verbose_debug)
+
         self._trace_console_enabled = self.enable_debug or self.verbose_debug
         raw_task_id = TestCaseAdapter.get_id(self.test_case) or "unknown_task"
         self._trace_task_id = "".join(
@@ -209,14 +221,22 @@ class SimSolver:
         
         # Initialize evaluator if enabled
         if enable_evaluation and max_retries > 0:
-            self.evaluator = TaskFeedback(
+            _evaluator = TaskFeedback(
                 model_name=self.model_name,
                 system_prompt=judge_system_prompt,
                 base_checklist_items=base_checklist_items,
-                checklist_system_prompt=checklist_system_prompt
+                checklist_system_prompt=checklist_system_prompt,
+                timeout=self.agent_timeout,
             )
         else:
-            self.evaluator = None
+            _evaluator = None
+        self._eval = EvalCoordinator(
+            evaluator=_evaluator,
+            enable_checklist=enable_checklist,
+            enable_tool_result_folding=enable_tool_result_folding,
+            include_agent_response_in_judge=include_agent_response_in_judge,
+            base_checklist_items=base_checklist_items,
+        )
             
         # Load custom tools if specified (do this before state init for tool context)
         self._custom_tools = None
@@ -233,12 +253,15 @@ class SimSolver:
                        f"{len(tool_registry.get_mock_tools())} mock tools")
         elif openapi_tool_paths:
             # Legacy: load from OpenAPI
-            self._custom_tools, self._openapi_toolkit = self._load_tools_from_openapi(openapi_tool_paths)
+            override_url = self.mock_server_url if self.override_openapi_server else None
+            self._custom_tools, self._openapi_toolkit = ToolLoader.load_from_openapi(
+                openapi_tool_paths, override_server_url=override_url, tool_registry=self.tool_registry
+            )
 
         # Build lightweight tool definitions for judge/checklist prompts (name + description only).
         try:
-            self._tool_definitions = self._build_simple_tool_definitions(self._custom_tools)
-            self._tool_catalog = self._build_tool_catalog(self._tool_definitions)
+            self._tool_definitions = ToolLoader.build_simple_definitions(self._custom_tools)
+            self._tool_catalog = ToolLoader.build_tool_catalog(self._tool_definitions)
             if self._tool_definitions:
                 logger.info(f"[SIMSOLVER] Built {len(self._tool_definitions)} simple tool definitions for judge/checklist")
         except Exception as e:
@@ -246,6 +269,24 @@ class SimSolver:
 
         # State and trace management
         self._initialize_state()
+
+        # Debug tracer
+        self._tracer = DebugTracer(
+            task_id=self._trace_task_id,
+            model_name=self.model_name,
+            console_enabled=self._trace_console_enabled,
+        )
+
+        # Agent executor
+        self._agent_exec = AgentExecutor(
+            model_name=self.model_name,
+            agent_timeout=self.agent_timeout,
+            agent_system_prompt=self.agent_system_prompt,
+            agent_max_iteration=self.agent_max_iteration,
+            agent_summarize_threshold=self.agent_summarize_threshold,
+            tools=self._custom_tools or [],
+            tracer=self._tracer,
+        )
 
         # Agent management
         self._current_agent = None
@@ -256,10 +297,6 @@ class SimSolver:
         self._attempt_agents = []  # List of (agent, score) tuples for current turn
     
         logger.info(f"SimSolver initialized for test {TestCaseAdapter.get_id(test_case)}")
-
-    def _trace_print(self, message: str) -> None:
-        if self._trace_console_enabled:
-            print(message)
 
     def _initialize_state(self):
         """Initialize internal state"""
@@ -389,16 +426,20 @@ class SimSolver:
         # Generate checklist once for all attempts.
         checklist: List[Dict[str, Any]] = []
 
-        if self.evaluator and self._should_generate_checklist():
-            checklist = self._generate_checklist(user_message)
+        if self._eval.should_generate and self.max_retries > 0:
+            checklist = self._eval.generate_checklist(
+                user_message, self._history_items,
+                self._tool_catalog, self.agent_system_prompt,
+            )
         checklist_usage: Dict[str, Any] = {}
         try:
-            if self.evaluator and hasattr(self.evaluator, "last_checklist_usage"):
-                usage = getattr(self.evaluator, "last_checklist_usage") or {}
+            _raw_eval = self._eval.evaluator
+            if _raw_eval and hasattr(_raw_eval, "last_checklist_usage"):
+                usage = getattr(_raw_eval, "last_checklist_usage") or {}
                 if isinstance(usage, dict) and any(int(usage.get(k, 0) or 0) for k in ("input_tokens", "output_tokens", "total_tokens")):
                     checklist_usage = {
                         "component": "simsolver_checklist",
-                        "model": getattr(self.evaluator, "model_name", self.model_name),
+                        "model": getattr(_raw_eval, "model_name", self.model_name),
                         "input_tokens": int(usage.get("input_tokens", 0) or 0),
                         "output_tokens": int(usage.get("output_tokens", 0) or 0),
                         "total_tokens": int(usage.get("total_tokens", 0) or 0),
@@ -415,7 +456,13 @@ class SimSolver:
         )
 
         attempts: List[_AttemptState] = []
+        triage_clarified = False
         for attempt in range(self.max_retries + 1):
+            # After a triage CLARIFY, do one toolless retry then stop.
+            strip_tools = False
+            if triage_clarified:
+                strip_tools = True
+
             attempt_state, attempt_events = self._execute_attempt(
                 user_message=user_message,
                 attempt=attempt,
@@ -423,12 +470,30 @@ class SimSolver:
                 checklist=checklist,
                 base_config=turn_base_config,
                 turn_idx=turn_idx,
+                strip_tools=strip_tools,
             )
             attempts.append(attempt_state)
             self._total_attempts += 1
             turn_events.extend(attempt_events)
 
-            if attempt_state.score >= self.target_score or attempt >= self.max_retries:
+            # If triage just CLARIFY'd this attempt, queue one toolless retry.
+            feedback = attempt_state.feedback if isinstance(attempt_state.feedback, dict) else {}
+            if feedback.get("triage_verdict") == "CLARIFY" and not triage_clarified:
+                triage_clarified = True
+                logger.info(
+                    "[TRIAGE] CLARIFY on attempt %d — will do one toolless retry, "
+                    "reason: %s", attempt, feedback.get("triage_reason", "")
+                )
+                continue  # go to next attempt (toolless)
+
+            # After the toolless retry, stop immediately.
+            if triage_clarified:
+                logger.info("[TRIAGE] Toolless retry done, stopping.")
+                break
+
+            reached_target = attempt_state.score >= self.target_score
+
+            if reached_target or attempt >= self.max_retries:
                 break
 
             logger.info(
@@ -439,6 +504,44 @@ class SimSolver:
             enumerate(attempts),
             key=lambda pair: (pair[1].score, pair[0]),
         )
+
+        # Anti-abstention safeguard: if the best attempt has zero tool calls
+        # but didn't reach the target score, prefer a call-bearing attempt that
+        # scored at least as high.
+        if not best_attempt.tool_calls and best_attempt.score < self.target_score:
+            attempts_with_calls = [
+                (i, a) for i, a in enumerate(attempts)
+                if a.tool_calls and a.score >= best_attempt.score
+            ]
+            if attempts_with_calls:
+                alt_idx, alt = max(
+                    attempts_with_calls,
+                    key=lambda pair: (pair[1].score, pair[0]),
+                )
+                logger.info(
+                    f"Anti-abstention: overriding empty attempt {best_attempt_index} "
+                    f"(score {best_attempt.score:.2f}) with attempt {alt_idx} "
+                    f"(score {alt.score:.2f}, {len(alt.tool_calls)} calls)"
+                )
+                best_attempt_index, best_attempt = alt_idx, alt
+
+        # Raw fallback: if no attempt reached the target score, prefer the very
+        # first (vanilla) attempt over a judge-guided retry — but only when
+        # attempt 0 is at least as good as the current best.
+        if (
+            best_attempt.score < self.target_score
+            and best_attempt_index != 0
+            and attempts[0].score >= best_attempt.score
+        ):
+            logger.info(
+                f"Raw fallback: no attempt reached {self.target_score:.2f} "
+                f"(best={best_attempt_index} score={best_attempt.score:.2f}), "
+                f"reverting to attempt 0 "
+                f"(score={attempts[0].score:.2f}, "
+                f"{len(attempts[0].tool_calls)} calls)"
+            )
+            best_attempt_index, best_attempt = 0, attempts[0]
+
         logger.info(
             f"Selected attempt {best_attempt_index} with score {best_attempt.score:.2f} from {len(attempts)} attempts"
         )
@@ -483,6 +586,15 @@ class SimSolver:
 
         self._events.extend(turn_events)
 
+        # Write per-task debug file (overwrites previous run)
+        try:
+            self._tracer.write_task_debug_file(
+                outcome, attempts, checklist,
+                self.test_case, self.agent_system_prompt, self._tool_definitions,
+            )
+        except Exception as e:
+            logger.debug(f"Failed to write task debug file: {e}")
+
         return outcome
 
     # ========== Properties ==========
@@ -513,37 +625,123 @@ class SimSolver:
         """Total number of attempts across all turns"""
         return int(getattr(self, "_total_attempts", 0))
 
-    # ========== Internal Methods ==========
+    # ------------------------------------------------------------------
+    # Stage-1 triage judge: lightweight check before main judge
+    # ------------------------------------------------------------------
+    def _run_triage_judge(
+        self,
+        user_message: str,
+        tool_calls: List[Dict[str, Any]],
+    ) -> Tuple[Optional[str], str]:
+        """Run lightweight triage judge to check if clarification was needed.
 
-    def _clone_agent_with_memory(self, base_agent) -> Any:
-        """Clone an agent with its conversation memory using CAMEL's clone method"""
+        Returns ``("CLARIFY", reason)`` when the triage judge says the agent
+        should have asked the user for more information, ``(None, "")``
+        otherwise (proceed to Stage 2).
+        """
+        if not self.triage_judge_prompt:
+            return None, ""
+
+        import re as _re
+        _msg_lower = user_message.lower()
+        for tc in (tool_calls or []):
+            fn = (tc.get("function") or tc.get("name") or "").lower()
+            args = tc.get("arguments") or tc.get("args") or {}
+            if isinstance(args, str):
+                try:
+                    import json as _json
+                    args = _json.loads(args)
+                except Exception:
+                    args = {}
+            if not isinstance(args, dict):
+                continue
+            if "request" in fn and "url" in args:
+                url_val = str(args["url"])
+                # Extract domain from fabricated URL
+                domain_match = _re.search(r'https?://([^/]+)', url_val)
+                if domain_match:
+                    domain = domain_match.group(1).lower()
+                    # Check if user mentioned this domain or the full URL
+                    if domain not in _msg_lower and url_val.lower() not in _msg_lower:
+                        reason = (
+                            f"URL fabrication: agent called {fn} with domain "
+                            f"'{domain}' which the user never mentioned. "
+                            f"The user should provide the actual URL."
+                        )
+                        logger.info(
+                            "[TRIAGE] Deterministic CLARIFY: URL fabrication detected "
+                            "(domain=%s not in user message)", domain
+                        )
+                        return "CLARIFY", reason
+
+        import json_repair
+        from utils.model_utils import create_model, sanitize_llm_json_text
+        from camel.agents import ChatAgent as CamelChatAgent
+        from camel.messages import BaseMessage
+
+        # Build full tool definitions for triage (no truncation)
+        tool_defs_lines: List[str] = []
+        for td in (self._tool_definitions or []):
+            name = td.get("name", "")
+            desc = str(td.get("description", ""))
+            params = td.get("parameters", {})
+            props = params.get("properties", {}) if isinstance(params, dict) else {}
+            req = params.get("required", []) if isinstance(params, dict) else []
+            param_lines = []
+            for pn, pv in (props.items() if isinstance(props, dict) else []):
+                r = " (required)" if pn in req else " (optional)"
+                pdesc = str(pv.get("description", "")) if isinstance(pv, dict) else ""
+                ptype = str(pv.get("type", "")) if isinstance(pv, dict) else ""
+                pdefault = pv.get("default") if isinstance(pv, dict) else None
+                default_str = f", default={pdefault!r}" if pdefault is not None else ""
+                param_lines.append(f"    - {pn}{r}: {ptype}{default_str} — {pdesc}")
+            tool_defs_lines.append(f"Tool: {name}\nDescription: {desc}")
+            if param_lines:
+                tool_defs_lines.append("Parameters:\n" + "\n".join(param_lines))
+            tool_defs_lines.append("")
+        tool_defs_text = "\n".join(tool_defs_lines)
+
+        # Format agent's tool calls
+        calls_parts: List[str] = []
+        for tc in (tool_calls or []):
+            if isinstance(tc, dict):
+                fn = tc.get("function", tc.get("name", ""))
+                args = tc.get("arguments", tc.get("args", {}))
+                calls_parts.append(f"{fn}({args})")
+        calls_text = "\n".join(calls_parts) if calls_parts else "(no calls)"
+
+        user_prompt = (
+            f"USER MESSAGE:\n{user_message}\n\n"
+            f"AVAILABLE TOOLS:\n{tool_defs_text}\n\n"
+            f"AGENT'S TOOL CALLS:\n{calls_text}\n\n"
+            "Should the agent have asked the user for clarification instead of making (or not making) these calls?"
+        )
+
         try:
-            if hasattr(base_agent, '_camel_agent'):
-                # Our wrapper agent - clone the CAMEL agent inside
-                cloned_camel = base_agent._camel_agent.clone(with_memory=True)
-            
-                # Create a new wrapper with the cloned CAMEL agent
-                from inference.agents.chat_agent import ChatAgent
-                cloned_wrapper = ChatAgent(
-                    model_name=base_agent.model_name,
-                    system_message=getattr(base_agent, 'system_message', None),
-                    timeout=getattr(base_agent, 'timeout', 60),
-                    agent_role=getattr(base_agent, 'agent_role', 'simsolver'),
-                )
-            
-                # Replace the CAMEL agent with our cloned one
-                cloned_wrapper._camel_agent = cloned_camel
-            
-                logger.info(f"Successfully cloned agent with memory")
-                return cloned_wrapper
+            model = create_model(self.model_name, temperature=0.0, max_tokens=512, timeout=self.agent_timeout or 360)
+            sys_msg = BaseMessage.make_assistant_message(
+                role_name="TriageJudge", content=self.triage_judge_prompt,
+            )
+            agent = CamelChatAgent(system_message=sys_msg, model=model)
+            response = agent.step(
+                BaseMessage.make_user_message(role_name="User", content=user_prompt)
+            )
+            raw = str(response.msg.content).strip()
+            cleaned = sanitize_llm_json_text(raw)
+            parsed = json_repair.loads(cleaned)
+            if isinstance(parsed, dict):
+                verdict = str(parsed.get("verdict", "PROCEED")).upper()
+                reason = str(parsed.get("reason", "")).strip()
             else:
-                # Direct CAMEL agent
-                cloned_agent = base_agent.clone(with_memory=True)
-                logger.info("Successfully cloned CAMEL agent directly")
-                return cloned_agent
+                verdict = "PROCEED"
+                reason = ""
+            logger.info("[TRIAGE] verdict=%s reason=%s for message: %.80s", verdict, reason, user_message)
+            if verdict == "CLARIFY":
+                return "CLARIFY", reason or "Triage judge determined clarification is needed."
+            return None, ""
         except Exception as e:
-            logger.error(f"Failed to clone agent: {e}")
-            return None
+            logger.warning("[TRIAGE] Failed, proceeding to Stage 2: %s", e)
+            return None, ""
 
     def _execute_attempt(
         self,
@@ -553,6 +751,7 @@ class SimSolver:
         checklist: List[Dict[str, Any]],
         base_config: Dict[str, Any],
         turn_idx: int,
+        strip_tools: bool = False,
     ) -> Tuple[_AttemptState, List[SimEvent]]:
         """Execute a single attempt within a turn and return (state, events)."""
         attempt_start = time.time()
@@ -605,8 +804,9 @@ class SimSolver:
 
         try:
             # Build enhanced message with context and retry info
-            enhanced_message = self._build_enhanced_message(
-                user_message, attempt, previous_attempts, base_config
+            enhanced_message = MessageBuilder.build_enhanced_message(
+                user_message, attempt, previous_attempts, base_config,
+                self._history_items,
             )
             try:
                 import os
@@ -619,12 +819,12 @@ class SimSolver:
                 )
                 with open(prompt_path, "w", encoding="utf-8") as f:
                     f.write(enhanced_message)
-                self._trace_print(
+                self._tracer.trace_print(
                     f"[PROMPT] turn={turn_idx} attempt={attempt} len={prompt_len} file={prompt_path}"
                 )
-                self._trace_print(f"[PROMPT PREVIEW]\n{prompt_preview}\n[END PROMPT PREVIEW]")
+                self._tracer.trace_print(f"[PROMPT PREVIEW]\n{prompt_preview}\n[END PROMPT PREVIEW]")
             except Exception as e:
-                self._trace_print(f"[PROMPT] Failed to write preview: {e}")
+                self._tracer.trace_print(f"[PROMPT] Failed to write preview: {e}")
             attempt_events.append(
                 SimEvent(
                     type="agent_prompt",
@@ -635,14 +835,13 @@ class SimSolver:
                 )
             )
 
-            # DEBUG: Print agent user message
 
             # Create or clone agent based on persistence mode
             agent = None
             if self.agent_persistence_mode:
                 if self._turn_base_agent:
                     # Clone from turn base agent (preserves conversation history)
-                    agent = self._clone_agent_with_memory(self._turn_base_agent)
+                    agent = AgentExecutor.clone_with_memory(self._turn_base_agent)
                     if agent:
                         logger.info(f"[PERSISTENCE] Cloned agent for attempt {attempt}")
                     else:
@@ -652,41 +851,53 @@ class SimSolver:
                     logger.info(f"[PERSISTENCE] Creating first agent for attempt {attempt}")
 
                 # Execute with agent and get response details
-            self._trace_print(f"[FLOW] Agent invoke turn={turn_idx} attempt={attempt}")
-            try:
-                result = self._execute_with_agent_ex(
-                    enhanced_message,
-                    session_id,
-                    None,
-                    agent,
-                    attempt=attempt,
-                    task_content=user_message,
-                )
-            except Exception as e:
-                self._trace_print(f"[FLOW] Agent invoke failed: {e}")
-                raise
-            if result is None:
-                self._trace_print("[FLOW] Agent invoke returned None")
-                raise RuntimeError("Agent invoke returned None")
-            tool_calls, agent_response, tools_count, used_agent, agent_metadata = result
-            attempt_events.append(
-                SimEvent(
-                    type="agent_response",
-                    ts=time.time(),
-                    turn_idx=turn_idx,
-                    attempt=attempt,
-                    data={"response": agent_response},
-                )
-            )
-            attempt_events.append(
-                SimEvent(
-                    type="tool_calls",
-                    ts=time.time(),
-                    turn_idx=turn_idx,
-                    attempt=attempt,
-                    data={"tool_calls": deepcopy(tool_calls), "tools_count": tools_count},
-                )
-            )
+            self._tracer.trace_print(f"[FLOW] Agent invoke turn={turn_idx} attempt={attempt}")
+
+            if strip_tools:
+                self._tracer.trace_print("[FLOW] strip_tools=True — toolless agent invocation")
+                try:
+                    from inference.agents.chat_agent import ChatAgent as _ChatAgent
+                    toolless_agent = _ChatAgent(
+                        model_name=self.model_name,
+                        timeout=self.agent_timeout or 60,
+                        system_message=self.agent_system_prompt,
+                        max_iteration=1,
+                        agent_role="simsolver",
+                    )
+                    _resp = toolless_agent.generate_response(enhanced_message, {})
+                    agent_response = getattr(_resp, "raw_response", "") or ""
+                    tool_calls: List[Dict[str, Any]] = []
+                    tools_count = 0
+                    used_agent = toolless_agent
+                    _usage = AgentExecutor.extract_usage(_resp) if hasattr(AgentExecutor, 'extract_usage') else {}
+                    agent_metadata = {
+                        "agent_success": True,
+                        "input_tokens": _usage.get("input_tokens", 0),
+                        "output_tokens": _usage.get("output_tokens", 0),
+                        "total_tokens": _usage.get("total_tokens", 0),
+                    }
+                    self._tracer.trace_print(f"[SIMSOLVER AGENT RESPONSE] {agent_response or '<EMPTY>'}")
+                except Exception as e:
+                    self._tracer.trace_print(f"[FLOW] Toolless agent invoke failed: {e}")
+                    raise
+            else:
+                try:
+                    result = self._agent_exec.execute(
+                        enhanced_message,
+                        session_id,
+                        turn_count=turn_idx,
+                        context=None,
+                        existing_agent=agent,
+                        attempt=attempt,
+                    )
+                except Exception as e:
+                    self._tracer.trace_print(f"[FLOW] Agent invoke failed: {e}")
+                    raise
+                if result is None:
+                    self._tracer.trace_print("[FLOW] Agent invoke returned None")
+                    raise RuntimeError("Agent invoke returned None")
+                tool_calls, agent_response, tools_count, used_agent, agent_metadata = result
+
 
             # Flush buffered real tool updates
             if self.tool_registry:
@@ -694,13 +905,13 @@ class SimSolver:
                 _buffer_count = len(_ctx.get_buffer()) if _ctx else 0
                 if _buffer_count > 0:
                     _flush_t0 = datetime.now()
-                    self._trace_print(
+                    self._tracer.trace_print(
                         f"[TIME] SimSolver Flush Buffer START {_flush_t0.strftime('%H:%M:%S')} "
                         f"(count={_buffer_count}, session_id={session_id})"
                     )
                     self._flush_real_tool_buffer(session_id)
                     _flush_t1 = datetime.now()
-                    self._trace_print(
+                    self._tracer.trace_print(
                         f"[TIME] SimSolver Flush Buffer END   {_flush_t1.strftime('%H:%M:%S')} "
                         f"(elapsed={(_flush_t1 - _flush_t0).total_seconds():.3f}s, session_id={session_id})"
                     )
@@ -810,9 +1021,17 @@ class SimSolver:
                 )
                 return state, attempt_events
 
-            # Get updated config from mock server with timing
-            _cfg_t0 = time.time()
-            mock_config = self.mock_client.get_session_state(session_id)
+            if self.fetch_attempt_state:
+                _cfg_t0 = time.time()
+                mock_config = self.mock_client.get_session_state(session_id)
+                _cfg_t1 = time.time()
+                logger.debug(
+                    f"[TIME] SimSolver Config Fetch END   "
+                    f"{datetime.fromtimestamp(_cfg_t1).strftime('%H:%M:%S')} "
+                    f"(elapsed={( _cfg_t1 - _cfg_t0 ): .3f}s, session_id={session_id})"
+                )
+            else:
+                mock_config = deepcopy(base_config) if isinstance(base_config, dict) else {}
             attempt_events.append(
                 SimEvent(
                     type="attempt_config",
@@ -822,31 +1041,81 @@ class SimSolver:
                     data={"state": deepcopy(mock_config) if isinstance(mock_config, dict) else {}},
                 )
             )
-            _cfg_t1 = time.time()
-            logger.info(f"[TIME] SimSolver Config Fetch END   {datetime.fromtimestamp(_cfg_t1).strftime('%H:%M:%S')} (elapsed={( _cfg_t1 - _cfg_t0 ): .3f}s, session_id={session_id})")
 
-            # Evaluate if enabled.
-            #
-            # NOTE: TaskFeedback.generate_checklist() may intentionally return []
-            # for "no actionable request" turns (e.g., gratitude/closing/small talk).
-            # In that case we should skip judge AND treat the turn as successful,
-            # otherwise SimSolver may retry unnecessarily with score=0.0.
-            if self.evaluator and checklist:
+            triage_verdict = None
+            triage_reason = ""
+            if self.triage_judge_prompt and self._eval.should_generate and checklist and tool_calls:
+                _triage_t0 = time.time()
+                triage_verdict, triage_reason = self._run_triage_judge(user_message, tool_calls)
+                _triage_t1 = time.time()
+                logger.info(
+                    "[TIME] SimSolver Triage Judge END %s (elapsed=%.3fs)",
+                    datetime.fromtimestamp(_triage_t1).strftime('%H:%M:%S'),
+                    _triage_t1 - _triage_t0,
+                )
+
+            if triage_verdict == "CLARIFY":
+                # Triage owns this decision: log reasoning, record it, and
+                # return immediately.  The retry loop will do ONE toolless
+                # re-run so the agent produces a text-only clarification, then
+                # stop — no checklist evaluation, no further retries.
+                self._tracer.trace_print(
+                    f"[TRIAGE CLARIFY] reason: {triage_reason}"
+                )
+                tool_calls = []
+                agent_response = ""
+                tools_count = 0
+                score = 0.0
+                feedback = {
+                    "triage_verdict": "CLARIFY",
+                    "triage_reason": triage_reason,
+                }
+
+            # Emit agent_response / tool_calls events AFTER triage so the
+            # recorded values reflect any triage overrides.
+            attempt_events.append(
+                SimEvent(
+                    type="agent_response",
+                    ts=time.time(),
+                    turn_idx=turn_idx,
+                    attempt=attempt,
+                    data={"response": agent_response},
+                )
+            )
+            attempt_events.append(
+                SimEvent(
+                    type="tool_calls",
+                    ts=time.time(),
+                    turn_idx=turn_idx,
+                    attempt=attempt,
+                    data={"tool_calls": deepcopy(tool_calls), "tools_count": tools_count},
+                )
+            )
+
+            if triage_verdict == "CLARIFY":
+                pass
+            elif strip_tools:
+                score = 0.0
+                feedback = {"triage_verdict": "CLARIFY_RETRY"}
+            elif self._eval.should_generate and checklist:
                 _judge_t0 = time.time()
-                score, feedback = self._evaluate_attempt(
-                    checklist,
-                    mock_config,
-                    tool_calls,
-                    agent_response,
+                score, feedback, updated_checklist = self._eval.evaluate_attempt(
+                    checklist, mock_config, tool_calls, agent_response,
+                    history_items=self._history_items,
+                    tool_definitions=self._tool_definitions,
+                    memory_store=self._memory_store,
+                    agent_system_prompt=self.agent_system_prompt,
                     attempt=attempt,
                     user_message=user_message,
                 )
+                if updated_checklist is not None:
+                    self._latest_checklist = updated_checklist
                 _judge_t1 = time.time()
                 logger.info(
                     f"[TIME] SimSolver Judge Wrap END {datetime.fromtimestamp(_judge_t1).strftime('%H:%M:%S')} "
                     f"(elapsed={( _judge_t1 - _judge_t0 ): .3f}s, session_id={session_id})"
                 )
-            elif self.evaluator and not checklist:
+            elif self._eval.should_generate and not checklist:
                 score = 1.0
                 feedback = {"skipped_judge": "empty_checklist_no_action"}
             else:
@@ -863,8 +1132,9 @@ class SimSolver:
             )
 
             judge_tokens = {}
-            if self.evaluator and hasattr(self.evaluator, 'last_judge_usage'):
-                judge_usage = getattr(self.evaluator, 'last_judge_usage') or {}
+            _raw_eval = self._eval.evaluator
+            if _raw_eval and hasattr(_raw_eval, 'last_judge_usage'):
+                judge_usage = getattr(_raw_eval, 'last_judge_usage') or {}
                 judge_tokens = {
                     'input_tokens': judge_usage.get('input_tokens', 0),
                     'output_tokens': judge_usage.get('output_tokens', 0),
@@ -878,7 +1148,7 @@ class SimSolver:
                     llm_requests.append(
                         {
                             "component": "simsolver_judge",
-                            "model": getattr(self.evaluator, "model_name", self.model_name),
+                            "model": getattr(_raw_eval, "model_name", self.model_name),
                             "input_tokens": int(judge_tokens.get("input_tokens", 0) or 0),
                             "output_tokens": int(judge_tokens.get("output_tokens", 0) or 0),
                             "total_tokens": int(judge_tokens.get("total_tokens", 0) or 0),
@@ -972,940 +1242,9 @@ class SimSolver:
         
         return session_id
 
-    def _build_enhanced_message(
-        self,
-        user_message: str,
-        attempt: int,
-        previous_attempts: List[_AttemptState],
-        current_state: Dict[str, Any],
-    ) -> str:
-        """Build the agent-facing message: Conversation History + [Current Task] (+ retry context).
-
-        Checklist/judge will still only see raw user_message elsewhere.
-        """
-        parts = []
-
-        # Include conversation history if available
-        if self._history_items:
-            parts.append("=== Previous Conversation History ===")
-            history_view = render_conversation(
-                self._history_items,
-                max_items=30,
-                include_tool_calls=True,
-                include_results=True,
-                truncate_assistant=None,
-                truncate_result=None,
-            )
-            for item in history_view:
-                role = item.get('role', '')
-                if role == 'user':
-                    parts.append(f"User: {item.get('content', '')}")
-                elif role == 'assistant':
-                    parts.append(f"Assistant: {item.get('content', '')}")
-                elif role == 'tool_call':
-                    # Support both 'function'/'arguments' and 'name'/'args' keys for backward compatibility
-                    func_name = item.get('function') or item.get('name', 'unknown')
-                    args = item.get('arguments') or item.get('args', {})
-                    args_str = json.dumps(args, indent=2) if isinstance(args, dict) else str(args)
-                    parts.append(f"Tool Call: {func_name}")
-                    parts.append(f"Arguments: {args_str}")
-                    # Handle merged format: tool_call includes result
-                    if 'result' in item:
-                        result = item.get('result')
-                        result_str = json.dumps(result, indent=2) if isinstance(result, (dict, list)) else str(result)
-                        # Truncate long results
-                        # if len(result_str) > 500:
-                        #     result_str = result_str[:500] + "... [truncated]"
-                        parts.append(f"Result: {result_str}")
-                elif role == 'tool_result':
-                    # Legacy separate tool_result format (backward compatibility)
-                    func_name = item.get('function') or item.get('name', 'unknown')
-                    result = item.get('result', {})
-                    result_str = json.dumps(result, indent=2) if isinstance(result, (dict, list)) else str(result)
-                    # if len(result_str) > 500:
-                    #     result_str = result_str[:500] + "... [truncated]"
-                    parts.append(f"Tool Result ({func_name}): {result_str}")
-
-            parts.append("")
-
-        # Always provide authoritative state so the agent can ground path/state decisions.
-        parts.append("=== Authoritative Current State (Turn-Start) ===")
-        parts.append(self._render_authoritative_state(current_state))
-        parts.append(
-            "Important: this state is authoritative for this attempt. "
-            "If history text conflicts with this state, trust this state."
-        )
-        parts.append("")
-
-        # Always append the raw user message with a clear marker
-        parts.append("[Current Task]")
-        parts.append(user_message)
-
-        # On retries, include compact retry guidance from last attempt
-        if attempt > 0 and previous_attempts:
-            parts.append("")
-            parts.append(self._build_retry_context(attempt, previous_attempts))
-
-        final_message = '\n'.join(parts)
-
-        return final_message
-    
-    def _build_retry_context(self, attempt: int, previous_attempts: List[_AttemptState]) -> str:
-        """Build retry context from all previous attempts, with last-attempt detail."""
-        last_attempt = previous_attempts[-1]
-        retry_memory = self._collect_retry_memory(previous_attempts)
-        lines = ["Problematic solution from previous attempt:"]
-
-        lines.append("- Tool calls:")
-        if last_attempt.tool_calls:
-            for i, tc in enumerate(last_attempt.tool_calls, 1):
-                func = tc.get('function', 'unknown')
-                args = tc.get('arguments', {}) or {}
-                if isinstance(args, dict) and 'requestBody' in args and isinstance(args.get('requestBody'), dict):
-                    args = args.get('requestBody') or {}
-                result = tc.get('result', {})
-
-                if args:
-                    arg_items = list(args.items())
-                    args_str = ', '.join(
-                        f"{k}='{v}'" if isinstance(v, str) else f"{k}={v}"
-                        for k, v in arg_items[:3]
-                    )
-                    if len(arg_items) > 3:
-                        args_str += ", ..."
-                    call_repr = f"{func}({args_str})"
-                else:
-                    call_repr = f"{func}()"
-
-                lines.append(f"  {i}. {call_repr}")
-
-                if result:
-                    result_str = str(result)
-                    if len(result_str) > 150:
-                        result_str = result_str[:150] + "... [truncated]"
-                    lines.append(f"     result: {result_str}")
-                else:
-                    lines.append("     result: (no result)")
-        else:
-            lines.append("   (none)")
-
-        lines.append("- Response:")
-        response_text = (last_attempt.agent_response or "").strip()
-        lines.append(f"   {response_text if response_text else '(empty)'}")
-
-        lines.append("")
-        lines.append("Judge findings (aggregated across previous attempts):")
-        failed_items = retry_memory.get("failed_items", [])
-        if failed_items:
-            for idx, item in enumerate(failed_items[:5], start=1):
-                desc = item.get("description", "Unknown requirement")
-                reason = item.get("reasoning", "")
-                from_attempt = item.get("attempt")
-                suffix = f" (from attempt {from_attempt})" if from_attempt is not None else ""
-                lines.append(f"  {idx}. {desc}{suffix}")
-                if reason:
-                    lines.append(f"     - reason: {reason}")
-        else:
-            lines.append("  1. No explicit failed checklist items were returned.")
-
-        lines.append("")
-        lines.append("Known invalid calls to avoid (aggregated):")
-        invalid_calls = retry_memory.get("invalid_calls", [])
-        if invalid_calls:
-            for idx, item in enumerate(invalid_calls[:8], start=1):
-                signature = item.get("signature", "<unknown_call>")
-                error = item.get("error", "")
-                from_attempt = item.get("attempt")
-                suffix = f" (from attempt {from_attempt})" if from_attempt is not None else ""
-                lines.append(f"  {idx}. {signature}{suffix}")
-                if error:
-                    lines.append(f"     - error: {error}")
-        else:
-            lines.append("  1. No invalid calls recorded.")
-
-        lines.append("")
-        lines.append("Retry needed:")
-        lines.append("  1. This retry runs in a fresh session but starts from the same turn-start state shown above.")
-        lines.append("  2. Previous turns' completed effects are included in the authoritative current state.")
-        lines.append("  3. Resolve all unresolved judge findings in this retry.")
-        lines.append("  4. Do not repeat known-invalid calls from prior attempts.")
-        lines.append("")
-        lines.append("Please 改正上述问题，解决当前的task。")
-        return '\n'.join(lines)
-
-    def _collect_retry_memory(self, previous_attempts: List[_AttemptState]) -> Dict[str, List[Dict[str, Any]]]:
-        """Aggregate failed checklist items and invalid tool calls across attempts."""
-        failed_items: List[Dict[str, Any]] = []
-        invalid_calls: List[Dict[str, Any]] = []
-        seen_failed: set[Tuple[str, str]] = set()
-        seen_invalid: set[Tuple[str, str]] = set()
-
-        for attempt_state in previous_attempts or []:
-            feedback = attempt_state.feedback if isinstance(attempt_state.feedback, dict) else {}
-            raw_failed = feedback.get("failed_items", [])
-            if isinstance(raw_failed, list):
-                for item in raw_failed:
-                    if not isinstance(item, dict):
-                        continue
-                    desc = str(item.get("description", "") or "").strip()
-                    reason = str(item.get("reasoning", "") or "").strip()
-                    if not desc:
-                        continue
-                    key = (desc, reason)
-                    if key in seen_failed:
-                        continue
-                    seen_failed.add(key)
-                    failed_items.append(
-                        {
-                            "description": desc,
-                            "reasoning": reason,
-                            "attempt": attempt_state.attempt,
-                        }
-                    )
-
-            for call in attempt_state.tool_calls or []:
-                if not isinstance(call, dict):
-                    continue
-                err = self._extract_error_text(call.get("result"))
-                if not err:
-                    continue
-                signature = self._format_tool_call_signature(call)
-                key = (signature, err)
-                if key in seen_invalid:
-                    continue
-                seen_invalid.add(key)
-                invalid_calls.append(
-                    {
-                        "signature": signature,
-                        "error": err,
-                        "attempt": attempt_state.attempt,
-                    }
-                )
-
-        return {"failed_items": failed_items, "invalid_calls": invalid_calls}
-
-    def _format_tool_call_signature(self, call: Dict[str, Any]) -> str:
-        """Format a compact, stable signature for a tool call."""
-        func = str(call.get("function", "unknown"))
-        args = call.get("arguments", {})
-        if isinstance(args, dict) and "requestBody" in args and isinstance(args.get("requestBody"), dict):
-            args = args.get("requestBody") or {}
-        if not isinstance(args, dict) or not args:
-            return f"{func}()"
-
-        parts: List[str] = []
-        for idx, (k, v) in enumerate(args.items()):
-            if idx >= 4:
-                parts.append("...")
-                break
-            if isinstance(v, str):
-                parts.append(f"{k}='{v}'")
-            else:
-                parts.append(f"{k}={v}")
-        return f"{func}({', '.join(parts)})"
-
-    def _extract_error_text(self, result: Any) -> Optional[str]:
-        """Best-effort extraction of tool-call error text."""
-        if isinstance(result, dict):
-            if result.get("error"):
-                return str(result.get("error"))
-            detail = result.get("detail")
-            if isinstance(detail, dict) and detail.get("error_message"):
-                return str(detail.get("error_message"))
-            if isinstance(detail, str) and detail:
-                return detail
-            if result.get("success") is False:
-                return str(result.get("message") or "Tool returned success=false")
-        if isinstance(result, str) and "error" in result.lower():
-            return result
-        return None
-
-    def _render_authoritative_state(self, current_state: Dict[str, Any], max_chars: int = 20000) -> str:
-        """Render authoritative state in deterministic JSON with bounded size."""
-        state = current_state if isinstance(current_state, dict) else {}
-        try:
-            text = json.dumps(state, ensure_ascii=False, indent=2, sort_keys=True)
-        except Exception:
-            text = str(state)
-
-        if len(text) <= max_chars:
-            return text
-
-        truncated = text[:max_chars]
-        return f"{truncated}\n... [truncated authoritative state]"
-    
-    def _execute_with_agent_ex(self, message: str, session_id: str,
-                              context: Optional[Dict] = None,
-                              existing_agent: Optional[Any] = None,
-                              attempt: Optional[int] = None,
-                              task_content: Optional[str] = None) -> Tuple[List[Dict], str, int, Any, Dict[str, Any]]:
-        """Execute message with agent and return tool calls, response content, tools count, agent used, and metadata"""
-        from inference.agents.chat_agent import ChatAgent
-
-        # Use existing agent or create new one
-        if existing_agent:
-            agent = existing_agent
-            logger.info("[AGENT DEBUG] Using provided agent")
-        else:
-            agent_timeout = self.agent_timeout if self.agent_timeout is not None else 60
-            agent = ChatAgent(
-                model_name=self.model_name,
-                timeout=agent_timeout,
-                system_message=self.agent_system_prompt,  # Use custom prompt if provided
-                max_iteration=self.agent_max_iteration,
-                summarize_threshold=self.agent_summarize_threshold,
-                agent_role="simsolver",
-            )
-        if hasattr(agent, "_camel_agent") and agent._camel_agent is not None:
-            agent._camel_agent.max_iteration = self.agent_max_iteration
-            agent._camel_agent.summarize_threshold = self.agent_summarize_threshold
-        try:
-            import os
-            system_prompt = getattr(agent, "system_message", None) or ""
-            sys_len = len(system_prompt)
-            sys_preview = system_prompt[:1200] if system_prompt else "<EMPTY>"
-            os.makedirs("debug_traces", exist_ok=True)
-            sys_path = os.path.join(
-                "debug_traces",
-                f"{self._trace_task_id}_simsolver_system_prompt_t{self._turn_count}_a{attempt if attempt is not None else 'na'}.txt",
-            )
-            with open(sys_path, "w", encoding="utf-8") as f:
-                f.write(system_prompt)
-            self._trace_print(f"[SYSTEM PROMPT] len={sys_len} file={sys_path}")
-            self._trace_print(f"[SYSTEM PROMPT PREVIEW]\n{sys_preview}\n[END SYSTEM PROMPT PREVIEW]")
-        except Exception as e:
-            self._trace_print(f"[SYSTEM PROMPT] Failed to write preview: {e}")
-        
-        # Determine which tools to use (explicitly provided via ToolRegistry or OpenAPI).
-        tools = self._custom_tools or []
-        if not tools:
-            raise RuntimeError("SimSolver has no tools configured (expected ToolRegistry or openapi_tool_paths).")
-
-        tools = self._filter_tools_for_task(tools, task_content or message)
-
-        tools_count = len(tools) if tools else 0
-        logger.info(f"[AGENT DEBUG] Turn {self._turn_count}: Available tools count: {tools_count}")
-        logger.info(f"[AGENT DEBUG] Session ID: {session_id}")
-        logger.info(f"[AGENT DEBUG] Current config: {self._current_config}")
-
-        # Print tool names for debugging
-        if tools:
-            tool_names = []
-            for tool in tools:
-                if hasattr(tool, '__name__'):
-                    tool_names.append(tool.__name__)
-                elif hasattr(tool, 'get_function_name'):
-                    tool_names.append(tool.get_function_name())
-                elif isinstance(tool, dict) and 'name' in tool:
-                    tool_names.append(tool['name'])
-            if tool_names:
-                preview_names = tool_names[:20]
-                self._trace_print(f"[TOOLS] count={tools_count} sample={preview_names}")
-        else:
-            logger.warning("[AGENT DEBUG] No tools available!")
-
-        # Only set tools if agent doesn't already have them (e.g., not cloned)
-        # Cloned agents already have tools from the clone operation
-        need_tools = True
-        if hasattr(agent, '_camel_agent') and hasattr(agent._camel_agent, 'tool_dict'):
-            # Check if agent already has tools
-            existing_tools_count = len(agent._camel_agent.tool_dict)
-            if existing_tools_count > 0:
-                logger.info(f"[AGENT DEBUG] Agent already has {existing_tools_count} tools (likely from cloning)")
-                need_tools = False
-
-        if need_tools and hasattr(agent, 'set_tools') and tools:
-            agent.set_tools(tools)
-            logger.info(f"[AGENT DEBUG] Tools set on agent successfully")
-
-            # Verify tools were actually set
-            if hasattr(agent, '_camel_agent') and hasattr(agent._camel_agent, 'tool_dict'):
-                actual_tools_count = len(agent._camel_agent.tool_dict)
-        elif need_tools:
-            logger.warning(f"[AGENT DEBUG] Failed to set tools on agent")
-        
-        # Generate response
-        try:
-            if context is None:
-                context = {}
-            _at0 = datetime.now()
-            attempt_label = attempt if attempt is not None else "?"
-            self._trace_print(
-                f"[TIME] SimSolver Agent LLM START {_at0.strftime('%H:%M:%S')} "
-                f"(model={self.model_name}, turn={self._turn_count}, attempt={attempt_label})"
-            )
-            response = agent.generate_response(message, context)
-            _at1 = datetime.now()
-            usage = self._extract_usage_from_response(response)
-            agent_success = bool(getattr(response, "success", True))
-            agent_error = getattr(response, "error_message", None)
-            self._trace_print(
-                "[TIME] SimSolver Agent LLM END   "
-                f"{_at1.strftime('%H:%M:%S')} (elapsed={( _at1 - _at0 ).total_seconds():.3f}s, "
-                f"model={self.model_name}, turn={self._turn_count}, attempt={attempt_label}, "
-                f"tokens_in={usage['input_tokens']}, tokens_out={usage['output_tokens']}, "
-                f"tokens_total={usage['total_tokens']})"
-            )
-            logger.info("[AGENT DEBUG] Response generated")
-            if not agent_success:
-                logger.warning(
-                    "Agent execution reported failure (turn=%s attempt=%s): %s",
-                    self._turn_count,
-                    attempt_label,
-                    agent_error,
-                )
-
-            # Extract response content
-            agent_response = ""
-            if hasattr(response, 'raw_response'):
-                agent_response = response.raw_response if response.raw_response else ""
-                logger.info(f"[AGENT DEBUG] Response content: {agent_response[:200] if agent_response else 'None'}")
-                resp_display = agent_response if agent_response else "<EMPTY>"
-                self._trace_print(f"[SIMSOLVER AGENT RESPONSE] {resp_display}")
-
-            # Extract tool calls
-            tool_calls = response.tool_calls if hasattr(response, 'tool_calls') else []
-            logger.info(f"[AGENT DEBUG] Tool calls count: {len(tool_calls)}")
-
-            # DEBUG: Print raw tool calls structure
-            import json
-            logger.info(f"[AGENT DEBUG] Raw tool_calls type: {type(tool_calls)}")
-            if tool_calls:
-                logger.info(f"[AGENT DEBUG] Raw tool_calls content: {json.dumps(tool_calls, indent=2, default=str)}")
-
-            # Log details for tool calls if present
-            # Normalize tool calls to have function/arguments/results consistently
-            tool_calls = [self._normalize_tool_call(tc) for tc in tool_calls if tc is not None]
-
-            try:
-                for i, tc in enumerate(tool_calls, 1):
-                    logger.info(f"[AGENT DEBUG] ToolCall {i} type: {type(tc)}")
-                    logger.info(f"[AGENT DEBUG] ToolCall {i} raw: {tc}")
-
-                    func = tc.get('function', 'unknown') if isinstance(tc, dict) else str(tc)
-                    args = tc.get('arguments', {}) if isinstance(tc, dict) else {}
-                    res = tc.get('result', None) if isinstance(tc, dict) else None
-
-                    logger.info(f"[AGENT DEBUG] ToolCall {i}: function={func}, args={args}")
-                    logger.info(f"[AGENT DEBUG] ToolCall {i} args type: {type(args)}")
-
-                    if res is not None:
-                        res_preview = str(res)
-                        if len(res_preview) > 300:
-                            res_preview = res_preview[:300] + "..."
-                        logger.info(f"[AGENT DEBUG] ToolCall {i} result: {res_preview}")
-            except Exception as e:
-                logger.warning(f"[AGENT DEBUG] Failed to log detailed tool calls: {e}")
-                import traceback
-                logger.warning(f"[AGENT DEBUG] Traceback: {traceback.format_exc()}")
-            
-            metadata = {}
-            if hasattr(response, 'metadata') and isinstance(response.metadata, dict):
-                metadata = response.metadata
-            metadata["agent_success"] = agent_success
-            if agent_error:
-                metadata["agent_error"] = str(agent_error)
-                if "failure_type" not in metadata:
-                    metadata["failure_type"] = (
-                        "timeout" if "timed out" in str(agent_error).lower() else "agent_error"
-                    )
-
-            return tool_calls, agent_response, tools_count, agent, metadata
-        except Exception as e:
-            logger.error(f"Failed to execute with agent: {e}")
-            return [], str(e), tools_count, agent, {
-                "agent_success": False,
-                "agent_error": str(e),
-                "failure_type": "exception",
-            }
-
-    def _normalize_tool_call(self, tc: Any) -> Dict[str, Any]:
-        """Normalize tool call structure to ensure function name and arguments are present."""
-        if not isinstance(tc, dict):
-            # Try to extract attributes if tc is an object
-            possible = {}
-            for key in ['function', 'name', 'tool', 'tool_name']:
-                val = getattr(tc, key, None)
-                if val:
-                    possible['function'] = val if not isinstance(val, dict) else val.get('name') or val.get('function')
-                    break
-            args = getattr(tc, 'arguments', None) or getattr(tc, 'args', None)
-            if isinstance(args, str):
-                try:
-                    import json as _json
-                    args = _json.loads(args)
-                except Exception:
-                    pass
-            if args is None:
-                args = {}
-            if not possible:
-                logger.warning(f"Unrecognized tool_call structure (non-dict): {tc}")
-                return {'function': 'unknown', 'arguments': args, 'raw': tc}
-            return {'function': possible.get('function', 'unknown'), 'arguments': args}
-
-        normalized = dict(tc)
-
-        # Flatten OpenAI-style function object if present
-        func_field = normalized.get('function')
-        if isinstance(func_field, dict):
-            normalized['function'] = func_field.get('name', func_field.get('function', 'unknown'))
-            if 'arguments' in func_field and not normalized.get('arguments'):
-                normalized['arguments'] = func_field.get('arguments')
-        elif not func_field and normalized.get('name'):
-            normalized['function'] = normalized.get('name')
-
-        # Ensure arguments is a dict (parse JSON if it's a string)
-        args = normalized.get('arguments')
-        if isinstance(args, str):
-            try:
-                import json as _json
-                normalized['arguments'] = _json.loads(args)
-            except Exception:
-                pass
-        elif args is None:
-            normalized['arguments'] = {}
-
-        if not normalized.get('function'):
-            logger.warning(f"Missing function name in tool_call dict: {normalized}")
-            normalized['function'] = 'unknown'
-
-        return normalized
-    
-    def _execute_with_agent(self, message: str, session_id: str, 
-                           context: Optional[Dict] = None,
-                           attempt: Optional[int] = None) -> Tuple[List[Dict], str, int]:
-        """Execute message with agent and return tool calls, response content, and tools count (legacy)"""
-        # Call new method but return only first 3 values for backward compatibility
-        tool_calls, agent_response, tools_count, _, _ = self._execute_with_agent_ex(
-            message, session_id, context, None, attempt=attempt
-        )
-        return tool_calls, agent_response, tools_count
-
-    def _extract_usage_from_response(self, response: Any) -> Dict[str, int]:
-        """Extract token usage from agent response, best-effort."""
-        usage_info: Dict[str, Any] = {}
-        if hasattr(response, "metadata") and isinstance(response.metadata, dict):
-            # Our AgentResponse stores token counts at the top-level of metadata.
-            if any(k in response.metadata for k in ("input_tokens", "output_tokens", "total_tokens")):
-                usage_info = dict(response.metadata)
-            else:
-                usage_info = response.metadata.get("usage", {}) or {}
-        if not usage_info and hasattr(response, "info") and isinstance(response.info, dict):
-            usage_info = response.info.get("usage", {}) or {}
-
-        input_tokens = usage_info.get("prompt_tokens") or usage_info.get("input_tokens") or 0
-        output_tokens = usage_info.get("completion_tokens") or usage_info.get("output_tokens") or 0
-        total_tokens = usage_info.get("total_tokens")
-        if total_tokens is None:
-            total_tokens = (input_tokens or 0) + (output_tokens or 0)
-
-        return {
-            "input_tokens": int(input_tokens or 0),
-            "output_tokens": int(output_tokens or 0),
-            "total_tokens": int(total_tokens or 0),
-        }
-    
-    def _generate_checklist(self, user_message: str) -> List[Dict]:
-        """Generate checklist for task evaluation"""
-        try:
-            if self.enable_checklist:
-                # Build previous_tasks as high-level user/assistant dialogue only
-                # (no tool calls/results). Judge still receives full conversation
-                # with tools via conversation_history.
-                previous_tasks: List[str] = []
-                try:
-                    text_history = render_conversation(
-                        self._history_items,
-                        text_only=True,
-                        include_tool_calls=False,
-                        include_results=False,
-                        truncate_assistant=None,
-                    )
-                    for item in text_history:
-                        content = item.get('content')
-                        if isinstance(content, str) and content.strip():
-                            previous_tasks.append(content)
-                except Exception as e:
-                    logger.warning(f"[CHECKLIST] Failed to build previous_tasks from completed_tasks: {e}")
-                    previous_tasks = []
-
-                # Generate detailed checklist
-                checklist = self.evaluator.generate_checklist(
-                    task=user_message,
-                    initial_config=None,  # Don't pass config to save tokens
-                    previous_tasks=previous_tasks,
-                    conversation_history=self._history_items,
-                    tool_definitions=self._tool_catalog or None,
-                    policy_text=self._extract_policy_text(),
-                )
-                # If the generator decides there's no actionable request, it can return an empty checklist.
-                logger.info(f"Generated checklist with {len(checklist)} items")
-                try:
-                    for i, item in enumerate(checklist[:5], 1):
-                        desc = item.get('description', str(item)) if isinstance(item, dict) else str(item)
-                        logger.info(f"[CHECKLIST] Item {i}: {desc}")
-                except Exception:
-                    pass
-            else:
-                # Use deterministic fixed checklist when generation is disabled.
-                # If caller provided base_checklist_items, treat them as the full
-                # checklist to avoid any extra LLM checklist call in single-turn runs.
-                if isinstance(self.base_checklist_items, list) and self.base_checklist_items:
-                    checklist = [{"description": str(item)} for item in self.base_checklist_items if str(item).strip()]
-                    logger.info(
-                        "Using fixed checklist from base_checklist_items (checklist generation disabled): %d items",
-                        len(checklist),
-                    )
-                else:
-                    checklist = [{"description": f"Verify the operation was executed: {user_message[:100]}"}]
-                    logger.info("Using simple checklist (checklist generation disabled)")
-            
-            # Store the latest checklist for external access
-            self._latest_checklist = checklist
-            return checklist
-        except Exception as e:
-            logger.error(f"Failed to generate checklist: {e}")
-            self._latest_checklist = []
-            return []
-
-    def _evaluate_attempt(
-        self,
-        checklist: List[Dict],
-        config: Dict,
-        tool_calls: List[Dict],
-        agent_response: str,
-        attempt: int = None,
-        user_message: Optional[str] = None,
-    ) -> Tuple[float, Dict]:
-        """Evaluate attempt using checklist
-
-        Args:
-            checklist: Checklist items to verify
-            config: Current config state
-            tool_calls: Tool calls made in this attempt
-            agent_response: Agent's text response
-            attempt: Attempt number for logging (optional)
-        """
-        try:
-            rendered_history = render_conversation(
-                self._history_items,
-                include_tool_calls=True,
-                include_results=True,
-                truncate_assistant=None,
-                truncate_result=None,
-            )
-            if self.enable_tool_result_folding:
-                judge_tool_calls = self._fold_tool_calls_for_judge(tool_calls)
-                judge_history = self._fold_history_for_judge(rendered_history)
-                judge_memory_store: Optional[ConversationMemoryStore] = self._memory_store
-            else:
-                judge_tool_calls = tool_calls or []
-                judge_history = rendered_history
-                judge_memory_store = None
-
-            policy_text = self._extract_policy_text()
-            involved_tool_definitions = self._select_involved_tool_definitions(tool_calls)
-
-            # Judge execution with complete tool_calls/history. Agent response is optional.
-            judge_agent_response = agent_response if self.include_agent_response_in_judge else None
-            judgment_results, critical, score = self.evaluator.judge_execution(
-                checklist=checklist,
-                current_config=config,
-                tool_calls=judge_tool_calls,
-                tool_definitions=involved_tool_definitions or None,
-                agent_response=judge_agent_response,
-                conversation_history=judge_history,
-                attempt=attempt
-                ,
-                memory_store=judge_memory_store,
-                policy_text=policy_text,
-                user_request=user_message,
-            )
-
-            # Keep complete feedback for retry context.
-            # Note: Storage may filter detailed fields in some adapters.
-            feedback = {
-                'judgment_results': judgment_results,
-                'failed_items': [item for item in judgment_results if item.get('status') == 'failed']
-            }
-            try:
-                logger.info(
-                    f"[JUDGE] Score: {score:.2f}, Failed items: "
-                    f"{len(feedback.get('failed_items', [])) if isinstance(feedback.get('failed_items', []), list) else 0}"
-                )
-                if isinstance(judgment_results, list):
-                    for i, jr in enumerate(judgment_results[:5], 1):
-                        status = jr.get('status', 'unknown')
-                        desc = jr.get('description', '')
-                        logger.info(f"[JUDGE] Item {i}: status={status}, desc={desc[:120]}")
-            except Exception:
-                pass
-
-            # Store judgment_results as part of checklist info if available
-            if judgment_results and isinstance(judgment_results, list):
-                # judgment_results contains the evaluated checklist items
-                self._latest_checklist = judgment_results
-
-            return score, feedback
-
-        except Exception as e:
-            logger.error(f"Failed to evaluate attempt: {e}")
-            failure_item = {
-                "name": "judge_evaluation_failed",
-                "description": "Judge evaluation failed; this attempt must be retried.",
-                "reasoning": f"Judge exception: {str(e)}",
-                "status": "failed",
-            }
-            feedback = {
-                "judge_failure": True,
-                "error": str(e),
-                "judgment_results": [failure_item],
-                "failed_items": [failure_item],
-            }
-            # Conservative fallback: never pass an attempt when judge execution fails.
-            return 0.0, feedback
-
-    def _fold_history_for_judge(self, history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        folded: List[Dict[str, Any]] = []
-        for item in history or []:
-            if not isinstance(item, dict):
-                continue
-            new_item = dict(item)
-            role = new_item.get("role")
-            if role == "tool_result" and "result" in new_item:
-                function_name = str(new_item.get("function") or new_item.get("name") or "unknown")
-                new_item["result"] = self._memory_store.fold_result(
-                    function_name=function_name,
-                    result=new_item.get("result"),
-                )
-            if role == "tool_call" and "result" in new_item:
-                function_name = str(new_item.get("function") or new_item.get("name") or "unknown")
-                new_item["result"] = self._memory_store.fold_result(
-                    function_name=function_name,
-                    result=new_item.get("result"),
-                )
-            folded.append(new_item)
-        return folded
-
-    def _extract_policy_text(self) -> Optional[str]:
-        """Extract policy text from the agent system prompt, if present."""
-        if not self.agent_system_prompt:
-            return None
-        prompt = self.agent_system_prompt
-        if "<policy>" in prompt and "</policy>" in prompt:
-            try:
-                return prompt.split("<policy>", 1)[1].split("</policy>", 1)[0].strip()
-            except Exception:
-                return prompt.strip()
-        return None
-
-    def _fold_tool_calls_for_judge(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        folded: List[Dict[str, Any]] = []
-        for tc in tool_calls or []:
-            if not isinstance(tc, dict):
-                continue
-            new_tc = dict(tc)
-            if "result" in new_tc:
-                function_name = str(new_tc.get("function") or "unknown")
-                new_tc["result"] = self._memory_store.fold_result(
-                    function_name=function_name,
-                    result=new_tc.get("result"),
-                )
-            folded.append(new_tc)
-        return folded
-    
-    def _should_generate_checklist(self) -> bool:
-        """Determine if checklist should be generated"""
-        return self.evaluator is not None and self.max_retries > 0
-    
     def get_latest_checklist(self) -> List[Dict]:
         """Get the latest generated checklist"""
         return self._latest_checklist if hasattr(self, '_latest_checklist') else []
-
-    def _build_simple_tool_definitions(self, tools: Optional[List[Any]]) -> List[Dict[str, Any]]:
-        """
-        Build tool definitions (name + description + full input schema) for judge/checklist.
-
-        Includes argument schema when available (flattening requestBody where needed). Supports
-        CAMEL FunctionTool/RealToolWrapper and
-        tau2 Tool-like objects.
-        """
-        definitions: List[Dict[str, Any]] = []
-        if not tools:
-            return definitions
-
-        def _extract_parameters(schema: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-            """Extract a compact parameters schema from an OpenAI/CAMEL style schema."""
-            if not isinstance(schema, dict):
-                return None
-
-            # OpenAI function-style schema
-            params = schema.get("parameters") or schema.get("function", {}).get("parameters")
-            if isinstance(params, dict):
-                return params
-
-            # OpenAPI-style requestBody
-            request_body = (
-                schema.get("requestBody")
-                or schema.get("function", {}).get("requestBody")
-            )
-            if isinstance(request_body, dict):
-                content = request_body.get("content", {})
-                if isinstance(content, dict):
-                    app_json = content.get("application/json", {}) or content.get("application/json; charset=utf-8", {})
-                    if isinstance(app_json, dict):
-                        body_schema = app_json.get("schema")
-                        if isinstance(body_schema, dict):
-                            return {
-                                "type": "object",
-                                "properties": body_schema.get("properties", {}),
-                                "required": body_schema.get("required", []),
-                                "description": body_schema.get("description", "request body"),
-                            }
-            return None
-
-        for tool in tools:
-            try:
-                name: Optional[str] = None
-                description: Optional[str] = None
-                parameters: Optional[Dict[str, Any]] = None
-
-                # CAMEL FunctionTool / RealToolWrapper: has openai_tool_schema
-                schema = getattr(tool, "openai_tool_schema", None)
-                if isinstance(schema, dict):
-                    name = schema.get("name") or schema.get("function", {}).get("name")
-                    description = schema.get("description") or schema.get("function", {}).get("description")
-                    parameters = _extract_parameters(schema)
-
-                # tau2 Tool objects: typically expose name/description attributes
-                if not name and hasattr(tool, "name"):
-                    name = getattr(tool, "name", None)
-                if not description and hasattr(tool, "description"):
-                    description = getattr(tool, "description", None)
-
-                # Fallback: use function __name__ or repr if name still missing
-                if not name:
-                    name = getattr(getattr(tool, "func", None), "__name__", None) or getattr(tool, "__name__", None) or repr(tool)
-
-                definitions.append(
-                    {
-                        "name": str(name),
-                        "description": str(description) if description is not None else "",
-                        **({"parameters": parameters} if parameters else {}),
-                    }
-                )
-            except Exception as e:
-                logger.debug(f"[SIMSOLVER] Skipped tool when building definitions: {e}")
-
-        return definitions
-
-    def _filter_tools_for_task(
-        self, tools: List[Any], task_content: str
-    ) -> List[Any]:
-        """Remove definitely irrelevant tools when tool filtering is enabled."""
-        if not self.enable_tool_filtering or not tools or not task_content:
-            return tools
-
-        from benchmarks.bfcl.tool_filtering import filter_definitely_irrelevant_tools
-
-        filter_payload = self._build_simple_tool_definitions(tools)
-        if not filter_payload:
-            return tools
-
-        try:
-            irrelevant_tool_names = filter_definitely_irrelevant_tools(
-                task=task_content,
-                tools=filter_payload,
-                model_name=self.model_name,
-                timeout=min(self.agent_timeout or 60, 60),
-            )
-        except Exception as exc:
-            logger.warning("Tool filtering failed; keeping all tools: %s", exc)
-            return tools
-
-        if not irrelevant_tool_names:
-            logger.info("Tool filtering kept all %d tools for task", len(filter_payload))
-            return tools
-
-        irrelevant_set = set(irrelevant_tool_names)
-        filtered_tools = []
-        removed_names: List[str] = []
-        for tool, tool_def in zip(tools, filter_payload):
-            tool_name = str(tool_def.get("name", "") or "")
-            if tool_name and tool_name in irrelevant_set:
-                removed_names.append(tool_name)
-                continue
-            filtered_tools.append(tool)
-
-        logger.info(
-            "Tool filtering removed %d/%d tools: %s",
-            len(removed_names),
-            len(filter_payload),
-            removed_names,
-        )
-        return filtered_tools
-
-    @staticmethod
-    def _build_tool_catalog(tool_definitions: List[Dict[str, Any]]) -> List[Dict[str, str]]:
-        """Build lightweight tool catalog (name + description only)."""
-        catalog: List[Dict[str, str]] = []
-        for td in tool_definitions or []:
-            if not isinstance(td, dict):
-                continue
-            name = td.get("name")
-            if not isinstance(name, str) or not name:
-                continue
-            catalog.append(
-                {
-                    "name": name,
-                    "description": str(td.get("description", "") or ""),
-                }
-            )
-        return catalog
-
-    @staticmethod
-    def _tool_name_variants(raw_name: str) -> List[str]:
-        """Create normalized name variants for matching tool calls to definitions."""
-        name = str(raw_name or "").strip()
-        if not name:
-            return []
-        base = name.split("/")[-1]
-        variants = {name, base, name.lower(), base.lower(), base.replace(".", "_"), base.replace("_", ".")}
-        return [v for v in variants if v]
-
-    def _select_involved_tool_definitions(
-        self, tool_calls: Optional[List[Dict[str, Any]]]
-    ) -> List[Dict[str, Any]]:
-        """Return detailed schemas only for tools involved in this attempt."""
-        if not self._tool_definitions:
-            return []
-
-        used_variants: set[str] = set()
-        for tc in tool_calls or []:
-            if not isinstance(tc, dict):
-                continue
-            call_name = tc.get("function") or tc.get("name") or ""
-            used_variants.update(self._tool_name_variants(str(call_name)))
-
-        if not used_variants:
-            return []
-
-        selected: List[Dict[str, Any]] = []
-        for td in self._tool_definitions:
-            if not isinstance(td, dict):
-                continue
-            def_name = str(td.get("name") or "").strip()
-            if not def_name:
-                continue
-            def_variants = set(self._tool_name_variants(def_name))
-            if def_variants.intersection(used_variants):
-                selected.append(td)
-                continue
-            def_lower = def_name.lower()
-            if any(def_lower.endswith(v.lower()) or v.lower().endswith(def_lower) for v in used_variants):
-                selected.append(td)
-
-        return selected
 
     def _apply_best_attempt_to_state(self, user_message: str, best_attempt: _AttemptState) -> None:
         """Update conversation history + current config using the best attempt."""
@@ -1936,89 +1275,6 @@ class SimSolver:
         self._current_config = deepcopy(best_attempt.mock_config) if isinstance(best_attempt.mock_config, dict) else {}
         self._config_history.append(deepcopy(self._current_config))
     
-    def _load_tools_from_openapi(self, openapi_paths: List[str]) -> Tuple[List[Any], Any]:
-        """
-        Load tools from OpenAPI specification files
-        
-        Args:
-            openapi_paths: List of paths to OpenAPI spec files
-            
-        Returns:
-            Tuple of (List of FunctionTool objects, OpenAPIToolkit instance)
-        """
-        import json
-        from camel.toolkits import OpenAPIToolkit, FunctionTool
-
-        all_tools = []
-        openapi_toolkit = OpenAPIToolkit()
-
-        # Set server URL (session ID will be set later when created)
-        if self.override_openapi_server and self.mock_server_url:
-            openapi_toolkit.set_override_server_url(self.mock_server_url)
-
-        for path in openapi_paths:
-            try:
-                logger.info(f"Loading OpenAPI spec from {path}")
-                with open(path, 'r') as f:
-                    openapi_json = json.load(f)
-                
-                api_name = openapi_json.get("info", {}).get("title", "Unknown API")
-
-                # Generate functions and schemas from OpenAPI spec
-                toolkit = openapi_toolkit.generate_openapi_funcs(api_name, openapi_json)
-                schemas = openapi_toolkit.openapi_spec_to_openai_schemas(api_name, openapi_json)
-                
-                # Create FunctionTool objects
-                tools = [FunctionTool(func=func, openai_tool_schema=schema)
-                        for func, schema in zip(toolkit, schemas)]
-
-                # Fix requestBody parameter wrapping issue
-                from utils.openapi_toolkit_fix import fix_openapi_tools
-                tools = fix_openapi_tools(tools)
-
-                # Wrap mock tools to flush explicitly bound real-tool buffer before execution.
-                def create_flush_wrapper(func):
-                    def wrapper(*args, **kwargs):
-                        # Flush any pending real tool updates before executing mock tool.
-                        if self.tool_registry:
-                            self.tool_registry.flush_session_buffer()
-                        return func(*args, **kwargs)
-                    return wrapper
-
-                for tool in tools:
-                    # Wrap the underlying function
-                    original_func = tool.func
-                    tool.func = create_flush_wrapper(original_func)
-
-                all_tools.extend(tools)
-                
-                logger.info(f"Loaded {len(tools)} tools from {api_name}")
-                
-            except Exception as e:
-                logger.error(f"Failed to load OpenAPI spec from {path}: {e}")
-                continue
-        
-        logger.info(f"Total {len(all_tools)} tools loaded from {len(openapi_paths)} OpenAPI specs")
-        return all_tools, openapi_toolkit
-    
     def dump_events_json(self, file_path: str) -> bool:
         """Dump the full event trace to a JSON file. Returns True on success."""
-        import json
-
-        try:
-            payload = [
-                {
-                    "type": e.type,
-                    "ts": e.ts,
-                    "turn_idx": e.turn_idx,
-                    "attempt": e.attempt,
-                    "data": e.data,
-                }
-                for e in self.get_events()
-            ]
-            with open(file_path, "w") as f:
-                json.dump(payload, f, indent=2, ensure_ascii=False)
-            return True
-        except Exception as e:
-            logger.error(f"Failed to dump events JSON: {e}")
-            return False
+        return DebugTracer.dump_events_json(self.get_events(), file_path)

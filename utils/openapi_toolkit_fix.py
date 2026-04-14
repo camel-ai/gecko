@@ -8,6 +8,32 @@ from camel.toolkits import FunctionTool
 logger = logging.getLogger(__name__)
 
 
+
+def _normalize_kwargs_for_export(kwargs: Dict[str, Any], params: Dict[str, Any]) -> Dict[str, Any]:
+    normalized = _materialize_numeric_defaults_for_export(dict(kwargs) if isinstance(kwargs, dict) else kwargs, params)
+    return _canonicalize_kwargs_for_export(normalized, params)
+
+
+def _materialize_numeric_defaults_for_export(kwargs: Dict[str, Any], params: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(kwargs, dict):
+        return kwargs
+
+    normalized = dict(kwargs)
+    for key, schema in params.items():
+        if key in normalized or not isinstance(schema, dict):
+            continue
+        default = schema.get("default")
+        if isinstance(default, bool):
+            continue
+        if isinstance(default, (int, float)):
+            normalized[key] = default
+    return normalized
+
+
+def _canonicalize_kwargs_for_export(kwargs: Dict[str, Any], params: Dict[str, Any]) -> Dict[str, Any]:
+    return dict(kwargs) if isinstance(kwargs, dict) else kwargs
+
+
 def wrap_openapi_tool(original_tool: FunctionTool) -> FunctionTool:
     """
     Wrap an OpenAPIToolkit FunctionTool to handle requestBody parameter format.
@@ -116,19 +142,12 @@ def wrap_openapi_tool(original_tool: FunctionTool) -> FunctionTool:
 
 
 def fix_openapi_tools(tools: List[FunctionTool]) -> List[FunctionTool]:
-    """
-    Fix all OpenAPIToolkit tools to handle requestBody parameter format.
-
-    Args:
-        tools: List of FunctionTool objects from OpenAPIToolkit
-
-    Returns:
-        List of wrapped FunctionTool objects with fixed parameter handling
-    """
+    import re
     fixed_tools = []
     for tool in tools:
         try:
             fixed_tool = wrap_openapi_tool(tool)
+            fixed_tool = _strip_schema_prefix_from_tool(fixed_tool)
             fixed_tools.append(fixed_tool)
         except Exception as e:
             logger.warning(f"Failed to wrap tool: {e}")
@@ -137,6 +156,47 @@ def fix_openapi_tools(tools: List[FunctionTool]) -> List[FunctionTool]:
 
     logger.info(f"Fixed {len(fixed_tools)} OpenAPIToolkit tools for requestBody handling")
     return fixed_tools
+
+
+def _strip_schema_prefix_from_tool(tool: FunctionTool) -> FunctionTool:
+    import re
+    schema = getattr(tool, 'openai_tool_schema', None)
+    if not schema:
+        return tool
+
+    # Get current name and description from nested or flat schema
+    if 'function' in schema:
+        name = schema['function'].get('name', '')
+        desc = schema['function'].get('description', '')
+    else:
+        name = schema.get('name', '')
+        desc = schema.get('description', '')
+
+    prefix_match = re.match(r'^([A-Z]{1,4}\d+)_', name)
+    if not prefix_match:
+        return tool
+
+    prefix = prefix_match.group(1)  # e.g. "LM1023"
+    new_name = name[len(prefix) + 1:]  # Strip "LM1023_"
+
+    new_desc = desc
+    new_desc = re.sub(
+        rf'\s*This function is from {re.escape(prefix)}[ .]?(?:API\.?)?\s*'
+        rf'(?:(?:The\s+)?{re.escape(prefix)}\b.*)?$',
+        '', new_desc, flags=re.DOTALL,
+    )
+    new_desc = new_desc.strip()
+
+    # Update the schema
+    if 'function' in schema:
+        schema['function']['name'] = new_name
+        schema['function']['description'] = new_desc
+    else:
+        schema['name'] = new_name
+        schema['description'] = new_desc
+
+    logger.debug(f"Stripped schema prefix: {name} -> {new_name}")
+    return tool
 
 
 # Monkey-patch for OpenAPIToolkit to automatically fix tools on generation

@@ -14,6 +14,8 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
+_SENTINEL = object()
+
 
 @dataclass
 class FunctionInfo:
@@ -395,6 +397,43 @@ class EnhancedPythonParser:
             helper_functions=helper_functions,
         )
 
+    @staticmethod
+    def _ast_node_to_value(node: ast.AST) -> Any:
+        """Convert an AST default-value node to a Python literal. Returns _SENTINEL on failure."""
+        if isinstance(node, ast.Constant):
+            return node.value
+        if isinstance(node, ast.List):
+            items = [EnhancedPythonParser._ast_node_to_value(e) for e in node.elts]
+            if _SENTINEL in items:
+                return _SENTINEL
+            return items
+        if isinstance(node, ast.Tuple):
+            items = [EnhancedPythonParser._ast_node_to_value(e) for e in node.elts]
+            if _SENTINEL in items:
+                return _SENTINEL
+            return items
+        if isinstance(node, ast.Dict):
+            keys = [EnhancedPythonParser._ast_node_to_value(k) for k in node.keys if k is not None]
+            vals = [EnhancedPythonParser._ast_node_to_value(v) for v in node.values]
+            if _SENTINEL in keys or _SENTINEL in vals:
+                return _SENTINEL
+            return dict(zip(keys, vals))
+        if isinstance(node, ast.Set):
+            items = [EnhancedPythonParser._ast_node_to_value(e) for e in node.elts]
+            if _SENTINEL in items:
+                return _SENTINEL
+            return items
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+            operand = EnhancedPythonParser._ast_node_to_value(node.operand)
+            if operand is _SENTINEL:
+                return _SENTINEL
+            return -operand
+        if isinstance(node, ast.Name) and node.id in ("True", "False", "None"):
+            return {"True": True, "False": False, "None": None}[node.id]
+        if isinstance(node, ast.Attribute):
+            return _SENTINEL  # skip complex expressions
+        return _SENTINEL
+
     def _parse_function(self, node: ast.FunctionDef, content: str) -> Optional[FunctionInfo]:
         docstring = ast.get_docstring(node) or ""
         parameters = []
@@ -431,6 +470,10 @@ class EnhancedPythonParser:
                 arg_index = index + self_offset
                 if arg_index >= num_no_default:
                     param["required"] = False
+                    default_node = defaults[arg_index - num_no_default]
+                    default_val = self._ast_node_to_value(default_node)
+                    if default_val is not _SENTINEL:
+                        param["default"] = default_val
 
         return_type = None
         if node.returns:
@@ -539,13 +582,150 @@ def _collect_self_root(expr: ast.AST, roots: Set[str]) -> None:
         _collect_self_root(expr.value, roots)
 
 
+def _extract_equality_keys_from_condition(node: ast.expr) -> List[str]:
+    """Extract lookup keys from an if/elif condition node.
+
+    Supported patterns::
+
+        x == "value"                                    -> ["value"]
+        x == "a" and y == "b"                           -> ["a|b"]
+        (x == "a" and y == "b") or (x == "c" and y == "d") -> ["a|b", "c|d"]
+    """
+    if isinstance(node, ast.BoolOp) and isinstance(node.op, ast.Or):
+        keys: List[str] = []
+        for sub in node.values:
+            keys.extend(_extract_equality_keys_from_condition(sub))
+        return keys
+
+    if isinstance(node, ast.BoolOp) and isinstance(node.op, ast.And):
+        values: List[str] = []
+        for sub in node.values:
+            if (
+                isinstance(sub, ast.Compare)
+                and len(sub.ops) == 1
+                and isinstance(sub.ops[0], ast.Eq)
+            ):
+                val = _literal_eval_node(sub.comparators[0])
+                if isinstance(val, (str, int, float)):
+                    values.append(str(val))
+                else:
+                    return []
+            else:
+                return []
+        return ["|".join(values)] if values else []
+
+    if (
+        isinstance(node, ast.Compare)
+        and len(node.ops) == 1
+        and isinstance(node.ops[0], ast.Eq)
+    ):
+        val = _literal_eval_node(node.comparators[0])
+        if isinstance(val, (str, int, float)):
+            return [str(val)]
+    return []
+
+
+def _extract_if_elif_lookups(func_node: ast.FunctionDef) -> Dict[str, Any]:
+    """Extract if/elif chains as lookup tables.
+
+    Detects two patterns inside each branch:
+
+    * **Assignment pattern** – every branch assigns a literal to the same variable.
+    * **Return pattern** – every branch ``return``s a literal dict/list.
+
+    Returns ``{var_name: {key: value, ...}}`` or
+    ``{"return_lookup": {key: value, ...}}``.
+    """
+    results: Dict[str, Any] = {}
+
+    for stmt in func_node.body:
+        if not isinstance(stmt, ast.If):
+            continue
+
+        # Collect all branches: [(condition_or_None, body_stmts)]
+        branches: List[Tuple[Optional[ast.expr], List[ast.stmt]]] = []
+        current = stmt
+        while True:
+            branches.append((current.test, current.body))
+            if len(current.orelse) == 1 and isinstance(current.orelse[0], ast.If):
+                current = current.orelse[0]
+            elif current.orelse:
+                branches.append((None, current.orelse))  # else
+                break
+            else:
+                break
+
+        if len(branches) < 3:
+            continue
+
+        var_name: Optional[str] = None
+        entries: List[Tuple[str, Any]] = []
+        valid = True
+
+        for condition, body_stmts in branches:
+            value = None
+            branch_var: Optional[str] = None
+
+            for body_stmt in body_stmts:
+                if isinstance(body_stmt, ast.Assign) and len(body_stmt.targets) == 1:
+                    target = body_stmt.targets[0]
+                    if isinstance(target, ast.Name):
+                        val = _literal_eval_node(body_stmt.value)
+                        if val is not None and isinstance(val, (dict, list)):
+                            value = val
+                            branch_var = target.id
+                elif isinstance(body_stmt, ast.Return):
+                    val = _literal_eval_node(body_stmt.value)
+                    if val is not None and isinstance(val, (dict, list)):
+                        value = val
+
+            if value is None:
+                valid = False
+                break
+
+            if branch_var is not None:
+                if var_name is None:
+                    var_name = branch_var
+                elif branch_var != var_name:
+                    valid = False
+                    break
+
+            if condition is None:
+                entries.append(("_default", value))
+            else:
+                keys = _extract_equality_keys_from_condition(condition)
+                if not keys:
+                    valid = False
+                    break
+                for key in keys:
+                    entries.append((key, value))
+
+        if not valid or len(entries) < 3:
+            continue
+
+        table: Dict[str, Any] = {}
+        for key, value in entries:
+            table[key] = value
+
+        name = var_name if var_name else "return_lookup"
+        results[name] = table
+
+    return results
+
+
 def _extract_static_data_from_method(method: FunctionInfo) -> Dict[str, Any]:
     func_node = _parse_method_node(method.source_code)
     if not func_node:
         return {}
 
+    # Phase 1: extract if/elif lookup tables
+    if_elif_lookups = _extract_if_elif_lookups(func_node)
+    if_elif_vars = set(if_elif_lookups.keys()) - {"return_lookup"}
+
     def _should_keep(name: str, literal: Any) -> bool:
         if name == "__return__":
+            return False
+        if name in if_elif_vars:
             return False
         if isinstance(literal, dict):
             return True
@@ -555,6 +735,7 @@ def _extract_static_data_from_method(method: FunctionInfo) -> Dict[str, Any]:
             return len(literal) > 0
         return False
 
+    # Phase 2: simple assignments (original logic, skips if_elif_vars)
     static_data: Dict[str, Any] = {}
     for node in ast.walk(func_node):
         if isinstance(node, ast.Assign):
@@ -572,19 +753,23 @@ def _extract_static_data_from_method(method: FunctionInfo) -> Dict[str, Any]:
             if isinstance(node.target, ast.Name):
                 if _should_keep(node.target.id, literal):
                     static_data[node.target.id] = literal
-    # Capture direct constant return payloads (e.g., list_all_* methods returning
-    # literal lists) so callers can inherit deterministic constraints.
-    direct_returns: List[Any] = []
-    for stmt in func_node.body:
-        if not isinstance(stmt, ast.Return):
-            continue
-        literal = _literal_eval_node(stmt.value)
-        if isinstance(literal, (dict, list, tuple)) and literal:
-            direct_returns.append(literal)
-    if len(direct_returns) == 1:
-        static_data["return_value"] = direct_returns[0]
-    elif len(direct_returns) > 1:
-        static_data["return_values"] = direct_returns[:3]
+
+    # Phase 3: merge if/elif lookup tables
+    static_data.update(if_elif_lookups)
+
+    # Phase 4: direct constant return payloads (only when no return_lookup)
+    if "return_lookup" not in if_elif_lookups:
+        direct_returns: List[Any] = []
+        for stmt in func_node.body:
+            if not isinstance(stmt, ast.Return):
+                continue
+            literal = _literal_eval_node(stmt.value)
+            if isinstance(literal, (dict, list, tuple)) and literal:
+                direct_returns.append(literal)
+        if len(direct_returns) == 1:
+            static_data["return_value"] = direct_returns[0]
+        elif len(direct_returns) > 1:
+            static_data["return_values"] = direct_returns[:3]
     return static_data
 
 
@@ -626,18 +811,29 @@ def _extract_validation_rules_from_method(method: FunctionInfo) -> List[Dict[str
 
     rules: List[Dict[str, Any]] = []
     seen = set()
+
+    def _add_rule(rule: Dict[str, Any]) -> None:
+        marker = json.dumps(rule, ensure_ascii=False, sort_keys=True)
+        if marker not in seen:
+            seen.add(marker)
+            rules.append(rule)
+
     for node in ast.walk(func_node):
         if isinstance(node, ast.If):
             condition = _safe_unparse(node.test)
+            # Check if-body for error returns
             for body_node in node.body:
                 if isinstance(body_node, ast.Return):
                     signature = _extract_return_signature(body_node.value)
                     if signature:
-                        rule = {"condition": condition, "result": signature}
-                        marker = json.dumps(rule, ensure_ascii=False, sort_keys=True)
-                        if marker not in seen:
-                            seen.add(marker)
-                            rules.append(rule)
+                        _add_rule({"condition": condition, "result": signature})
+            # Check else-body for error returns (negated condition)
+            for else_node in node.orelse:
+                if isinstance(else_node, ast.Return):
+                    signature = _extract_return_signature(else_node.value)
+                    if signature:
+                        negated = f"not ({condition})"
+                        _add_rule({"condition": negated, "result": signature})
         elif isinstance(node, ast.Raise):
             if isinstance(node.exc, ast.Call):
                 exc_name = _safe_unparse(node.exc.func)

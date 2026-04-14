@@ -1,3 +1,4 @@
+import glob
 import json
 import logging
 import os
@@ -6,6 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from benchmarks.bfcl.utils import derive_single_turn_schema_name
 from gats.core.task import GATSTask, GATSResult
+from utils.openapi_toolkit_fix import _normalize_kwargs_for_export
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +33,184 @@ MULTI_TURN_SCHEMA_MAP = {
     "VehicleControl": "VehicleControlAPI.json",
     "VehicleControlAPI": "VehicleControlAPI.json",
 }
+
+# Lazy cache: {func_name: {param_name: schema_type}} for int→float coercion
+_MULTI_TURN_PARAM_TYPES: Dict[str, Dict[str, str]] = {}
+_SINGLE_TURN_PARAM_SCHEMAS: Dict[str, Dict[str, Dict[str, Any]]] = {}
+_SINGLE_TURN_REQUIRED_PARAMS: Dict[str, Dict[str, set]] = {}
+
+
+def _get_multi_turn_param_types() -> Dict[str, Dict[str, str]]:
+    """Build and cache a mapping of {func_name: {param_name: type}} from multi-turn OpenAPI schemas."""
+    if _MULTI_TURN_PARAM_TYPES:
+        return _MULTI_TURN_PARAM_TYPES
+
+    schema_dir = os.path.join(SCHEMA_BASE_DIR, "multi_turn")
+    for schema_file in glob.glob(os.path.join(schema_dir, "*.json")):
+        with open(schema_file) as f:
+            schema = json.load(f)
+        for path, methods in schema.get("paths", {}).items():
+            for method, details in methods.items():
+                func_name = details.get("operationId", "")
+                if not func_name:
+                    continue
+                param_types: Dict[str, str] = {}
+                body = details.get("requestBody", {})
+                if body:
+                    content = body.get("content", {}).get("application/json", {}).get("schema", {})
+                    for pname, pschema in content.get("properties", {}).items():
+                        param_types[pname] = pschema.get("type", "")
+                for p in details.get("parameters", []):
+                    param_types[p["name"]] = p.get("schema", {}).get("type", "")
+                _MULTI_TURN_PARAM_TYPES[func_name] = param_types
+
+    return _MULTI_TURN_PARAM_TYPES
+
+
+def _get_single_turn_param_schemas(test_id: str) -> Dict[str, Dict[str, Any]]:
+    """Build and cache {operation_id: {param_name: param_schema}} for one single-turn task."""
+    cached = _SINGLE_TURN_PARAM_SCHEMAS.get(test_id)
+    if cached is not None:
+        return cached
+
+    param_schemas: Dict[str, Dict[str, Any]] = {}
+    try:
+        schema_path = resolve_single_turn_schemas(test_id)[0]
+        with open(schema_path) as f:
+            schema = json.load(f)
+        for methods in schema.get("paths", {}).values():
+            if not isinstance(methods, dict):
+                continue
+            for details in methods.values():
+                if not isinstance(details, dict):
+                    continue
+                operation_id = details.get("operationId", "")
+                if not operation_id:
+                    continue
+                body_schema = (
+                    details.get("requestBody", {})
+                    .get("content", {})
+                    .get("application/json", {})
+                    .get("schema", {})
+                )
+                properties = body_schema.get("properties", {})
+                if isinstance(properties, dict):
+                    param_schemas[operation_id] = properties
+    except Exception as exc:
+        logger.debug("Failed to load single-turn param schemas for %s: %s", test_id, exc)
+
+    _SINGLE_TURN_PARAM_SCHEMAS[test_id] = param_schemas
+    return param_schemas
+
+
+def _lookup_param_schema(
+    schemas: Dict[str, Dict[str, Any]], func_name: str
+) -> Dict[str, Any]:
+    """Look up param schema with BFCL dot→underscore fallback.
+
+    BFCL function names use dot notation (e.g. ``investment.predictProfit``)
+    while OpenAPI operationIds use underscores (``investment_predictProfit``).
+    """
+    result = schemas.get(func_name)
+    if result:
+        return result
+    if '.' in func_name:
+        result = schemas.get(func_name.replace('.', '_'))
+        if result:
+            return result
+    return {}
+
+
+def _get_single_turn_required_params(test_id: str) -> Dict[str, set]:
+    """Build and cache {operation_id: set(required_param_names)} for one single-turn task."""
+    cached = _SINGLE_TURN_REQUIRED_PARAMS.get(test_id)
+    if cached is not None:
+        return cached
+
+    required_map: Dict[str, set] = {}
+    try:
+        schema_path = resolve_single_turn_schemas(test_id)[0]
+        with open(schema_path) as f:
+            schema = json.load(f)
+        for methods in schema.get("paths", {}).values():
+            if not isinstance(methods, dict):
+                continue
+            for details in methods.values():
+                if not isinstance(details, dict):
+                    continue
+                operation_id = details.get("operationId", "")
+                if not operation_id:
+                    continue
+                body_schema = (
+                    details.get("requestBody", {})
+                    .get("content", {})
+                    .get("application/json", {})
+                    .get("schema", {})
+                )
+                required_map[operation_id] = set(body_schema.get("required", []))
+    except Exception:
+        pass
+
+    _SINGLE_TURN_REQUIRED_PARAMS[test_id] = required_map
+    return required_map
+
+
+def _fill_optional_defaults(
+    args: Dict[str, Any],
+    param_schemas: Dict[str, Any],
+    required_params: set,
+) -> Dict[str, Any]:
+    """Fill schema defaults for optional params the agent omitted.
+
+    Only fills when the schema has an explicit ``default`` field.
+    Returns a new dict (does not mutate *args*).
+    """
+    result = dict(args)
+    for param_name, param_schema in param_schemas.items():
+        if param_name in result:
+            continue
+        if param_name in required_params:
+            continue
+        if not isinstance(param_schema, dict):
+            continue
+        if "default" in param_schema:
+            default_val = param_schema["default"]
+            schema_type = param_schema.get("type")
+            if isinstance(default_val, str) and schema_type:
+                if schema_type == "boolean":
+                    default_val = default_val.lower() not in ("false", "0", "")
+                elif schema_type == "integer":
+                    try:
+                        default_val = int(default_val)
+                    except (ValueError, TypeError):
+                        pass
+                elif schema_type == "number":
+                    try:
+                        default_val = float(default_val)
+                    except (ValueError, TypeError):
+                        pass
+            result[param_name] = default_val
+    return result
+
+
+def _strip_dontcare_booleans(
+    args: Dict[str, Any],
+    param_schemas: Dict[str, Any],
+) -> Dict[str, Any]:
+    result = dict(args)
+    for param_name, value in list(result.items()):
+        if not isinstance(value, str) or value.lower() != "dontcare":
+            continue
+        schema = param_schemas.get(param_name)
+        if not isinstance(schema, dict):
+            continue
+        enum = schema.get("enum")
+        if not isinstance(enum, list):
+            continue
+        enum_lower = {str(v).lower() for v in enum}
+        if enum_lower == {"true", "false", "dontcare"}:
+            del result[param_name]
+    return result
 
 
 def resolve_single_turn_schemas(test_id: str) -> List[str]:
@@ -205,6 +385,28 @@ def build_agent_prompt_with_system_messages(
 # ---------------------------------------------------------------------------
 
 BFCL_TASK_DIR = os.path.join(_PROJECT_ROOT, "data", "bfcl_v4", "task")
+BFCL_ANSWER_DIR = os.path.join(_PROJECT_ROOT, "data", "bfcl_v4", "possible_answer")
+
+
+def _load_ground_truth_map(category: str) -> Dict[str, Any]:
+    """Load ground truth answers keyed by test ID for a category."""
+    answer_file = os.path.join(BFCL_ANSWER_DIR, f"BFCL_v4_{category}.json")
+    if not os.path.exists(answer_file):
+        return {}
+    gt_map: Dict[str, Any] = {}
+    try:
+        with open(answer_file, "r", encoding="utf-8") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                data = json.loads(line)
+                tid = str(data.get("id", ""))
+                gt = data.get("ground_truth")
+                if tid and gt is not None:
+                    gt_map[tid] = gt
+    except Exception:
+        logger.debug(f"Could not load ground truth from {answer_file}")
+    return gt_map
 
 
 def load_single_turn_tasks(
@@ -220,6 +422,8 @@ def load_single_turn_tasks(
     task_file = os.path.join(BFCL_TASK_DIR, f"BFCL_v4_{category}.json")
     if not os.path.exists(task_file):
         raise FileNotFoundError(f"BFCL task file not found: {task_file}")
+
+    gt_map = _load_ground_truth_map(category)
 
     tasks: List[GATSTask] = []
     with open(task_file, "r", encoding="utf-8") as f:
@@ -252,16 +456,27 @@ def load_single_turn_tasks(
                 base_agent_prompt, system_messages
             )
 
+            gt = gt_map.get(raw_id)
+            if gt is None:
+                for gt_id, gt_val in gt_map.items():
+                    if gt_id == raw_id or gt_id.startswith(f"{raw_id}-"):
+                        gt = gt_val
+                        break
+
+            metadata: Dict[str, Any] = {
+                "category": test_category,
+                "involved_classes": involved_classes,
+            }
+            if gt is not None:
+                metadata["ground_truth"] = gt
+
             tasks.append(
                 GATSTask(
                     id=raw_id,
                     turns=[question_text],
                     tool_schemas=tool_schemas,
                     initial_config=initial_config,
-                    metadata={
-                        "category": test_category,
-                        "involved_classes": involved_classes,
-                    },
+                    metadata=metadata,
                     agent_prompt=effective_prompt,
                 )
             )
@@ -376,10 +591,24 @@ def filter_tasks_by_ids(
     ids: Optional[List[str]] = None,
     pattern: Optional[str] = None,
 ) -> List[GATSTask]:
-    """Filter loaded tasks by IDs or regex pattern."""
     if ids is not None:
-        id_set = set(ids)
-        return [t for t in tasks if t.id in id_set]
+        task_ids = {t.id for t in tasks}
+        matched_ids = set()
+
+        for requested_id in ids:
+            if requested_id in task_ids:
+                matched_ids.add(requested_id)
+                continue
+
+            for task_id in task_ids:
+                if (
+                    task_id.startswith(requested_id)
+                    and len(task_id) > len(requested_id)
+                    and task_id[len(requested_id)] in {"-", "_"}
+                ):
+                    matched_ids.add(task_id)
+
+        return [t for t in tasks if t.id in matched_ids]
     if pattern:
         regex = re.compile(pattern)
         return [t for t in tasks if regex.search(t.id)]
@@ -409,6 +638,14 @@ def _extract_tool_call_error(result: Any) -> Optional[str]:
     if isinstance(result, str) and "error" in result.lower():
         return result
     return None
+
+
+def _is_gecko_validation_error(result: Any) -> bool:
+    if isinstance(result, dict):
+        detail = result.get("detail")
+        if isinstance(detail, dict) and detail.get("error_message"):
+            return True
+    return False
 
 
 def filter_failed_tool_calls(
@@ -456,9 +693,11 @@ def _format_single_turn_eval(
     if result.turns:
         turn = result.turns[0]
         if 0 <= turn.best_attempt < len(turn.attempts):
-            calls = filter_failed_tool_calls(
-                turn.attempts[turn.best_attempt].tool_calls
-            )
+            raw_calls = turn.attempts[turn.best_attempt].tool_calls or []
+            calls = [
+                tc for tc in raw_calls
+                if not _is_gecko_validation_error(tc.get("result"))
+            ]
 
     bfcl_result: List[Dict[str, str]] = []
     for tc in calls:
@@ -472,22 +711,49 @@ def _format_single_turn_eval(
             func_name = raw_name
 
         arguments = tc.get("arguments", {})
+        export_arguments = tc.get("original_arguments", arguments)
         if isinstance(arguments, str):
             try:
-                parsed = json.loads(arguments)
+                parsed = json.loads(export_arguments)
                 if isinstance(parsed, dict) and "requestBody" in parsed:
-                    args_json = json.dumps(parsed["requestBody"])
+                    params = _lookup_param_schema(_get_single_turn_param_schemas(result.task_id), func_name)
+                    normalized_args = _normalize_kwargs_for_export(parsed["requestBody"], params)
+                    args_json = json.dumps(normalized_args)
                 else:
-                    args_json = arguments
+                    params = _lookup_param_schema(_get_single_turn_param_schemas(result.task_id), func_name)
+                    normalized_args = _normalize_kwargs_for_export(parsed, params) if isinstance(parsed, dict) else parsed
+                    args_json = json.dumps(normalized_args) if isinstance(normalized_args, dict) else export_arguments
             except (json.JSONDecodeError, TypeError):
-                args_json = arguments
-        elif isinstance(arguments, dict):
-            if "requestBody" in arguments:
-                args_json = json.dumps(arguments["requestBody"])
+                args_json = export_arguments
+        elif isinstance(export_arguments, dict):
+            if "requestBody" in export_arguments:
+                params = _lookup_param_schema(_get_single_turn_param_schemas(result.task_id), func_name)
+                args_json = json.dumps(_normalize_kwargs_for_export(export_arguments["requestBody"], params))
             else:
-                args_json = json.dumps(arguments)
+                params = _lookup_param_schema(_get_single_turn_param_schemas(result.task_id), func_name)
+                args_json = json.dumps(_normalize_kwargs_for_export(export_arguments, params))
         else:
-            args_json = json.dumps(arguments)
+            args_json = json.dumps(export_arguments)
+
+        # Post-process: fill schema defaults for omitted optional params
+        try:
+            parsed_args = json.loads(args_json)
+            if isinstance(parsed_args, dict):
+                params = _lookup_param_schema(
+                    _get_single_turn_param_schemas(result.task_id), func_name
+                )
+                req_map = _get_single_turn_required_params(result.task_id)
+                required = (
+                    req_map.get(func_name)
+                    or (req_map.get(func_name.replace('.', '_')) if '.' in func_name else None)
+                    or set()
+                )
+                if params:
+                    filled = _fill_optional_defaults(parsed_args, params, required)
+                    filled = _strip_dontcare_booleans(filled, params)
+                    args_json = json.dumps(filled)
+        except (json.JSONDecodeError, TypeError):
+            pass
 
         bfcl_result.append({func_name: args_json})
 
@@ -520,13 +786,18 @@ def _format_tool_call_as_string(
 
     if isinstance(arguments, dict):
         param_strs = []
+        param_types = _get_multi_turn_param_types().get(func_name, {})
         for key, value in arguments.items():
             if key == "requestBody" and isinstance(value, dict):
                 for k, v in value.items():
+                    if isinstance(v, int) and not isinstance(v, bool) and param_types.get(k) == "number":
+                        v = float(v)
                     param_strs.append(f"{k}={repr(v)}")
             else:
+                if isinstance(value, int) and not isinstance(value, bool) and param_types.get(key) == "number":
+                    value = float(value)
                 param_strs.append(f"{key}={repr(value)}")
-        return f"{func_name}({', '.join(param_strs)})"
+        return f"{func_name}({','.join(param_strs)})"
     return f"{func_name}({arguments})"
 
 
@@ -536,14 +807,22 @@ def _format_multi_turn_eval(
     """Multi-turn BFCL eval: {"id": ..., "result": [["func(a=1)"], ...], ...}"""
     all_turn_calls: List[List[str]] = []
     for turn in result.turns:
-        calls: List[Dict[str, Any]] = []
-        if 0 <= turn.best_attempt < len(turn.attempts):
+        if turn.real_tool_calls:
+            calls = turn.real_tool_calls
+        elif 0 <= turn.best_attempt < len(turn.attempts):
             calls = turn.attempts[turn.best_attempt].tool_calls
+        else:
+            calls = []
 
         formatted = [
             _format_tool_call_as_string(tc, result.task_id, benchmark)
             for tc in calls
         ]
+        if len(formatted) > 1:
+            seen_last = {}
+            for i, s in enumerate(formatted):
+                seen_last[s] = i
+            formatted = [s for i, s in enumerate(formatted) if seen_last[s] == i]
         all_turn_calls.append(formatted)
 
     return {

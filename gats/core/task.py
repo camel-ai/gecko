@@ -11,8 +11,6 @@ class GATSTask:
     tool_schemas: List[str]  # OpenAPI spec file paths
     initial_config: Optional[Dict[str, Any]] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
-    # Per-task agent prompt override (e.g., base prompt + task system messages).
-    # If set, takes precedence over GATSConfig.agent_prompt for this task.
     agent_prompt: Optional[str] = None
 
 
@@ -41,6 +39,7 @@ class GATSTurn:
     checklist: List[Dict[str, Any]]
     config_after: Dict[str, Any]
     execution_time: float
+    real_tool_calls: List[Dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass

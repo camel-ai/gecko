@@ -141,7 +141,6 @@ Constraints:
             "name": tool.name,
             "description": tool.description,
             "request_schema": tool.request_schema,
-            "protected_request_paths": sorted(tool.protected_request_paths),
             "output_hint_schema": tool.output_hint_schema,
             "context_hints": tool.context_hints,
             "seed_success_schema": seed_success_schema,
@@ -165,7 +164,7 @@ Rules:
 - CRITICAL: Do NOT add minLength, maxLength, minimum, or maximum constraints that are not in the original specification unless they are obvious safety bounds (e.g., array maxItems for sanity).
 - CRITICAL: Do NOT add new properties/parameters in request_schema_updates that do not exist in the original specification. Only refine descriptions or add constraints to EXISTING properties.
 - CRITICAL: Do NOT fabricate unit specifications (e.g., "in cents", "in smallest unit", "in milliseconds") unless the original specification explicitly states the unit. If the unit is not specified, describe the parameter without assuming a unit system.
-- For parameters or array items with format "double" (floating-point), include in their description a note like "Provide as a decimal number (e.g., 1.0, not 1)" to ensure callers use floating-point notation.
+- CRITICAL: Do NOT rewrite or rephrase any description that is already present in request_schema properties — existing descriptions must be copied verbatim into request_schema_updates if you reference them at all.
 - success_schema must be executable OpenAPI schema with no $ref.
 - Do not include error wrapper/object in success_schema; return only the successful payload structure.
 - Do not output confidence or reasoning fields.

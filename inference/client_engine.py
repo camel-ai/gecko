@@ -44,8 +44,6 @@ class InferenceConfig:
     enable_judge: bool = True
     enable_checklist: bool = True
     final_state_only: bool = False
-    
-    enable_tool_filtering: bool = False
 
 
 @dataclass

@@ -8,6 +8,7 @@ from typing import List
 import copy
 import json
 import re
+from .global_config import get_agent_timeout
 class RequestValidator:
     """Validates requests against OpenAPI schemas using openapi_core."""
     
@@ -19,6 +20,27 @@ class RequestValidator:
         """
         self.schema = schema
         self.validation_model = validation_model
+
+    _SEMANTIC_STRIP_KEYS = {
+        "enum",
+        "const",
+        "minimum",
+        "maximum",
+        "exclusiveMinimum",
+        "exclusiveMaximum",
+        "multipleOf",
+        "minLength",
+        "maxLength",
+        "pattern",
+        "format",
+        "minItems",
+        "maxItems",
+        "uniqueItems",
+        "minProperties",
+        "maxProperties",
+        "additionalProperties",
+        "required",
+    }
 
     def _check_numeric_bounds(self, value: float, schema: Dict[str, Any], display_context: str) -> Optional[Dict[str, str]]:
         if "minimum" in schema:
@@ -82,15 +104,12 @@ class RequestValidator:
         expected_format = schema.get("format")
         enum = schema.get("enum")
 
-        if enum and value not in enum:
-            return {"error_message": f"{display_context} must be one of {enum}, got '{value}'"}
-
         # Basic type checks + extended rule checks
         if expected_type == "number":
             if not isinstance(value, (int, float)) or isinstance(value, bool):
                 return {"error_message": f"{display_context} should be a number, not {type(value).__name__}"}
-            if isinstance(value, int) and expected_format == "float":
-                return {"error_message": f"{display_context} should be a float (e.g., 1.0), not an integer"}
+            if isinstance(value, int) and expected_format in ("float", "double"):
+                return {"error_message": f"{display_context} should be a float (e.g., {float(value)}), not an integer ({value})"}
             bounds_err = self._check_numeric_bounds(float(value), schema, display_context)
             if bounds_err:
                 return bounds_err
@@ -105,6 +124,8 @@ class RequestValidator:
         elif expected_type == "string":
             if not isinstance(value, str):
                 return {"error_message": f"{display_context} should be a string, not {type(value).__name__}"}
+            if enum and value not in enum:
+                return {"error_message": f"{display_context} must be one of {enum}, got '{value}'"}
             fmt_err = self._check_string_rules(value, schema, display_context)
             if fmt_err:
                 return fmt_err
@@ -127,7 +148,11 @@ class RequestValidator:
                     if key in seen:
                         return {"error_message": f"{display_context} should contain unique items"}
                     seen.add(key)
-            item_schema = schema.get("items", {})
+            item_schema = copy.deepcopy(schema.get("items", {}))
+            # Some generated schemas incorrectly attach enum to the array itself
+            # even though each item is the enumerated value. Treat that as item enum.
+            if enum and "enum" not in item_schema:
+                item_schema["enum"] = enum
             for idx, item in enumerate(value):
                 error = self.validate_schema_value(item, item_schema, f"{context}[{idx}]")
                 if error:
@@ -156,6 +181,66 @@ class RequestValidator:
                         return error
 
         return None  # No errors
+
+    def _collect_schema_field_map(self, operation: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+        field_map: Dict[str, Dict[str, Any]] = {}
+        for param in operation.get("parameters", []):
+            name = param.get("name")
+            if name:
+                field_map[name] = copy.deepcopy(param.get("schema", {}))
+        if "requestBody" in operation:
+            json_schema = (
+                operation["requestBody"]
+                .get("content", {})
+                .get("application/json", {})
+                .get("schema", {})
+            )
+            for name, schema in (json_schema.get("properties") or {}).items():
+                field_map[name] = copy.deepcopy(schema)
+        return field_map
+
+    def _sanitize_schema_for_semantic_validation(self, schema: Any) -> Any:
+        if isinstance(schema, list):
+            return [self._sanitize_schema_for_semantic_validation(item) for item in schema]
+        if not isinstance(schema, dict):
+            return schema
+
+        sanitized: Dict[str, Any] = {}
+        for key, value in schema.items():
+            if key in self._SEMANTIC_STRIP_KEYS:
+                continue
+            if key in {"properties", "items", "anyOf", "oneOf", "allOf"}:
+                sanitized[key] = self._sanitize_schema_for_semantic_validation(value)
+            else:
+                sanitized[key] = copy.deepcopy(value)
+        return sanitized
+
+    def _semantic_error_contradicts_schema(
+        self, args: Dict[str, Any], field_map: Dict[str, Dict[str, Any]], error_message: str
+    ) -> bool:
+        lowered = (error_message or "").lower()
+        if not lowered:
+            return False
+
+        for name, value in args.items():
+            schema = field_map.get(name)
+            if not schema:
+                continue
+
+            # Exact enum matches should never be rejected by semantic validation.
+            if schema.get("type") == "string" and isinstance(value, str):
+                enum = schema.get("enum")
+                if enum and value in enum and name.lower() in lowered and "enum" in lowered:
+                    return True
+
+            # Exact deterministic validation wins over contradictory semantic rejections.
+            err = self.validate_schema_value(value, schema, name)
+            if err is None and name.lower() in lowered and (
+                "enum" in lowered or "pattern" in lowered or "format" in lowered
+            ):
+                return True
+
+        return False
 
     async def validate_request(self, request: Request, path: str, method: str, api_name: str) -> Tuple[bool, Optional[Dict[str, str]]]:
         try:
@@ -349,13 +434,26 @@ class RequestValidator:
             session_id = request.headers.get("X-Session-ID")
 
             # Delegate to validate_params which already handles escaping and robustness
+            semantic_params_schema = [
+                self._sanitize_schema_for_semantic_validation(param_schema)
+                for param_schema in params_schema
+            ]
+
             validated_result = validate_params(
-                params_schema=params_schema,
+                params_schema=semantic_params_schema,
                 args=filtered_args,
                 temperature=0.001,
                 session_id=session_id,
                 validation_model=self.validation_model
             )
+            if not validated_result[0]:
+                field_map = self._collect_schema_field_map(operation)
+                if self._semantic_error_contradicts_schema(filtered_args, field_map, validated_result[1]):
+                    logging.warning(
+                        "Ignoring contradictory semantic validation error: %s",
+                        validated_result[1],
+                    )
+                    return True, ""
             return validated_result
         except Exception as e:
             logging.warning(f"validate_request_by_schema failed: {e}")
@@ -374,25 +472,25 @@ def validate_params(
     validation_model: str = "gpt-4.1-mini"
 ) -> Tuple[bool, str]:
     validate_params_prompt = """
-Please validate the given function call arguments against their parameter schemas.
+Please validate the given function call arguments for semantic fit only.
 
 **Validation Rules**:
-1. **Scope**  
-   - Only validate arguments defined in the provided schemas.  
-   - Ignore arguments not present in the schema (do not treat them as errors).  
-   - Type validation has already been handled elsewhere — skip type checking.
+1. **Scope**
+   - Only validate arguments defined in the provided schemas.
+   - Ignore arguments not present in the schema.
+   - Type checking and other hard schema constraints have already been handled elsewhere.
+   - Do NOT do enum membership checks, character-level regex matching, min/max/range checks, or length/item-count checks.
 
-2. **Semantic Checks**  
-   - Validate according to the parameter description, examples, enums, or format requirements.  
-   - If examples are provided (e.g. "full-time, part-time"), treat them as semantic categories. Any value in the same category (e.g. "internship", "contract") is valid.  
-   - If the description specifies a format (e.g. `YYYY-MM-DD`), enforce that exact pattern. However, if the argument is 'format', any format that matches the semantic meaning is valid (e.g. `format` in date tools can be `YYYY-MM-DD` or `YYYY`). 
-   - Use common sense to ensure values are within a reasonable range (e.g. interest rate ∈ [0,1]; clock hour ∈ [0,12]).  
-   - Detect redundant/overlapping information across arguments (e.g. `item="large pizza"` and `size="large"` → overlap).  
-   - Do NOT reject arguments based on dynamic runtime-state predicates that are not provided in args (e.g., "must exist in user_map", "must be logged in", "record must already exist"). Those are checked during tool execution, not request-shape validation.
-   - **Mandatory misplacement rule (hard fail)**: For free-form fields, if text contains semantics that belong to another dedicated structured parameter in schema, and that parameter is missing/empty in args, you MUST mark invalid.
-   - **Uncertainty policy (strict)**: "Default to valid when uncertain" applies ONLY when no dedicated structured parameter can represent the detected semantics. If such a parameter exists, do NOT default to valid.
+2. **Semantic Checks**
+   - Focus only on semantic fit between each argument and its parameter description.
+   - Use descriptions and examples to judge meaning, not literal hard constraints.
+   - Detect redundant/overlapping information across arguments (e.g. `item="large pizza"` and `size="large"`).
+   - Do NOT reject arguments based on dynamic runtime-state predicates not present in args (e.g. "must already exist", "must be logged in").
+   - **Mandatory misplacement rule (hard fail)**: If an optional parameter is omitted or empty, and another free-form field contains semantics that clearly belong in that dedicated parameter, mark invalid.
+   - **Described-format compliance (hard fail)**: When a description explicitly specifies a format using phrases like "in the format of" followed by a template and examples (e.g., "in the format of 'City, State', such as 'Los Angeles, CA'"), the value MUST follow that format. A bare value missing a required component (e.g., "Chicago" instead of "Chicago, IL") or using full names where abbreviations are shown in the examples (e.g., "California" instead of "CA") is invalid.
+   - If a value is semantically reasonable for the described field, prefer valid.
 
-3. **Error Messages**  
+3. **Error Messages**
    - Concise, precise, and human-readable.  
    - Do not include or suggest correct values.  
    - Only state which argument is invalid and why.
@@ -412,7 +510,7 @@ valid=\<true|false> error\_message="\<if false, list each invalid argument and r
 - **args**  
   `{"location": "London", "date": "01/01/2024"}`
 - **Output**  
-  `valid=false error_message="location not in required format (should include city and country); date not in required format (YYYY-MM-DD)"`
+  `valid=true error_message=""`
 
 **Few-shot (semantic misplacement)**:
 - **params_schema**
@@ -421,6 +519,14 @@ valid=\<true|false> error\_message="\<if false, list each invalid argument and r
   `{"text":"release update #urgent"}`
 - **Output**
   `valid=false error_message="text contains semantics that must be provided via labels; semantic misplacement."`
+
+**Few-shot (described-format compliance)**:
+- **params_schema**
+  `[{"name":"city","type":"string","description":"The city name, in the format of 'City, State' or 'City, Country'. Examples: 'San Francisco, CA' or 'Paris, FR'."}]`
+- **args**
+  `{"city": "Nairobi, Kenya"}`
+- **Output**
+  `valid=false error_message="city uses full country name 'Kenya'; the described format examples show two-letter abbreviations (e.g., 'FR'); expected abbreviated form."`
 """
  
     # Use create_model utility for all models
@@ -429,7 +535,7 @@ valid=\<true|false> error\_message="\<if false, list each invalid argument and r
     validate_params_assistant = ChatAgent(
         validate_params_prompt,
         model=model,
-        step_timeout=60.0,
+        step_timeout=get_agent_timeout(),
     )
     # Compose message using JSON only (no braces-escaping needed)
     message_payload = {

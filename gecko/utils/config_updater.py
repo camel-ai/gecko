@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from camel.agents import ChatAgent
 from utils.model_utils import create_model, sanitize_llm_json_text
-from .global_config import get_state_model
+from .global_config import get_state_model, get_agent_timeout
 import json_repair
 
 logger = logging.getLogger(__name__)
@@ -239,33 +239,19 @@ def apply_json_patch(target: Any, patch_ops: List[Dict[str, Any]]) -> Any:
 _FC_SYSTEM_PROMPT = """You are a state tracker. Given the previous state and a sequence of tool calls with their results, determine what state mutations occurred and call the provided tools to apply them.
 
 Rules:
-1. Read/query operations produce no mutations → call no_state_change().
-2. Context-changing operations (navigation, selection) → set_runtime_field(). value must be absolute (e.g. /workspace/document, not just document).
-3. Move/rename → move_entry() (atomic, never duplicate). For rename, pass new_name.
-4. Use tool results as source of truth.
-5. Process calls in listed order; if an earlier call changes scope, subsequent operations target the new scope.
-6. For write-like operations (names containing post/create/update/delete/add/remove/insert/append/set/move/mv/cp/touch/mkdir), do NOT default to no_state_change() when the call succeeded.
-7. If a successful response contains entity payload fields like id/content/tags/mentions/name/value (or a newly created object), you MUST emit explicit state mutations that explain that payload in state.
-8. no_state_change() is valid only when the operation is truly read-only OR the response explicitly indicates no mutation/error.
-9. STRICT runtime vs domain boundary:
-   - runtime_state is ONLY for transient execution context (e.g., current_working_directory, selected scope, cursor-like context).
-   - Business/domain data (tweets, comments, orders, tickets, files, counters, balances, records, collections) MUST be updated under the toolkit's normal state tree, NEVER under runtime_state.
-10. If Tool descriptions include state_hints.state_effects, treat them as high-priority mutation constraints and realize them in domain state paths.
-11. If a Required state effects section is provided for successful calls, you MUST realize every listed effect using domain-state mutations. no_state_change() is invalid for those calls.
-12. Canonical state location policy:
-   - For a toolkit, top-level state (/<ToolkitName>/...) is canonical for business truth.
-   - runtime_state/toolkits/<ToolkitName>/... is auxiliary runtime context only.
-   - If both contain overlapping business keys and conflict, follow and mutate top-level canonical state.
-13. Success mutation completeness:
-   - For successful create/book/post/add operations, ensure created entities are persisted in canonical collections/maps (e.g., records/lists/dicts) and counters/balances are updated consistently.
-   - If response includes identifiers (id/booking_id/transaction_id/message_id), mutations must make those identifiers explainable from canonical state.
-14. Authentication/session semantics:
-   - On successful auth/login, persist authenticated/session identity flags in canonical toolkit state (not runtime-only).
-   - Do not leave contradictory authenticated/session values across top-level and runtime_state.
+1. Read/query operations → no_state_change(). Write-like operations (post/create/update/delete/add/remove/send/set/move/...) that succeed MUST produce state mutations. no_state_change() is valid ONLY for truly read-only operations or explicit error responses.
+2. Use tool results as source of truth. Process calls in listed order.
+3. If a "Required state effects" section is provided, you MUST realize every listed effect. no_state_change() is invalid for those calls.
+4. State location: top-level /<ToolkitName>/... is canonical for domain data (tweets, orders, balances, counters, collections). runtime_state is ONLY for transient context (current_working_directory). Never put domain data in runtime_state.
+5. When a successful write operation creates or returns an entity (with fields like id, content, tags, etc.), persist it in the appropriate canonical collection using add_entry, and update related counters/balances consistently.
+6. When a successful response returns fields matching existing canonical state keys, update those state values to match (e.g. if response has {"remainingUnlockedDoors": 0} and state has "remainingUnlockedDoors": 4, emit replace_entry).
+7. On auth/login success, persist authentication flags in canonical toolkit state (not runtime-only).
+8. For filesystem toolkits: context-changing ops (cd/navigation) → set_runtime_field() with absolute paths; move/rename → move_entry() (atomic, never duplicate); scope from earlier calls affects subsequent ones.
 
 Path format for entry tools (add/remove/move/replace):
-- Paths can be relative to the current working scope (e.g. 'final_report.pdf') or absolute from config root (e.g. 'GorillaFileSystem/root/workspace/document/final_report.pdf').
-- Omit structural wrappers like 'contents' — the resolver handles them.
+- Use absolute paths from config root: '<ToolkitName>/<key>/...' (e.g. 'TwitterAPI/tweets', 'TradingBot/orders/12345', 'GorillaFileSystem/root/workspace/document').
+- Paths can also be relative to the current working scope when a filesystem toolkit is active.
+- For filesystem toolkits, omit structural 'contents' wrappers — the resolver handles them.
 """
 
 
@@ -282,34 +268,32 @@ def _fc_set_runtime_field(toolkit: str, key: str, value: str) -> str:
 
 def _fc_add_entry(parent_path: str, name: str, value_json: str) -> str:
     """Add a new child entry under parent_path.
-    parent_path: logical path with '/' separators, WITHOUT 'contents' wrappers.
-    name: key name for the new entry.
-    value_json: JSON string of the value to insert.
-      Directory: {"type":"directory","contents":{}}
-      File: {"type":"file","content":"..."}
+    parent_path: path with '/' separators (e.g. 'TwitterAPI/tweets', 'GorillaFileSystem/root/workspace').
+    name: key name for the new entry (e.g. '1', 'report.txt').
+    value_json: JSON string of the value to insert — any valid JSON (object, array, string, number, etc.).
     """
     return "ok"
 
 
 def _fc_remove_entry(entry_path: str) -> str:
     """Remove the entry at entry_path.
-    entry_path: logical path with '/' separators, WITHOUT 'contents' wrappers.
+    entry_path: logical path with '/' separators (e.g. 'TradingBot/watch_list/0', 'GorillaFileSystem/root/workspace/file.txt').
     """
     return "ok"
 
 
 def _fc_move_entry(source_path: str, dest_parent_path: str, new_name: str = "") -> str:
-    """Move an entry to a new parent directory, optionally renaming it.
+    """Move an entry to a new parent, optionally renaming it.
     source_path: logical path of the entry to move.
     dest_parent_path: logical path of the destination parent.
-    new_name: optional new basename for move+rename semantics.
+    new_name: optional new name for move+rename semantics.
     """
     return "ok"
 
 
 def _fc_replace_entry(entry_path: str, new_value_json: str) -> str:
     """Replace the value at entry_path.
-    entry_path: logical path with '/' separators, WITHOUT 'contents' wrappers.
+    entry_path: logical path with '/' separators (e.g. 'TwitterAPI/authenticated', 'TradingBot/account_info/balance').
     new_value_json: JSON string of the replacement value.
     """
     return "ok"
@@ -583,6 +567,104 @@ def _apply_counter_effect_guards(
     return apply_json_patch(_copy.deepcopy(state_result), guard_ops)
 
 
+def _get_toolkit_name_for_call(
+    call_name: str,
+    tool_descriptions: Optional[Dict[str, Any]],
+) -> Optional[str]:
+    """Extract toolkit name for a tool call from tool_descriptions."""
+    if not isinstance(tool_descriptions, dict):
+        return None
+    desc_entry = tool_descriptions.get(call_name)
+    if not isinstance(desc_entry, dict):
+        return None
+    toolkit_info = desc_entry.get("toolkit")
+    if isinstance(toolkit_info, dict):
+        name = toolkit_info.get("name")
+        if isinstance(name, str) and name:
+            return name
+    return None
+
+
+def _auto_merge_response_fields(
+    state_result: Dict[str, Any],
+    tool_calls: List[Dict[str, Any]],
+    tool_descriptions: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Auto-merge successful tool response fields into matching canonical state keys.
+
+    For each successful tool call, if the response contains fields whose names
+    match existing keys in the toolkit's canonical state, overwrite the state
+    values with the response values.  This ensures response-state consistency
+    even when the LLM state_model misses some updates.
+
+    Also syncs merged values to runtime_state if the same key exists there.
+    """
+    import copy as _copy
+
+    result = _copy.deepcopy(state_result)
+    merged_count = 0
+
+    for call in tool_calls:
+        call_result = call.get("result")
+        if not isinstance(call_result, dict):
+            continue
+        # Skip error responses
+        if "error" in call_result:
+            continue
+
+        call_name = call.get("name", "")
+        toolkit_name = _get_toolkit_name_for_call(call_name, tool_descriptions)
+
+        # Fallback: if tool_descriptions doesn't provide toolkit name,
+        # try to infer from state keys (skip runtime_state)
+        if not toolkit_name:
+            candidate_toolkits = [
+                k for k in result.keys()
+                if k != "runtime_state" and isinstance(result.get(k), dict)
+            ]
+            if len(candidate_toolkits) == 1:
+                toolkit_name = candidate_toolkits[0]
+
+        if not toolkit_name:
+            continue
+
+        toolkit_state = result.get(toolkit_name)
+        if not isinstance(toolkit_state, dict):
+            continue
+
+        runtime_toolkit = (
+            result.get("runtime_state", {})
+            .get("toolkits", {})
+            .get(toolkit_name)
+        )
+
+        for key, value in call_result.items():
+            # Merge into canonical state if key already exists
+            if key in toolkit_state:
+                old_val = toolkit_state[key]
+                if isinstance(value, dict) and isinstance(old_val, dict):
+                    old_val.update(value)
+                else:
+                    toolkit_state[key] = value
+                merged_count += 1
+
+            # Sync to runtime_state copy if same key exists there
+            if isinstance(runtime_toolkit, dict) and key in runtime_toolkit:
+                old_rt_val = runtime_toolkit[key]
+                if isinstance(value, dict) and isinstance(old_rt_val, dict):
+                    old_rt_val.update(value)
+                else:
+                    runtime_toolkit[key] = value
+
+    if merged_count > 0:
+        logger.info(
+            "[AUTO-MERGE] Merged %d response fields into canonical state",
+            merged_count,
+        )
+
+    return result
+
+
 # -- Path resolver -----------------------------------------------------------
 
 def resolve_logical_path(state: Dict[str, Any], logical_path: str) -> Tuple[str, Any]:
@@ -724,6 +806,31 @@ def _resolve_entry_path(running: Dict[str, Any], raw_path: str) -> str:
 
     prefix = _find_cwd_prefix(running)
     if prefix is None:
+        # No runtime_state — try to match the first segment against toolkit
+        # root keys so that "root/project/file.txt" resolves to
+        # "GorillaFileSystem/root/project/file.txt".
+        if segments:
+            for tk_name, tk_data in running.items():
+                if tk_name == "runtime_state" or not isinstance(tk_data, dict):
+                    continue
+                if segments[0] in tk_data:
+                    candidate = "/".join([tk_name] + segments)
+                    _, node = resolve_logical_path(running, candidate)
+                    if node is not None:
+                        logger.debug(
+                            "[FC PATH] '%s' → '%s' (toolkit-root inferred, no runtime_state)",
+                            raw_path, candidate,
+                        )
+                        return candidate
+                    # Also check if parent resolves (for new entries)
+                    parent_candidate = "/".join([tk_name] + segments[:-1])
+                    _, parent_node = resolve_logical_path(running, parent_candidate)
+                    if parent_node is not None:
+                        logger.debug(
+                            "[FC PATH] '%s' → '%s' (toolkit-root inferred, parent exists)",
+                            raw_path, candidate,
+                        )
+                        return candidate
         return raw_path
 
     toolkit_name, root_key = prefix[:2]
@@ -799,6 +906,9 @@ def _fc_calls_to_patch(
     Maintains a running copy of the state so that later operations can resolve
     paths through entries created by earlier ones (e.g. mkdir then mv into it).
 
+    Individual op errors are logged and skipped rather than raising, so that
+    valid ops from the same batch still get applied (graceful degradation).
+
     Args:
         state: The config dict *before* this update (used for path resolution
             and for reading source values on move).
@@ -818,9 +928,11 @@ def _fc_calls_to_patch(
         if hasattr(req, "tool_name"):
             name = req.tool_name
             if not isinstance(name, str) or not name:
-                raise ValueError(f"[FC STATE] Invalid tool name in request object: {name!r}")
+                logger.warning("[FC STATE] Invalid tool name in request object: %r — skipping", name)
+                continue
             if not isinstance(req.args, dict):
-                raise ValueError(f"[FC STATE] Tool args must be dict for '{name}', got {type(req.args).__name__}")
+                logger.warning("[FC STATE] Tool args must be dict for '%s', got %s — skipping", name, type(req.args).__name__)
+                continue
             args = req.args
         elif isinstance(req, dict):
             func = req.get("function") or {}
@@ -831,181 +943,32 @@ def _fc_calls_to_patch(
                 name = req.get("tool_name", req.get("name", ""))
                 raw_args = req.get("args", req.get("arguments", "{}"))
             if not isinstance(name, str) or not name:
-                raise ValueError(f"[FC STATE] Missing tool name in request: {req}")
+                logger.warning("[FC STATE] Missing tool name in request: %s — skipping", req)
+                continue
             if isinstance(raw_args, str):
                 try:
                     args = json.loads(raw_args)
                 except Exception as exc:
-                    raise ValueError(
-                        f"[FC STATE] Invalid JSON arguments for tool '{name}': {raw_args!r}"
-                    ) from exc
+                    logger.warning("[FC STATE] Invalid JSON arguments for tool '%s': %r — skipping (%s)", name, raw_args, exc)
+                    continue
             elif isinstance(raw_args, dict):
                 args = raw_args
             else:
-                raise ValueError(
-                    f"[FC STATE] Unsupported args type for tool '{name}': {type(raw_args).__name__}"
-                )
+                logger.warning("[FC STATE] Unsupported args type for tool '%s': %s — skipping", name, type(raw_args).__name__)
+                continue
         else:
-            raise TypeError(f"[FC STATE] Unsupported FC request type: {type(req).__name__}")
+            logger.warning("[FC STATE] Unsupported FC request type: %s — skipping", type(req).__name__)
+            continue
 
         step_ops: List[Dict[str, Any]] = []
         if name == "_fc_no_state_change":
             continue
 
-        if name == "_fc_set_runtime_field":
-            toolkit = args.get("toolkit", "")
-            key = args.get("key", "")
-            value = args.get("value", "")
-            if not isinstance(toolkit, str) or not toolkit:
-                raise ValueError("[FC STATE] _fc_set_runtime_field requires non-empty 'toolkit'")
-            if not isinstance(key, str) or not key:
-                raise ValueError("[FC STATE] _fc_set_runtime_field requires non-empty 'key'")
-            # Normalize CWD values: relative → absolute.
-            if key == "current_working_directory" and isinstance(value, str):
-                value = _normalize_cwd_value(running, toolkit, value)
-            pointer = f"/runtime_state/toolkits/{toolkit}/{key}"
-            step_ops.append({"op": "replace", "path": pointer, "value": value})
-
-        elif name == "_fc_add_entry":
-            parent_path = _resolve_entry_path(running, args.get("parent_path", ""))
-            child_name = args.get("name", "")
-            if not isinstance(child_name, str) or not child_name:
-                raise ValueError("[FC STATE] _fc_add_entry requires non-empty 'name'")
-            parent_pointer, parent_node = resolve_logical_path(running, parent_path)
-            if not isinstance(parent_node, (dict, list)):
-                fallback_path = _collapse_redundant_root_suffix(parent_path)
-                if fallback_path != parent_path:
-                    fallback_pointer, fallback_node = resolve_logical_path(running, fallback_path)
-                    if isinstance(fallback_node, (dict, list)):
-                        logger.debug(
-                            "[FC PATH] repaired duplicated-root path: '%s' -> '%s'",
-                            parent_path,
-                            fallback_path,
-                        )
-                        parent_path = fallback_path
-                        parent_pointer, parent_node = fallback_pointer, fallback_node
-            if not isinstance(parent_node, (dict, list)):
-                logger.warning(
-                    "[FC STATE] _fc_add_entry parent path not found: '%s' (pointer=%s), auto-creating empty object",
-                    parent_path,
-                    parent_pointer,
-                )
-                running = apply_json_patch(
-                    running,
-                    [{"op": "add", "path": parent_pointer, "value": {}}],
-                )
-                parent_pointer, parent_node = resolve_logical_path(running, parent_path)
-                if not isinstance(parent_node, (dict, list)):
-                    raise FileNotFoundError(
-                        f"[FC STATE] _fc_add_entry parent path not found after auto-create: '{parent_path}'"
-                    )
-            value_json = args.get("value_json", "{}")
-            if isinstance(value_json, str):
-                try:
-                    value = json.loads(value_json)
-                except Exception as exc:
-                    raise ValueError(
-                        f"[FC STATE] _fc_add_entry invalid value_json: {value_json!r}"
-                    ) from exc
-            else:
-                value = value_json
-            if isinstance(parent_node, list):
-                # Allow list append semantics for collection-like states.
-                if child_name in {"-", "append"}:
-                    pointer = f"{parent_pointer}/-"
-                elif child_name.isdigit():
-                    pointer = f"{parent_pointer}/{child_name}"
-                else:
-                    pointer = f"{parent_pointer}/-"
-            else:
-                pointer = _child_pointer(running, parent_path, child_name)
-            step_ops.append({"op": "add", "path": pointer, "value": value})
-
-        elif name == "_fc_remove_entry":
-            entry_path = _resolve_entry_path(running, args.get("entry_path", ""))
-            pointer, node = resolve_logical_path(running, entry_path)
-            if node is None:
-                raise FileNotFoundError(
-                    f"[FC STATE] _fc_remove_entry path not found: '{entry_path}'"
-                )
-            step_ops.append({"op": "remove", "path": pointer})
-
-        elif name == "_fc_move_entry":
-            source_path = _resolve_entry_path(running, args.get("source_path", ""))
-            dest_parent_path = _resolve_entry_path(running, args.get("dest_parent_path", ""))
-            new_name_raw = args.get("new_name", "")
-            if new_name_raw is None:
-                new_name_raw = ""
-            if not isinstance(new_name_raw, str):
-                raise ValueError(
-                    f"[FC STATE] _fc_move_entry new_name must be string, got {type(new_name_raw).__name__}"
-                )
-            new_name = new_name_raw.strip()
-            source_pointer, source_value = resolve_logical_path(running, source_path)
-            if source_value is None:
-                raise FileNotFoundError(
-                    f"[FC STATE] _fc_move_entry source not found: '{source_path}'"
-                )
-            _dest_parent_pointer, dest_parent_node = resolve_logical_path(running, dest_parent_path)
-            basename = source_path.rstrip("/").rsplit("/", 1)[-1]
-
-            if new_name:
-                if "/" in new_name:
-                    raise ValueError(
-                        f"[FC STATE] _fc_move_entry new_name must be basename, got '{new_name}'"
-                    )
-                if not isinstance(dest_parent_node, dict):
-                    raise FileNotFoundError(
-                        f"[FC STATE] _fc_move_entry destination parent not found: '{dest_parent_path}'"
-                    )
-                basename = new_name
-            elif isinstance(dest_parent_node, dict):
-                # Standard move: destination is an existing directory.
-                pass
-            else:
-                # Compatibility path: model may pass full destination path
-                # (including target basename) in dest_parent_path.
-                dest_parts = [p for p in dest_parent_path.strip("/").split("/") if p]
-                if len(dest_parts) <= 1:
-                    raise FileNotFoundError(
-                        f"[FC STATE] _fc_move_entry destination parent not found: '{dest_parent_path}'"
-                    )
-                candidate_parent = "/".join(dest_parts[:-1])
-                candidate_name = dest_parts[-1]
-                _candidate_parent_ptr, candidate_parent_node = resolve_logical_path(running, candidate_parent)
-                if not isinstance(candidate_parent_node, dict):
-                    raise FileNotFoundError(
-                        f"[FC STATE] _fc_move_entry destination parent not found: '{dest_parent_path}'"
-                    )
-                dest_parent_path = candidate_parent
-                basename = candidate_name
-
-            dest_pointer = _child_pointer(running, dest_parent_path, basename)
-            step_ops.append({"op": "remove", "path": source_pointer})
-            step_ops.append({"op": "add", "path": dest_pointer, "value": _copy.deepcopy(source_value)})
-
-        elif name == "_fc_replace_entry":
-            entry_path = _resolve_entry_path(running, args.get("entry_path", ""))
-            new_value_json = args.get("new_value_json", "{}")
-            if isinstance(new_value_json, str):
-                try:
-                    value = json.loads(new_value_json)
-                except Exception as exc:
-                    raise ValueError(
-                        f"[FC STATE] _fc_replace_entry invalid new_value_json: {new_value_json!r}"
-                    ) from exc
-            else:
-                value = new_value_json
-            pointer, node = resolve_logical_path(running, entry_path)
-            if node is None:
-                # Upsert fallback: if replace target is missing, use add at same pointer.
-                # apply_json_patch(add, create_missing=True) will materialize missing dict paths.
-                step_ops.append({"op": "add", "path": pointer, "value": value})
-            else:
-                step_ops.append({"op": "replace", "path": pointer, "value": value})
-
-        else:
-            raise ValueError(f"[FC STATE] Unknown tool: {name}")
+        try:
+            _fc_process_single_request(name, args, running, step_ops)
+        except (ValueError, FileNotFoundError, TypeError, KeyError, IndexError) as exc:
+            logger.warning("[FC STATE] Skipping failed op '%s': %s", name, exc)
+            continue
 
         # Apply this step's ops to running state and collect them.
         for op in step_ops:
@@ -1013,6 +976,174 @@ def _fc_calls_to_patch(
             running = apply_json_patch(running, [op])
 
     return ops
+
+
+def _fc_process_single_request(
+    name: str,
+    args: Dict[str, Any],
+    running: Dict[str, Any],
+    step_ops: List[Dict[str, Any]],
+) -> None:
+    """Process a single FC tool request into JSON Patch ops.
+
+    Raises on error so the caller can catch and skip gracefully.
+    """
+    import copy as _copy
+
+    if name == "_fc_set_runtime_field":
+        toolkit = args.get("toolkit", "")
+        key = args.get("key", "")
+        value = args.get("value", "")
+        if not isinstance(toolkit, str) or not toolkit:
+            raise ValueError("[FC STATE] _fc_set_runtime_field requires non-empty 'toolkit'")
+        if not isinstance(key, str) or not key:
+            raise ValueError("[FC STATE] _fc_set_runtime_field requires non-empty 'key'")
+        # Normalize CWD values: relative → absolute.
+        if key == "current_working_directory" and isinstance(value, str):
+            value = _normalize_cwd_value(running, toolkit, value)
+        pointer = f"/runtime_state/toolkits/{toolkit}/{key}"
+        step_ops.append({"op": "replace", "path": pointer, "value": value})
+
+    elif name == "_fc_add_entry":
+        parent_path = _resolve_entry_path(running, args.get("parent_path", ""))
+        child_name = args.get("name", "")
+        if not isinstance(child_name, str) or not child_name:
+            raise ValueError("[FC STATE] _fc_add_entry requires non-empty 'name'")
+        parent_pointer, parent_node = resolve_logical_path(running, parent_path)
+        if not isinstance(parent_node, (dict, list)):
+            fallback_path = _collapse_redundant_root_suffix(parent_path)
+            if fallback_path != parent_path:
+                fallback_pointer, fallback_node = resolve_logical_path(running, fallback_path)
+                if isinstance(fallback_node, (dict, list)):
+                    logger.debug(
+                        "[FC PATH] repaired duplicated-root path: '%s' -> '%s'",
+                        parent_path,
+                        fallback_path,
+                    )
+                    parent_path = fallback_path
+                    parent_pointer, parent_node = fallback_pointer, fallback_node
+        if not isinstance(parent_node, (dict, list)):
+            logger.warning(
+                "[FC STATE] _fc_add_entry parent path not found: '%s' (pointer=%s), auto-creating empty object",
+                parent_path,
+                parent_pointer,
+            )
+            running = apply_json_patch(
+                running,
+                [{"op": "add", "path": parent_pointer, "value": {}}],
+            )
+            parent_pointer, parent_node = resolve_logical_path(running, parent_path)
+            if not isinstance(parent_node, (dict, list)):
+                raise FileNotFoundError(
+                    f"[FC STATE] _fc_add_entry parent path not found after auto-create: '{parent_path}'"
+                )
+        value_json = args.get("value_json", "{}")
+        if isinstance(value_json, str):
+            try:
+                value = json.loads(value_json)
+            except Exception as exc:
+                raise ValueError(
+                    f"[FC STATE] _fc_add_entry invalid value_json: {value_json!r}"
+                ) from exc
+        else:
+            value = value_json
+        if isinstance(parent_node, list):
+            # Allow list append semantics for collection-like states.
+            if child_name in {"-", "append"}:
+                pointer = f"{parent_pointer}/-"
+            elif child_name.isdigit():
+                pointer = f"{parent_pointer}/{child_name}"
+            else:
+                pointer = f"{parent_pointer}/-"
+        else:
+            pointer = _child_pointer(running, parent_path, child_name)
+        step_ops.append({"op": "add", "path": pointer, "value": value})
+
+    elif name == "_fc_remove_entry":
+        entry_path = _resolve_entry_path(running, args.get("entry_path", ""))
+        pointer, node = resolve_logical_path(running, entry_path)
+        if node is None:
+            raise FileNotFoundError(
+                f"[FC STATE] _fc_remove_entry path not found: '{entry_path}'"
+            )
+        step_ops.append({"op": "remove", "path": pointer})
+
+    elif name == "_fc_move_entry":
+        source_path = _resolve_entry_path(running, args.get("source_path", ""))
+        dest_parent_path = _resolve_entry_path(running, args.get("dest_parent_path", ""))
+        new_name_raw = args.get("new_name", "")
+        if new_name_raw is None:
+            new_name_raw = ""
+        if not isinstance(new_name_raw, str):
+            raise ValueError(
+                f"[FC STATE] _fc_move_entry new_name must be string, got {type(new_name_raw).__name__}"
+            )
+        new_name = new_name_raw.strip()
+        source_pointer, source_value = resolve_logical_path(running, source_path)
+        if source_value is None:
+            raise FileNotFoundError(
+                f"[FC STATE] _fc_move_entry source not found: '{source_path}'"
+            )
+        _dest_parent_pointer, dest_parent_node = resolve_logical_path(running, dest_parent_path)
+        basename = source_path.rstrip("/").rsplit("/", 1)[-1]
+
+        if new_name:
+            if "/" in new_name:
+                raise ValueError(
+                    f"[FC STATE] _fc_move_entry new_name must be basename, got '{new_name}'"
+                )
+            if not isinstance(dest_parent_node, dict):
+                raise FileNotFoundError(
+                    f"[FC STATE] _fc_move_entry destination parent not found: '{dest_parent_path}'"
+                )
+            basename = new_name
+        elif isinstance(dest_parent_node, dict):
+            # Standard move: destination is an existing directory.
+            pass
+        else:
+            # Compatibility path: model may pass full destination path
+            # (including target basename) in dest_parent_path.
+            dest_parts = [p for p in dest_parent_path.strip("/").split("/") if p]
+            if len(dest_parts) <= 1:
+                raise FileNotFoundError(
+                    f"[FC STATE] _fc_move_entry destination parent not found: '{dest_parent_path}'"
+                )
+            candidate_parent = "/".join(dest_parts[:-1])
+            candidate_name = dest_parts[-1]
+            _candidate_parent_ptr, candidate_parent_node = resolve_logical_path(running, candidate_parent)
+            if not isinstance(candidate_parent_node, dict):
+                raise FileNotFoundError(
+                    f"[FC STATE] _fc_move_entry destination parent not found: '{dest_parent_path}'"
+                )
+            dest_parent_path = candidate_parent
+            basename = candidate_name
+
+        dest_pointer = _child_pointer(running, dest_parent_path, basename)
+        step_ops.append({"op": "remove", "path": source_pointer})
+        step_ops.append({"op": "add", "path": dest_pointer, "value": _copy.deepcopy(source_value)})
+
+    elif name == "_fc_replace_entry":
+        entry_path = _resolve_entry_path(running, args.get("entry_path", ""))
+        new_value_json = args.get("new_value_json", "{}")
+        if isinstance(new_value_json, str):
+            try:
+                value = json.loads(new_value_json)
+            except Exception as exc:
+                raise ValueError(
+                    f"[FC STATE] _fc_replace_entry invalid new_value_json: {new_value_json!r}"
+                ) from exc
+        else:
+            value = new_value_json
+        pointer, node = resolve_logical_path(running, entry_path)
+        if node is None:
+            # Upsert fallback: if replace target is missing, use add at same pointer.
+            # apply_json_patch(add, create_missing=True) will materialize missing dict paths.
+            step_ops.append({"op": "add", "path": pointer, "value": value})
+        else:
+            step_ops.append({"op": "replace", "path": pointer, "value": value})
+
+    else:
+        raise ValueError(f"[FC STATE] Unknown tool: {name}")
 
 
 def _update_state_via_fc(
@@ -1043,7 +1174,7 @@ def _update_state_via_fc(
         _FC_SYSTEM_PROMPT,
         model=create_model(state_model, max_tokens=4096, temperature=0.001),
         external_tools=fc_tools,
-        step_timeout=60.0,
+        step_timeout=get_agent_timeout(),
     )
 
     # Build user query — identical structure to the freeform path.
@@ -1074,60 +1205,70 @@ def _update_state_via_fc(
         query_sections.append(f"Tool descriptions:\n{_json_or_str(tool_descriptions)}")
     state_query = "\n\n".join(query_sections)
 
-    _ct0 = datetime.now()
-    logger.debug("[FC STATE] LLM START (model=%s)", state_model)
-    state_response = state_agent.step(state_query)
-    _ct1 = datetime.now()
-    logger.debug("[FC STATE] LLM END (elapsed=%.3fs)", (_ct1 - _ct0).total_seconds())
-
-    # Extract tool-call requests from response.
-    info = getattr(state_response, "info", None) or {}
-    fc_requests = info.get("external_tool_call_requests") or []
-
-    if required_state_effects:
-        req_names = _extract_fc_request_names(fc_requests)
-        if req_names and all(name == "_fc_no_state_change" for name in req_names):
-            correction = (
-                "CORRECTION: Required state effects were provided for successful calls. "
-                "You MUST realize those effects with concrete domain-state mutations "
-                "(_fc_add_entry/_fc_replace_entry/_fc_move_entry/_fc_remove_entry as appropriate). "
-                "Do NOT use _fc_no_state_change for these calls."
-            )
-            logger.warning(
-                "[FC STATE] Retrying because model returned only _fc_no_state_change "
-                "despite required successful state effects."
-            )
-            state_response = state_agent.step(f"{state_query}\n\n{correction}")
-            info = getattr(state_response, "info", None) or {}
-            fc_requests = info.get("external_tool_call_requests") or []
-
-    if not fc_requests:
-        raise RuntimeError("[FC STATE] No function-call requests returned by state model")
-
-    # Convert to JSON Patch ops.
-    patch_ops = _fc_calls_to_patch(previous_state, fc_requests)
-
+    state_response = None
+    fc_requests: List[Any] = []
     try:
-        logger.info("[FC STATE PATCH] ops: %s", json.dumps(patch_ops, ensure_ascii=False, indent=2, default=str))
-    except Exception as _exc:
-        logger.info("[FC STATE PATCH] ops: <unprintable> (%s)", _exc)
+        _ct0 = datetime.now()
+        logger.debug("[FC STATE] LLM START (model=%s)", state_model)
+        state_response = state_agent.step(state_query)
+        _ct1 = datetime.now()
+        logger.debug("[FC STATE] LLM END (elapsed=%.3fs)", (_ct1 - _ct0).total_seconds())
 
-    if patch_ops:
-        state_result = apply_json_patch(_copy.deepcopy(previous_state), patch_ops)
-        logger.info(f"[FC STATE] Applied {len(patch_ops)} patch ops from {len(fc_requests)} tool calls")
-    else:
-        req_names = _extract_fc_request_names(fc_requests)
-        if required_state_effects and req_names and all(name == "_fc_no_state_change" for name in req_names):
-            raise RuntimeError(
-                "[FC STATE] Required state effects were provided for successful calls, "
-                "but model still returned _fc_no_state_change with no patch ops."
-            )
-        if not req_names or not all(name == "_fc_no_state_change" for name in req_names):
-            raise RuntimeError(
-                "[FC STATE] Model returned function calls but produced no patch ops "
-                "without explicit _fc_no_state_change"
-            )
+        # Extract tool-call requests from response.
+        info = getattr(state_response, "info", None) or {}
+        fc_requests = info.get("external_tool_call_requests") or []
+
+        if required_state_effects:
+            req_names = _extract_fc_request_names(fc_requests)
+            if req_names and all(name == "_fc_no_state_change" for name in req_names):
+                correction = (
+                    "CORRECTION: Required state effects were provided for successful calls. "
+                    "You MUST realize those effects with concrete domain-state mutations "
+                    "(_fc_add_entry/_fc_replace_entry/_fc_move_entry/_fc_remove_entry as appropriate). "
+                    "Do NOT use _fc_no_state_change for these calls."
+                )
+                logger.warning(
+                    "[FC STATE] Retrying because model returned only _fc_no_state_change "
+                    "despite required successful state effects."
+                )
+                state_response = state_agent.step(f"{state_query}\n\n{correction}")
+                info = getattr(state_response, "info", None) or {}
+                fc_requests = info.get("external_tool_call_requests") or []
+    except Exception as llm_exc:
+        logger.warning("[FC STATE] LLM call failed: %s — degrading to auto-merge", llm_exc)
+        fc_requests = []
+
+    _fc_degraded = False
+    if not fc_requests:
+        logger.warning("[FC STATE] No function-call requests returned by state model — degrading to auto-merge")
+        _fc_degraded = True
         state_result = _copy.deepcopy(previous_state)
+    else:
+        # Convert to JSON Patch ops (individual op errors are skipped inside).
+        patch_ops = _fc_calls_to_patch(previous_state, fc_requests)
+
+        try:
+            logger.info("[FC STATE PATCH] ops: %s", json.dumps(patch_ops, ensure_ascii=False, indent=2, default=str))
+        except Exception as _exc:
+            logger.info("[FC STATE PATCH] ops: <unprintable> (%s)", _exc)
+
+        if patch_ops:
+            state_result = apply_json_patch(_copy.deepcopy(previous_state), patch_ops)
+            logger.info("[FC STATE] Applied %d patch ops from %d tool calls", len(patch_ops), len(fc_requests))
+        else:
+            req_names = _extract_fc_request_names(fc_requests)
+            if required_state_effects and req_names and all(n == "_fc_no_state_change" for n in req_names):
+                logger.warning(
+                    "[FC STATE] Required state effects present but model returned only "
+                    "_fc_no_state_change — degrading to auto-merge"
+                )
+                _fc_degraded = True
+            elif not req_names or not all(n == "_fc_no_state_change" for n in req_names):
+                logger.warning(
+                    "[FC STATE] Model returned function calls but produced no patch ops — degrading to auto-merge"
+                )
+                _fc_degraded = True
+            state_result = _copy.deepcopy(previous_state)
 
     if required_state_effects:
         state_result = _apply_counter_effect_guards(
@@ -1136,9 +1277,15 @@ def _update_state_via_fc(
             required_state_effects=required_state_effects,
         )
 
+    state_result = _auto_merge_response_fields(
+        state_result=state_result,
+        tool_calls=tool_calls,
+        tool_descriptions=tool_descriptions,
+    )
+
     # Record token usage.
     try:
-        if session_id:
+        if session_id and state_response is not None:
             from ..utils.llm_usage import extract_token_usage
             usage = extract_token_usage(state_response)
             from ..handlers.session_handler import session_handler
@@ -1460,7 +1607,7 @@ def bootstrap_state(
     bootstrap_agent = ChatAgent(
         _BOOTSTRAP_SYSTEM_PROMPT,
         model=create_model(state_model, max_tokens=16384, temperature=0.001),
-        step_timeout=60.0,
+        step_timeout=get_agent_timeout(),
     )
 
     _t0 = datetime.now()
@@ -1656,6 +1803,55 @@ def update_state_from_real_tool(
         logger.debug(f"Involved classes: {involved_classes}")
     logger.info(f"[STATE UPDATE] Processing {len(formatted_calls)} tool calls in batch mode")
 
+    tool_descriptions: Optional[Dict[str, Any]] = None
+    try:
+        from ..schemas.global_loader import get_global_schema_loader
+        schema_loader = get_global_schema_loader()
+        if schema_loader is not None:
+            _td: Dict[str, Any] = {}
+            for fc in formatted_calls:
+                fname = fc.get("name", "")
+                # Split "ToolkitName_operationId" on first underscore
+                parts = fname.split("_", 1)
+                if len(parts) == 2:
+                    toolkit_prefix, op_id = parts
+                else:
+                    toolkit_prefix, op_id = "", fname
+                schema_file = schema_loader.find_schema_file(toolkit_prefix) if toolkit_prefix else None
+                if not schema_file and fname:
+                    schema_file = schema_loader.find_schema_file(fname)
+                if schema_file:
+                    schema = schema_loader.load_schema(schema_file)
+                    x_ds = schema.get("info", {}).get("x-default-state", {})
+                    tools_block = x_ds.get("tools", {})
+                    tool_entry = tools_block.get(op_id, {})
+                    if isinstance(tool_entry, dict) and tool_entry:
+                        hints: Dict[str, Any] = {}
+                        for key in ("state_effects", "state_effects_on_success",
+                                    "state_effects_on_error", "state_effects_always"):
+                            val = tool_entry.get(key)
+                            if isinstance(val, list) and val:
+                                hints[key] = val
+                        if hints:
+                            # Also include toolkit info for context
+                            info = schema.get("info", {})
+                            toolkit_info: Dict[str, Any] = {}
+                            title = info.get("title")
+                            if isinstance(title, str) and title:
+                                toolkit_info["name"] = title
+                            td_entry: Dict[str, Any] = {"state_hints": hints}
+                            if toolkit_info:
+                                td_entry["toolkit"] = toolkit_info
+                            _td[fname] = td_entry
+            if _td:
+                tool_descriptions = _td
+                logger.info(
+                    "[STATE UPDATE] Built tool_descriptions for %d/%d calls from schemas",
+                    len(_td), len(formatted_calls),
+                )
+    except Exception as e:
+        logger.debug("[STATE UPDATE] Could not build tool_descriptions from schemas: %s", e)
+
     # Default task description
     if task is None:
         task = "Register entities discovered by Real Tool execution so Mock Tools can reference them (Hybrid Mode)"
@@ -1667,7 +1863,8 @@ def update_state_from_real_tool(
             tool_calls=formatted_calls,
             task=task,
             session_id=session_id,
-            state_model=state_model
+            state_model=state_model,
+            tool_descriptions=tool_descriptions,
         )
         logger.info(f"[STATE UPDATE] Batch update completed successfully for {len(formatted_calls)} tool calls")
         return result

@@ -9,6 +9,17 @@ from ..core.request_handler import RequestHandler
 from ..core.route_matcher import RouteMatcher
 from ..schemas.loader import SchemaLoader
 
+_INTERNAL_ENDPOINTS = {
+    "/health",
+    "/session-id",
+    "/set-session-state",
+    "/get-session-state",
+    "/get-session-history",
+    "/get-session-llm-usage",
+    "/update_state",
+    "/update-state-from-real",
+}
+
 
 class RouteMiddleware(BaseHTTPMiddleware):
     """Middleware for handling API routing and request processing."""
@@ -32,6 +43,9 @@ class RouteMiddleware(BaseHTTPMiddleware):
         self.validation_model = validation_model
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        if request.url.path in _INTERNAL_ENDPOINTS:
+            return await call_next(request)
+
         # Extract API name and path
         api_name, remaining_path = self.route_matcher.extract_api_info(request)
         if not api_name:

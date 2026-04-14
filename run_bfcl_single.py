@@ -36,7 +36,6 @@ def create_argument_parser() -> argparse.ArgumentParser:
         help="Comma-separated IDs (supports short numeric IDs with auto-prefix)",
     )
     test_group.add_argument("--ids-file", type=str, help="File containing test IDs")
-    test_group.add_argument("--pattern", type=str, help="Regex pattern for test IDs")
 
     parser.add_argument(
         "--category",
@@ -47,18 +46,9 @@ def create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--limit", type=int, help="Limit number of tests")
 
     parser.add_argument("--model", type=str, default="gpt-4.1-mini")
-    parser.add_argument("--workers", type=int, default=1)
-    parser.add_argument("--max-retries", type=int, default=3)
-    parser.add_argument("--target-score", type=float, default=1.0)
-    parser.add_argument("--agent-timeout", type=int, default=120)
-    parser.add_argument("--agent-persistence", action="store_true")
-    parser.add_argument(
-        "--override-openapi-server",
-        dest="override_openapi_server",
-        action=argparse.BooleanOptionalAction,
-        default=False,
-        help="Override OpenAPI servers with gecko_url (default: False for BFCL)",
-    )
+    parser.add_argument("--workers", type=int, default=10)
+    parser.add_argument("--max-retries", type=int, default=2)
+    parser.add_argument("--agent-timeout", type=int, default=360)
 
     parser.add_argument(
         "--bfcl-eval",
@@ -91,8 +81,6 @@ def validate_arguments(args: argparse.Namespace) -> None:
         errors.append("--workers must be >= 1")
     if args.max_retries < 0:
         errors.append("--max-retries must be >= 0")
-    if not 0 <= args.target_score <= 1:
-        errors.append("--target-score must be in [0, 1]")
     if args.category.startswith("multi_turn"):
         errors.append(f"--category {args.category} is multi-turn; use run_bfcl_multi.py")
     try:
@@ -111,10 +99,12 @@ def main() -> None:
     setup_logging(args)
     validate_arguments(args)
 
-    from gats import GATSConfig, GATSRunner
+    from functools import partial
+    from gats import GATSRunner, GATSSolver
     from gats.benchmarks.bfcl.prompts import (
         BFCL_TASK_AGENT_SYSTEM_PROMPT,
         BFCL_SINGLE_DEFAULT_JUDGE_PROMPT,
+        BFCL_SINGLE_TRIAGE_JUDGE_PROMPT,
         BFCL_DEFAULT_CHECKLIST_PROMPT,
     )
     from gats.benchmarks.bfcl.helpers import (
@@ -140,13 +130,11 @@ def main() -> None:
         category=args.category,
         ids=args.ids or None,
         ids_file=getattr(args, "ids_file", None),
-        pattern=getattr(args, "pattern", None),
         run_all=args.all,
     )
     tasks = filter_tasks_by_ids(
         all_tasks,
         ids=target_ids,
-        pattern=getattr(args, "pattern", None),
     )
 
     if not tasks:
@@ -154,28 +142,25 @@ def main() -> None:
         sys.exit(0)
     logger.info(f"Running {len(tasks)} tasks")
 
-    # --- Configure GATS ---
-    config = GATSConfig(
+    # --- Configure solver factory ---
+    solver_factory = partial(
+        GATSSolver,
         model=args.model,
         max_retries=args.max_retries,
-        target_score=args.target_score,
         agent_timeout=args.agent_timeout,
-        agent_persistence=args.agent_persistence,
-        enable_tool_filtering=True,
         # Single-turn BFCL: fixed checklist (no dynamic LLM generation).
         enable_checklist=False,
         enable_tool_result_folding=False,
         judge_prompt=BFCL_SINGLE_DEFAULT_JUDGE_PROMPT,
+        triage_judge_prompt=BFCL_SINGLE_TRIAGE_JUDGE_PROMPT,
         checklist_prompt=BFCL_DEFAULT_CHECKLIST_PROMPT,
         base_checklist_items=[
-            "Relevance: if a function's domain and output type match the user's request, call it -- even if parameters require reasonable inference. Do not abstain due to unspecified optional parameters. Zero calls only when no function can produce the requested output, or the user is not making an actionable request.",
-            "Arguments: use the user's exact wording for string and date parameters -- no format conversion, no abbreviation, no expansion, no added qualifiers (e.g. do not add state/country/city suffixes the user did not write, do not expand 'Van Gogh' to 'Vincent van Gogh'). Use full words from the question, not abbreviations or codes (e.g. 'English' not 'en'). When a parameter name already describes a category, pass only the identifying value (cell_type='human' not 'human cell'). Percentages/rates as decimals (4% -> 0.04) UNLESS the parameter description says 'as a percentage', in which case pass the number itself (5% -> 5.0). Numbers with type float/double must use decimal notation (1.0, not 1). User's explicit values override schema defaults. When the user clearly implies a value for an optional parameter, provide it.",
-            "Coverage: one call per distinct entity/value requested. When a function accepts an array/list parameter, combine all requested values into ONE call (e.g. indexes=['S&P 500','Dow Jones'] in one call, not two separate calls). Do not expand a collective term into sub-items (e.g. 'renewable' stays as 'renewable', not split into solar/wind/hydro). 'Respectively' means positional mapping. Without 'respectively', all combinations required (Cartesian product).",
-            "Minimality: no extra calls beyond what the user requests, no duplicate calls, no hallucinated parameters. Do not chain follow-up actions -- 'search/find/look up X' means only search, not also play/book/reserve X. When multiple tools are available, only call the one that directly answers the question -- do not call additional tools for prerequisite data the main tool already handles internally.",
+            "Coverage: cover all requested values, combinations, and repeated occurrences. Use one array/list call when that cleanly represents the request; use multiple calls when separate results, repeated samples, or item-by-item combinations are requested.",
+            "Parameter provenance and format compliance: For each parameter, (1) verify value came from user's message, schema default, or schema-described reformatting/mapping (e.g. schema says '1 for Bangkok' and user says 'Bangkok' \u2192 province_id=1 is schema-derived, NOT fabrication); (2) CHECK the tool_definitions schema description \u2014 if it specifies a format like 'City, State' or shows examples like 'New York, NY', the value MUST match that format (bare 'Chicago' \u2192 FAIL, 'Chicago, IL' \u2192 PASS). Fabrication of external knowledge (URLs, commands, GPS coords) \u2192 FAIL.",
+            "Call adequacy: verify that the selected call set captures the user's requested scope, count, filters, and pairings. Do not require the mock tool's response fields to be a perfect final natural-language answer if the call structure itself is correct.",
         ],
-        override_openapi_servers=args.override_openapi_server,
+        override_openapi_servers=False,
         collect_gecko_usage=False,  # Reduce overhead for single-turn
-        max_workers=args.workers,
         debug=args.debug,
         verbose=args.verbose,
     )
@@ -202,7 +187,7 @@ def main() -> None:
         logger.warning("Could not load BFCLBenchmark for function name mapping")
 
     # --- Run ---
-    runner = GATSRunner(config)
+    runner = GATSRunner(solver_factory)
     results = runner.run(
         tasks,
         workers=args.workers,
@@ -214,10 +199,9 @@ def main() -> None:
 
     # --- Summary ---
     total = len(results)
-    success = sum(1 for r in results if r.success)
     avg_time = sum(r.total_time for r in results) / total if total else 0
     total_attempts = sum(r.total_attempts for r in results)
-    print(f"\nResults: {success}/{total} passed, avg time: {avg_time:.1f}s, total attempts: {total_attempts}")
+    print(f"\nCompleted: {total} tasks, avg time: {avg_time:.1f}s, total attempts: {total_attempts}")
     print(f"Eval file: {eval_file}")
 
     # --- Run BFCL official eval ---

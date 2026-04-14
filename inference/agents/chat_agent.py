@@ -318,57 +318,50 @@ class ChatAgent(BaseAgent):
     def _handle_multi_message_response(self, response):
         response_texts = []
         all_tool_calls = []
-        
+
         try:
+            all_tool_calls = self._extract_camel_tool_calls(response)
+
+            # --- Extract text and record messages ---
             if hasattr(response, 'msgs') and response.msgs:
                 if len(response.msgs) > 1:
                     logger.info(f"Handling multiple messages: {len(response.msgs)} messages returned")
-                    
+
                     for i, msg in enumerate(response.msgs):
                         if hasattr(msg, 'content') and msg.content and msg.content.strip():
                             response_texts.append(msg.content.strip())
                             logger.debug(f"Message {i+1} content: {msg.content[:100]}...")
-                        
-                        if hasattr(msg, 'tool_calls') and msg.tool_calls:
-                            logger.info(f"[MULTI MSG DEBUG] Message {i+1} has {len(msg.tool_calls)} tool_calls")
-                            for j, tool_call in enumerate(msg.tool_calls):
-                                try:
-                                    logger.info(f"[MULTI MSG DEBUG] Message {i+1} tool_call {j} type: {type(tool_call)}")
-                                    if hasattr(tool_call, 'function'):
-                                        func_info = tool_call.function
-                                        logger.info(f"[MULTI MSG DEBUG] func_info type: {type(func_info)}")
-                                        logger.info(f"[MULTI MSG DEBUG] func_info.name: {func_info.name if hasattr(func_info, 'name') else 'NO NAME'}")
-                                        logger.info(f"[MULTI MSG DEBUG] func_info.arguments: {func_info.arguments if hasattr(func_info, 'arguments') else 'NO ARGS'}")
 
-                                        tool_call_data = {
-                                            "function": func_info.name if hasattr(func_info, 'name') else '',
-                                            "arguments": json.loads(func_info.arguments if hasattr(func_info, 'arguments') else '{}')
-                                        }
-                                        all_tool_calls.append(tool_call_data)
-                                        logger.info(f"[MULTI MSG DEBUG] Extracted tool call from message {i+1}: {tool_call_data}")
-                                except Exception as e:
-                                    logger.warning(f"[MULTI MSG DEBUG] Failed to extract tool call from message {i+1}: {e}")
-                                    import traceback
-                                    logger.warning(f"[MULTI MSG DEBUG] Traceback: {traceback.format_exc()}")
-                        
-                        if ((hasattr(msg, 'tool_calls') and msg.tool_calls) or 
+                        if ((hasattr(msg, 'tool_calls') and msg.tool_calls) or
                             (hasattr(msg, 'content') and msg.content and msg.content.strip())):
                             try:
                                 self._camel_agent.record_message(msg)
                                 logger.debug(f"Recorded message {i+1} to chat history")
                             except Exception as e:
                                 logger.warning(f"Failed to record message {i+1}: {e}")
-                
+
                 else:
                     msg = response.msgs[0]
                     if hasattr(msg, 'content') and msg.content:
                         response_texts.append(msg.content)
-            
-            if not all_tool_calls:
-                all_tool_calls = self._extract_camel_tool_calls(response)
-            
+
+            # --- Fallback: msg-based extraction (no results) if info path failed ---
+            if not all_tool_calls and hasattr(response, 'msgs') and response.msgs:
+                for i, msg in enumerate(response.msgs):
+                    if hasattr(msg, 'tool_calls') and msg.tool_calls:
+                        for tool_call in msg.tool_calls:
+                            try:
+                                if hasattr(tool_call, 'function'):
+                                    func_info = tool_call.function
+                                    all_tool_calls.append({
+                                        "function": func_info.name if hasattr(func_info, 'name') else '',
+                                        "arguments": json.loads(func_info.arguments if hasattr(func_info, 'arguments') else '{}')
+                                    })
+                            except Exception as e:
+                                logger.warning(f"Failed to extract tool call from message {i+1}: {e}")
+
             response_text = " ".join(response_texts) if response_texts else ""
-            
+
             if not response_text:
                 if hasattr(response, 'content'):
                     response_text = response.content
@@ -376,24 +369,24 @@ class ChatAgent(BaseAgent):
                     response_text = response.msg.content
                 else:
                     response_text = str(response)
-            
+
             if not all_tool_calls and response_text:
                 all_tool_calls = self.parse_tool_calls(response_text)
-            
+
             logger.debug(f"Multi-message handling result: {len(all_tool_calls)} tool calls, text length: {len(response_text)}")
-            
+
         except Exception as e:
             logger.error(f"Error in _handle_multi_message_response: {e}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
-            
+
             response_text = response.content if hasattr(response, 'content') else str(response)
             if hasattr(response, 'msg') and hasattr(response.msg, 'content'):
                 response_text = response.msg.content
             all_tool_calls = self._extract_camel_tool_calls(response)
             if not all_tool_calls:
                 all_tool_calls = self.parse_tool_calls(response_text)
-        
+
         return response_text, all_tool_calls
     
     def _parse_tool_calls_impl(self, response_text: str) -> List[Dict[str, Any]]:

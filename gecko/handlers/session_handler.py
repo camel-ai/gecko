@@ -1,4 +1,5 @@
 import json
+import os
 import uuid
 import sqlite3
 from typing import Any, Dict, List, Optional, Union
@@ -13,6 +14,11 @@ from ..utils.request_details import RequestDetails
 from ..utils.config_updater import update_state as util_update_state
 from ..utils.config_updater import bootstrap_state, extract_toolkit_summaries
 from ..schemas.global_loader import get_global_schema_loader
+from ..utils.global_config import (
+    get_response_model,
+    get_state_model,
+    get_validation_model,
+)
 
 import logging
 
@@ -33,6 +39,7 @@ class SessionHandler:
     def __init__(self, db_path="sessions.db"):
         """Initialize the session handler."""
         self.db_path = db_path
+        self.started_at = time.time()
         self.local = threading.local()
         self._init_db()
         self.router = APIRouter()
@@ -82,6 +89,11 @@ class SessionHandler:
     
     def _register_routes(self):
         """Register the session routes."""
+        @self.router.get("/health")
+        async def health_check():
+            """Return Gecko health and current runtime configuration."""
+            return JSONResponse(content=self.get_health_status())
+
         @self.router.get("/session-id")
         async def get_session_id():
             """Get a new session ID."""
@@ -509,7 +521,47 @@ class SessionHandler:
         conn = self._get_connection()
         cursor = conn.execute("SELECT 1 FROM sessions WHERE session_id = ?", (session_id,))
         return cursor.fetchone() is not None
-    
+
+    def get_health_status(self) -> Dict[str, Any]:
+        """Return a lightweight health snapshot for the current Gecko process."""
+        schema_loader = get_global_schema_loader()
+        schema_dirs = []
+        schema_cache_size = 0
+        if schema_loader is not None:
+            schema_dirs = list(getattr(schema_loader, "schema_dirs", []) or [])
+            schema_cache_size = len(getattr(schema_loader, "schemas_cache", {}) or {})
+
+        conn = self._get_connection()
+        sessions_row = conn.execute("SELECT COUNT(*) AS count FROM sessions").fetchone()
+        usage_row = conn.execute(
+            "SELECT COUNT(*) AS count FROM llm_usage_events"
+        ).fetchone()
+        session_count = int(sessions_row["count"] or 0) if sessions_row else 0
+        llm_usage_event_count = int(usage_row["count"] or 0) if usage_row else 0
+
+        state_model = get_state_model()
+        uptime_seconds = max(0.0, time.time() - self.started_at)
+
+        return {
+            "status": "ok",
+            "service": "gecko",
+            "process_id": os.getpid(),
+            "uptime_seconds": round(uptime_seconds, 3),
+            "config": {
+                "db_path": self.db_path,
+                "schema_dirs": schema_dirs,
+                "schema_cache_size": schema_cache_size,
+                "response_model": get_response_model(),
+                "validation_model": get_validation_model(),
+                "state_model": state_model,
+                "state_model_enabled": state_model is not None,
+            },
+            "stats": {
+                "session_count": session_count,
+                "llm_usage_event_count": llm_usage_event_count,
+            },
+        }
+
     def record_llm_usage(
         self,
         session_id: str,

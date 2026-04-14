@@ -11,6 +11,14 @@ from camel.configs import ChatGPTConfig
 logger = logging.getLogger(__name__)
 
 
+# Suppress CAMEL's repetitive "Unknown model: context window size not defined" warning.
+class _ContextWindowFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "context window size not defined" not in record.getMessage()
+
+logging.getLogger().addFilter(_ContextWindowFilter())
+
+
 def strip_thinking_content(text: str) -> str:
     """Strip model reasoning blocks like <think>...</think> before JSON parsing."""
     if not isinstance(text, str):
@@ -114,7 +122,10 @@ def create_model(
             "type": "Qwen/Qwen3-14B",
             "url": "https://api.deepinfra.com/v1/openai",
             "api_key": "DEEPINFRA_API_KEY",
-        }
+            "extra_config": {
+                "extra_body": {"chat_template_kwargs": {"enable_thinking": True, "max_thinking_tokens": 8192}},
+            },
+        },
     }
 
 

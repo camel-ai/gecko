@@ -23,9 +23,11 @@ class SessionMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # Check if this is the session-id endpoint or state-sync endpoint.
-        if request.url.path == "/session-id":
-            return await call_next(request)
-        elif request.url.path == "/set-session-state":
+        if request.url.path in {
+            "/health",
+            "/session-id",
+            "/set-session-state",
+        }:
             return await call_next(request)
         elif request.url.path == "/update-state-from-real":
             # Real tool sync endpoint handles its own session validation

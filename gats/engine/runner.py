@@ -2,11 +2,9 @@ import logging
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Callable, List, Optional
+from typing import Any, Callable, List, Optional
 
-from gats.core.config import GATSConfig
 from gats.core.task import GATSTask, GATSResult, GATSTurn
-from gats.engine.solver import GATSSolver
 
 logger = logging.getLogger(__name__)
 
@@ -14,8 +12,14 @@ logger = logging.getLogger(__name__)
 class GATSRunner:
     """Execute GATSTasks with optional parallelism, resume, and callbacks."""
 
-    def __init__(self, config: GATSConfig):
-        self.config = config
+    def __init__(
+        self,
+        solver_factory: Callable[[GATSTask], Any],
+        *,
+        target_score: float = 1.0,
+    ):
+        self._solver_factory = solver_factory
+        self._target_score = target_score
 
     def run_one(self, task: GATSTask) -> GATSResult:
         """Execute a single task (single or multi-turn)."""
@@ -25,15 +29,18 @@ class GATSRunner:
         success = True
 
         try:
-            solver = GATSSolver(task, self.config)
+            solver = self._solver_factory(task)
+
+            is_multi_turn = len(task.turns) > 1
 
             for turn_idx, question in enumerate(task.turns):
                 gats_turn = solver.process_turn(question)
                 turns.append(gats_turn)
 
-                if gats_turn.score < self.config.target_score:
+                if gats_turn.score < self._target_score:
                     success = False
-                    break
+                    if not is_multi_turn:
+                        break
 
             all_events = solver.get_events()
 
@@ -54,7 +61,7 @@ class GATSRunner:
         self,
         tasks: List[GATSTask],
         *,
-        workers: Optional[int] = None,
+        workers: int = 1,
         resume_dir: Optional[str] = None,
         on_task_done: Optional[Callable[[GATSResult], None]] = None,
     ) -> List[GATSResult]:
@@ -62,14 +69,12 @@ class GATSRunner:
 
         Args:
             tasks: Tasks to execute.
-            workers: Parallel worker count (default: config.max_workers).
+            workers: Parallel worker count.
             resume_dir: Directory for resume state. Completed task IDs are
                 tracked via ``{task_id}.done`` marker files; on restart those
                 tasks are skipped.
             on_task_done: Called after each task completes (for incremental saving).
         """
-        effective_workers = workers or self.config.max_workers
-
         # Resume: load completed task IDs
         completed_ids: set = set()
         if resume_dir:
@@ -95,7 +100,7 @@ class GATSRunner:
                     f.write("")
             return result
 
-        if effective_workers <= 1:
+        if workers <= 1:
             for i, task in enumerate(tasks_to_run):
                 logger.info(f"[{i + 1}/{len(tasks_to_run)}] {task.id}")
                 result = _process_task(task)
@@ -103,7 +108,7 @@ class GATSRunner:
                 if on_task_done:
                     on_task_done(result)
         else:
-            with ThreadPoolExecutor(max_workers=effective_workers) as executor:
+            with ThreadPoolExecutor(max_workers=workers) as executor:
                 future_to_task = {
                     executor.submit(_process_task, t): t for t in tasks_to_run
                 }

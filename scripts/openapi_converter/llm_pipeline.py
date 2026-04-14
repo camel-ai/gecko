@@ -701,6 +701,23 @@ Return ONLY JSON object:
             return "Operation"
         return text[0].upper() + text[1:]
 
+    @staticmethod
+    def _clean_param_description(text: str) -> str:
+        """Remove fabricated examples and implementation details from param descriptions."""
+        # Strip "For example: 'ABC123'." patterns and trailing fragments
+        cleaned = re.sub(
+            r"\s*[Ff]or example[:\s]*['\"][^'\"]*['\"]\.?\s*", " ", text
+        )
+        # Strip trailing "Use a human-readable name here." type filler
+        cleaned = re.sub(
+            r"\s*Use a human-readable name here\.?\s*", " ", cleaned
+        )
+        # Strip "This should be a ..." filler that often follows fabricated examples
+        cleaned = re.sub(
+            r"\s*This should be a [^.]*\.\s*", " ", cleaned
+        )
+        return " ".join(cleaned.split()).strip()
+
     def _normalize_endpoint_description(self, text: str) -> str:
         """Normalize endpoint description text without hard truncation."""
         normalized = " ".join((text or "").split()).strip()
@@ -787,16 +804,31 @@ Return ONLY JSON object:
             hint_lower = hint.lower()
 
         if "list" in hint_lower or "tuple" in hint_lower:
-            return {"type": "array", "items": {"type": "string"}}
+            items_type = self._extract_inner_type(hint)
+            return {"type": "array", "items": {"type": items_type}}
         if "dict" in hint_lower or "mapping" in hint_lower:
             return {"type": "object", "additionalProperties": True}
 
         inferred = self._infer_json_type(hint)
         if inferred == "array":
-            return {"type": "array", "items": {"type": "string"}}
+            items_type = self._extract_inner_type(hint)
+            return {"type": "array", "items": {"type": items_type}}
         if inferred == "object":
             return {"type": "object", "additionalProperties": True}
-        return {"type": inferred}
+        schema = {"type": inferred}
+        # Preserve float distinction: OpenAPI "number" + format "float"
+        if inferred == "number" and hint_lower.startswith("float"):
+            schema["format"] = "float"
+        return schema
+
+    def _extract_inner_type(self, type_hint: str) -> str:
+        """Extract and convert the inner type from a generic like List[float] -> 'number'."""
+        import re
+        m = re.search(r'\[([^\[\]]+)\]', type_hint)
+        if m:
+            inner = m.group(1).strip().split(",")[0].strip()  # Take first type for Tuple[T, ...]
+            return self._infer_json_type(inner)
+        return "string"
 
     def _schema_from_ast_value(self, node: Optional[ast.AST], depth: int = 0) -> Dict[str, Any]:
         if node is None:
@@ -809,7 +841,7 @@ Return ONLY JSON object:
             if isinstance(value, int):
                 return {"type": "integer"}
             if isinstance(value, float):
-                return {"type": "number"}
+                return {"type": "number", "format": "float"}
             if isinstance(value, str):
                 return {"type": "string"}
             if value is None:
@@ -844,7 +876,7 @@ Return ONLY JSON object:
             if "count" in name or "num" in name or name.endswith("_id"):
                 return {"type": "integer"}
             if "cost" in name or "price" in name or "amount" in name:
-                return {"type": "number"}
+                return {"type": "number", "format": "float"}
             if name.startswith("is_") or name.startswith("has_"):
                 return {"type": "boolean"}
             return {"type": "string"}
@@ -864,7 +896,7 @@ Return ONLY JSON object:
             if call_name in {"int", "randint"}:
                 return {"type": "integer"}
             if call_name in {"float"}:
-                return {"type": "number"}
+                return {"type": "number", "format": "float"}
             if call_name in {"bool"}:
                 return {"type": "boolean"}
             return {"type": "string"}
@@ -977,6 +1009,8 @@ Return ONLY JSON object:
             name = param["name"]
             param_schema = self._schema_from_type_hint(param.get("type_hint", "Any"))
             param_schema["description"] = param_descriptions.get(name, f"Parameter {name}")
+            if "default" in param:
+                param_schema["default"] = param["default"]
             properties[name] = param_schema
             if param.get("required", True):
                 required.append(name)
@@ -1047,7 +1081,7 @@ Return ONLY JSON object:
             properties = schema.get("properties", {})
             for key, value in parameter_descriptions.items():
                 if key in properties and isinstance(value, str) and value.strip():
-                    properties[key]["description"] = value.strip()
+                    properties[key]["description"] = self._clean_param_description(value.strip())
 
         success_schema = override.get("success_schema")
         if success_schema is not None:
@@ -1344,6 +1378,7 @@ Rules:
 - For counting operations (like wc), explicitly specify how counts are calculated (e.g., lines by len(content.splitlines()), words by len(content.split()), characters by len(content)) in behavior_hints.
 - If a method does not mutate state (e.g., read-only operations like cat, wc, ls, pwd), `state_effects_on_success`, `state_effects_on_error`, and `state_effects_always` MUST be empty lists `[]`. Do NOT write "No state mutation occurs".
 - param_descriptions keys must come from that method's parameters.
+- param_descriptions must only describe what the parameter represents and its expected format/unit. Do NOT include fabricated examples (e.g., "For example: 'ABC123'"), internal validation logic, implementation details, or constraints not visible in the method's docstring or signature.
 - Keep description concise and usage-focused (usually 1-2 sentences).
 - Description should explain what the tool does and the practical call scope/inputs.
 - Do NOT include explicit mutation statements, branch-level validation details, or template details in description.
@@ -1772,19 +1807,6 @@ Return ONLY the enrichment object JSON."""
             desc = str(prop.get("description", "") or "").strip()
             lname = name.lower()
 
-            # Add light-weight examples to free-form string fields.
-            if "for example:" not in desc.lower() and "e.g." not in desc.lower():
-                if lname.endswith("_id") or lname == "id":
-                    desc = _append_once(
-                        desc,
-                        "For example: 'ABC123'. This should be an identifier string, not a display name.",
-                    )
-                elif "name" in lname or "user" in lname:
-                    desc = _append_once(
-                        desc,
-                        "For example: 'John'.",
-                    )
-
             # Disambiguate name-like fields when id-like sibling params exist.
             is_name_like = (
                 ("name" in lname and not lname.endswith("_name_id"))
@@ -1874,6 +1896,18 @@ Return ONLY the enrichment object JSON."""
             return
         schema["oneOf"] = filtered
 
+    @staticmethod
+    def _ensure_float_format(obj: Any) -> None:
+        """Add format:'float' to every type:'number' schema that lacks it."""
+        if isinstance(obj, dict):
+            if obj.get("type") == "number" and "format" not in obj:
+                obj["format"] = "float"
+            for v in obj.values():
+                EnhancedOpenAPIGenerator._ensure_float_format(v)
+        elif isinstance(obj, list):
+            for item in obj:
+                EnhancedOpenAPIGenerator._ensure_float_format(item)
+
     # ---- Consolidated post-processing ----
 
     def _post_process_spec(self) -> None:
@@ -1933,6 +1967,9 @@ Return ONLY the enrichment object JSON."""
                             )
                     else:
                         endpoint["description"] = summary
+
+        # Ensure all number properties have format: "float"
+        self._ensure_float_format(self.spec.get("paths", {}))
 
         # Step 6: Validate and fix structure
         self._validate_and_fix_spec()
