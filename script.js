@@ -1,24 +1,4 @@
-window.HELP_IMPROVE_VIDEOJS = false;
-
-$(document).ready(function () {
-  var options = {
-    slidesToScroll: 1,
-    slidesToShow: 1,
-    loop: true,
-    infinite: true,
-    autoplay: true,
-    autoplaySpeed: 8000,
-    initialSlide: 0
-  };
-
-  if (window.bulmaCarousel && typeof bulmaCarousel.attach === 'function') {
-    bulmaCarousel.attach('.carousel', options);
-  }
-
-  if (window.bulmaSlider && typeof bulmaSlider.attach === 'function') {
-    bulmaSlider.attach();
-  }
-
+document.addEventListener('DOMContentLoaded', function () {
   var jumpLinks = Array.prototype.slice.call(
     document.querySelectorAll('.side-jump a, .mobile-jump a')
   );
