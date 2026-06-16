@@ -1,0 +1,252 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM791",
+    "version": "1.0.0",
+    "description": "LM791 provides property search and visit scheduling endpoints for rental and purchase workflows. Use Homes_2_FindHomeByArea to locate listings by city and optional filters (bedrooms, bathrooms, garage, in-unit laundry), then call Homes_2_ScheduleVisit to arrange tours using YYYY-MM-DD dates. Designed for integration into real-estate apps or chat assistants, the API supports quick filtering and appointment coordination in client-facing flows."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM791"
+    }
+  ],
+  "paths": {
+    "/Homes_2_FindHomeByArea": {
+      "post": {
+        "operationId": "Homes_2_FindHomeByArea",
+        "summary": "Simulate searching properties by city with basic filters",
+        "description": "Return a paginated list of properties in the specified area that match the requested intent, bedroom and bathroom counts, and optional garage / in-unit laundry filters.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "area": {
+                    "type": "string",
+                    "description": "The city where the property is located, in the format of 'City, State' (e.g., 'Berkeley, CA' or 'New York, NY')."
+                  },
+                  "intent": {
+                    "type": "string",
+                    "description": "The intent to either rent or buy the property.",
+                    "enum": [
+                      "rent",
+                      "buy"
+                    ]
+                  },
+                  "number_of_beds": {
+                    "type": "integer",
+                    "description": "The number of bedrooms in the property."
+                  },
+                  "number_of_baths": {
+                    "type": "integer",
+                    "description": "The number of bathrooms in the property."
+                  },
+                  "has_garage": {
+                    "type": "boolean",
+                    "description": "Indicates whether the property includes a garage. The default is 'dontcare' which includes properties regardless of garage availability.",
+                    "default": null
+                  },
+                  "in_unit_laundry": {
+                    "type": "boolean",
+                    "description": "Indicates whether the property has in-unit laundry facilities. The default is 'dontcare' which includes properties regardless of in-unit laundry facilities.",
+                    "default": null
+                  }
+                },
+                "required": [
+                  "area",
+                  "intent",
+                  "number_of_beds",
+                  "number_of_baths"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful search response containing matching properties and pagination metadata",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "description": "Array of matching property records",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the property"
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Short human-friendly title for the listing"
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Free-text description of the property"
+                          },
+                          "price": {
+                            "type": "number",
+                            "description": "Listing price. Provide as a float (e.g., 1.0, not 1)",
+                            "format": "double"
+                          },
+                          "currency": {
+                            "type": "string",
+                            "description": "Currency of the price as an ISO 4217 code (e.g., USD)"
+                          },
+                          "beds": {
+                            "type": "integer",
+                            "description": "Number of bedrooms"
+                          },
+                          "baths": {
+                            "type": "integer",
+                            "description": "Number of bathrooms"
+                          },
+                          "has_garage": {
+                            "type": "string",
+                            "description": "True if the property includes a garage; null if unknown"
+                          },
+                          "in_unit_laundry": {
+                            "type": "string",
+                            "description": "True if the property has in-unit laundry; null if unknown"
+                          },
+                          "address": {
+                            "type": "object",
+                            "description": "Structured address information",
+                            "properties": {
+                              "city": {
+                                "type": "string",
+                                "description": "City name"
+                              },
+                              "state": {
+                                "type": "string",
+                                "description": "State or region"
+                              }
+                            },
+                            "required": [
+                              "city",
+                              "state"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "price",
+                          "currency",
+                          "beds",
+                          "baths",
+                          "address"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "Total number of matching properties across all pages"
+                    },
+                    "page": {
+                      "type": "integer",
+                      "description": "Current page number (1-based)"
+                    },
+                    "per_page": {
+                      "type": "integer",
+                      "description": "Number of results returned per page"
+                    }
+                  },
+                  "required": [
+                    "results",
+                    "total",
+                    "page",
+                    "per_page"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Homes_2_ScheduleVisit": {
+      "post": {
+        "operationId": "Homes_2_ScheduleVisit",
+        "summary": "Schedule a property visit",
+        "description": "Simulate arranging a visit for an interested party. The visit_date must be provided in the YYYY-MM-DD format.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "property_name": {
+                    "type": "string",
+                    "description": "The exact name of the property or apartment complex to visit."
+                  },
+                  "visit_date": {
+                    "type": "string",
+                    "description": "The scheduled date for the property visit, in the format of 'YYYY-MM-DD'.",
+                    "format": "date"
+                  }
+                },
+                "required": [
+                  "property_name",
+                  "visit_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Confirmation of a successfully scheduled visit",
+                  "properties": {
+                    "confirmation_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the scheduled visit (use this for lookup or cancellations)."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "High-level outcome of the scheduling operation (e.g., scheduled, pending, failed)."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message with next steps or brief details (e.g., instructions for arrival)."
+                    },
+                    "instructions": {
+                      "type": "string",
+                      "description": "Any additional instructions for the visitor (parking, check-in desk, documentation to bring)."
+                    }
+                  },
+                  "required": [
+                    "confirmation_id",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

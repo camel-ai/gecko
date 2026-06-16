@@ -1,0 +1,479 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI704",
+    "version": "1.0.0",
+    "description": "LI704 provides a compact set of endpoints for payments and dining workflows, enabling apps to request or make payments and search or reserve restaurants. Use Payment_1_RequestPayment to prompt receivers or Payment_1_MakePayment to execute transfers, while Restaurants_2_FindRestaurants and Restaurants_2_ReserveRestaurant support discovery and bookings. Designed for synchronous, transactional integrations with clear parameters for amounts, recipients, location, time, and visibility."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI704"
+    }
+  ],
+  "paths": {
+    "/Payment_1_RequestPayment": {
+      "post": {
+        "operationId": "Payment_1_RequestPayment",
+        "summary": "Simulate initiating a payment request",
+        "description": "Simulates creation of a payment request to a specified receiver for a given amount and returns metadata for the created request.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "receiver": {
+                    "type": "string",
+                    "description": "The name or identifier of the contact or account to which the payment request is sent."
+                  },
+                  "amount": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The monetary value to be requested, specified in dollars.. Use float format (e.g., 1.0 not 1)."
+                  },
+                  "private_visibility": {
+                    "type": "boolean",
+                    "description": "Indicates if the transaction should be hidden from public transaction feeds. When set to true, the transaction is private.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "receiver",
+                  "amount"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful payment request object",
+                  "properties": {
+                    "payment_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the created payment request."
+                    },
+                    "receiver": {
+                      "type": "string",
+                      "description": "The name or identifier of the contact or account to which the payment request was sent."
+                    },
+                    "amount": {
+                      "type": "number",
+                      "description": "The monetary value requested. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "private_visibility": {
+                      "type": "boolean",
+                      "description": "Indicates if the transaction is hidden from public transaction feeds. When true, the transaction is private.",
+                      "default": false
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Current status of the payment request (examples: pending, completed)."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp when the payment request was created (ISO 8601 recommended)."
+                    }
+                  },
+                  "required": [
+                    "payment_id",
+                    "receiver",
+                    "amount",
+                    "status",
+                    "created_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Payment_1_MakePayment": {
+      "post": {
+        "operationId": "Payment_1_MakePayment",
+        "summary": "Initiate a simulated payment transaction",
+        "description": "Simulate initiating a transaction to send a specified amount to a contact using the chosen payment method.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "payment_method": {
+                    "type": "string",
+                    "description": "The payment source to use for the transaction, such as a balance within the app or a linked bank card.",
+                    "enum": [
+                      "app balance",
+                      "debit card",
+                      "credit card"
+                    ]
+                  },
+                  "amount": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The monetary value to send, specified in the currency used by the payment platform.. Use float format (e.g., 1.0 not 1).",
+                    "minimum": 0.01
+                  },
+                  "receiver": {
+                    "type": "string",
+                    "description": "The identifier of the contact or account to receive the payment. This could be a username, phone number, or email address."
+                  },
+                  "private_visibility": {
+                    "type": "boolean",
+                    "description": "A flag indicating whether the transaction should be hidden from public transaction feeds.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "payment_method",
+                  "amount",
+                  "receiver"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful payment creation payload",
+                  "properties": {
+                    "transaction_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the created transaction."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Resulting transaction status.",
+                      "enum": [
+                        "pending",
+                        "completed",
+                        "failed"
+                      ]
+                    },
+                    "amount": {
+                      "type": "number",
+                      "description": "The monetary value sent. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Currency code used for the transaction (e.g., USD)."
+                    },
+                    "receiver": {
+                      "type": "string",
+                      "description": "Identifier of the contact or account that received the payment."
+                    },
+                    "sent_at": {
+                      "type": "string",
+                      "description": "ISO 8601 timestamp when the transaction was created.",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "transaction_id",
+                    "status",
+                    "amount",
+                    "currency",
+                    "receiver",
+                    "sent_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Restaurants_2_ReserveRestaurant": {
+      "post": {
+        "operationId": "Restaurants_2_ReserveRestaurant",
+        "summary": "Simulate making a restaurant table reservation",
+        "description": "Create a reservation request for a restaurant, specifying restaurant name, location, time, optional date, and party size.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "restaurant_name": {
+                    "type": "string",
+                    "description": "The name of the restaurant for the reservation."
+                  },
+                  "location": {
+                    "type": "string",
+                    "description": "The location of the restaurant, in the format of 'City, State', such as 'Berkeley, CA' or 'New York, NY'."
+                  },
+                  "time": {
+                    "type": "string",
+                    "description": "The tentative time of the reservation, in 24-hour format 'HH:MM'."
+                  },
+                  "number_of_seats": {
+                    "type": "integer",
+                    "description": "The number of seats to reserve at the restaurant.",
+                    "enum": [
+                      1,
+                      2,
+                      3,
+                      4,
+                      5,
+                      6
+                    ],
+                    "default": 2
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "The tentative date of the restaurant reservation, in the format 'YYYY-MM-DD'. If not specified, the default value represents the current date.",
+                    "default": null
+                  }
+                },
+                "required": [
+                  "restaurant_name",
+                  "location",
+                  "time"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful reservation response",
+                  "properties": {
+                    "reservation_id": {
+                      "type": "string",
+                      "description": "A unique identifier assigned to the confirmed reservation."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Status of the reservation (for example: confirmed, tentative)."
+                    },
+                    "confirmation_time": {
+                      "type": "string",
+                      "description": "Timestamp when the reservation was confirmed (ISO 8601 string recommended)."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Optional human-readable message from the restaurant (e.g., special instructions or notes)."
+                    },
+                    "location_details": {
+                      "type": "object",
+                      "description": "Optional additional location metadata returned by the restaurant (address, floor, etc.).",
+                      "properties": {
+                        "address": {
+                          "type": "string",
+                          "description": "Address or other free-form location details."
+                        }
+                      },
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "reservation_id",
+                    "status",
+                    "confirmation_time"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Restaurants_2_FindRestaurants": {
+      "post": {
+        "operationId": "Restaurants_2_FindRestaurants",
+        "summary": "Find restaurants matching location, category, and optional preferences",
+        "description": "Simulate returning a list of restaurants that match the requested category and location, optionally filtering by price range and boolean preferences.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "category": {
+                    "type": "string",
+                    "description": "The cuisine type or category of food offered by the restaurant.",
+                    "enum": [
+                      "Mexican",
+                      "Bistro",
+                      "Izakaya",
+                      "Brunch",
+                      "Thai",
+                      "Sandwich",
+                      "Seafood",
+                      "Barbecue",
+                      "European",
+                      "Steakhouse",
+                      "Vietnamese",
+                      "Asian",
+                      "Coffeehouse",
+                      "American",
+                      "Gastropub",
+                      "Austrian",
+                      "Italian",
+                      "Indian",
+                      "Spanish",
+                      "Vegetarian",
+                      "Brasserie",
+                      "Chinese",
+                      "Breakfast",
+                      "Greek",
+                      "California",
+                      "Tapas",
+                      "Take-out",
+                      "Japanese"
+                    ]
+                  },
+                  "location": {
+                    "type": "string",
+                    "description": "The city and state where the restaurant is located, in the format of 'City, State', such as 'Berkeley, CA' or 'New York, NY'."
+                  },
+                  "price_range": {
+                    "type": "string",
+                    "description": "The expected price range for dining at the restaurant.",
+                    "enum": [
+                      "cheap",
+                      "moderate",
+                      "pricey",
+                      "ultra high-end"
+                    ],
+                    "default": "dontcare"
+                  },
+                  "has_vegetarian_options": {
+                    "type": "boolean",
+                    "description": "Indicates if the restaurant offers adequate vegetarian options.",
+                    "default": false
+                  },
+                  "has_seating_outdoors": {
+                    "type": "boolean",
+                    "description": "Indicates if the restaurant has outdoor seating available.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "category",
+                  "location"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload containing matching restaurants",
+                  "properties": {
+                    "restaurants": {
+                      "type": "array",
+                      "description": "List of matching restaurants, ordered by relevance",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the restaurant"
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Public name of the restaurant"
+                          },
+                          "category": {
+                            "type": "string",
+                            "description": "Primary cuisine or category for the restaurant"
+                          },
+                          "address": {
+                            "type": "string",
+                            "description": "Human-readable address or neighborhood"
+                          },
+                          "price_range": {
+                            "type": "string",
+                            "description": "Expected price range (e.g., 'cheap', 'moderate', 'pricey', 'ultra high-end')"
+                          },
+                          "has_vegetarian_options": {
+                            "type": "boolean",
+                            "description": "Whether the restaurant offers adequate vegetarian options"
+                          },
+                          "has_seating_outdoors": {
+                            "type": "boolean",
+                            "description": "Whether the restaurant has outdoor seating available"
+                          },
+                          "rating": {
+                            "type": "number",
+                            "description": "Average rating as a decimal number. Provide as a float (e.g., 1.0, not 1)",
+                            "format": "double"
+                          },
+                          "distance": {
+                            "type": "number",
+                            "description": "Approximate distance from the requested location as a decimal number. Provide as a float (e.g., 1.0, not 1)",
+                            "format": "double"
+                          },
+                          "phone": {
+                            "type": "string",
+                            "description": "Contact phone number, if available"
+                          },
+                          "website": {
+                            "type": "string",
+                            "description": "Website URL for the restaurant, if available",
+                            "format": "uri"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "category",
+                          "address"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "restaurants"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

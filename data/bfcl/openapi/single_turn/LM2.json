@@ -1,0 +1,257 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM2",
+    "version": "1.0.0",
+    "description": "Bộ API LM2 cho phép tích hợp dịch vụ tìm chuyến và tra cứu thời tiết để hỗ trợ ứng dụng di chuyển. Các endpoint cung cấp tìm chuyến phù hợp theo vị trí, loại chuyến và thời gian chờ của khách (uber_ride) và tra cứu điều kiện thời tiết theo địa điểm (uber_ride2). Thiết kế hướng REST, trả JSON, kèm tham số rõ ràng, hỗ trợ xử lý bất đồng bộ và mã lỗi nhất quán."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM2"
+    }
+  ],
+  "paths": {
+    "/uber_ride": {
+      "post": {
+        "operationId": "uber_ride",
+        "summary": "Find a suitable Uber ride",
+        "description": "Mô phỏng tìm chuyến đi Uber phù hợp dựa trên vị trí bắt đầu, loại chuyến và khoảng thời gian khách hàng sẵn sàng chờ.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "loc": {
+                    "type": "string",
+                    "description": "The starting location for the Uber ride, in the format of 'Street Address, City, State'. Example: '123 Main St, San Francisco, CA'."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "The type of Uber ride requested by the user.",
+                    "enum": [
+                      "plus",
+                      "comfort",
+                      "black"
+                    ]
+                  },
+                  "time": {
+                    "type": "integer",
+                    "description": "The maximum amount of time the customer is willing to wait for the ride, in minutes."
+                  }
+                },
+                "required": [
+                  "loc",
+                  "type",
+                  "time"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful ride match response",
+                  "properties": {
+                    "ride_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the matched ride."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Ride category assigned to the match (e.g., plus, comfort, black)."
+                    },
+                    "eta_minutes": {
+                      "type": "integer",
+                      "description": "Estimated time of arrival in minutes."
+                    },
+                    "driver": {
+                      "type": "object",
+                      "description": "Driver information",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "Driver's full name."
+                        },
+                        "rating": {
+                          "type": "number",
+                          "description": "Driver rating (e.g., 4.9)."
+                        },
+                        "vehicle": {
+                          "type": "object",
+                          "description": "Vehicle details",
+                          "properties": {
+                            "make": {
+                              "type": "string",
+                              "description": "Vehicle manufacturer (e.g., Toyota)."
+                            },
+                            "model": {
+                              "type": "string",
+                              "description": "Vehicle model (e.g., Camry)."
+                            },
+                            "license_plate": {
+                              "type": "string",
+                              "description": "Vehicle license plate."
+                            }
+                          },
+                          "required": [
+                            "make",
+                            "model"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "price": {
+                      "type": "object",
+                      "description": "Estimated price for the ride",
+                      "properties": {
+                        "amount": {
+                          "type": "number",
+                          "description": "Fare amount. Use float format (e.g., 1.0 not 1).",
+                          "format": "double"
+                        },
+                        "currency": {
+                          "type": "string",
+                          "description": "Currency code (e.g., USD)."
+                        }
+                      },
+                      "required": [
+                        "amount",
+                        "currency"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "surge_multiplier": {
+                      "type": "number",
+                      "description": "Current surge multiplier if any. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "estimated_distance_km": {
+                      "type": "number",
+                      "description": "Estimated trip distance in kilometers. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    }
+                  },
+                  "required": [
+                    "ride_id",
+                    "type",
+                    "eta_minutes",
+                    "price"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/uber_ride2": {
+      "post": {
+        "operationId": "uber_ride2",
+        "summary": "Get weather for a location",
+        "description": "Simulate retrieving current weather for the provided location and return realistic weather details.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "loc": {
+                    "type": "string",
+                    "description": "The location of the starting place of the Uber ride, in the format of 'City, State', such as 'Berkeley, CA' and 'New York, NY'."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "The type of Uber ride the user is ordering.",
+                    "enum": [
+                      "plus",
+                      "comfort",
+                      "black"
+                    ]
+                  },
+                  "time": {
+                    "type": "integer",
+                    "description": "The maximum amount of time in minutes the customer is willing to wait for the ride.",
+                    "default": 10
+                  }
+                },
+                "required": [
+                  "loc",
+                  "type"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful weather response payload",
+                  "properties": {
+                    "temperature": {
+                      "type": "number",
+                      "description": "Current temperature at the location as a decimal number (degrees Celsius by default)."
+                    },
+                    "unit": {
+                      "type": "string",
+                      "description": "Unit used for temperature values (e.g., \"C\" or \"F\").",
+                      "default": "C"
+                    },
+                    "condition": {
+                      "type": "string",
+                      "description": "Short human-readable description of the weather (e.g., \"Partly cloudy\", \"Light rain\")."
+                    },
+                    "observation_time": {
+                      "type": "string",
+                      "description": "Time of the observation (ISO 8601 timestamp or a human-readable timestamp)."
+                    },
+                    "humidity": {
+                      "type": "integer",
+                      "description": "Relative humidity as a percentage (0-100)."
+                    },
+                    "wind_speed": {
+                      "type": "number",
+                      "description": "Wind speed using the unit implied by the response (e.g., meters/second or km/h)."
+                    },
+                    "precipitation_chance": {
+                      "type": "number",
+                      "description": "Estimated chance of precipitation as a percentage (0-100)."
+                    }
+                  },
+                  "required": [
+                    "temperature",
+                    "unit",
+                    "condition",
+                    "observation_time"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,1199 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Retail Tools Mock API",
+    "version": "1.0.0",
+    "description": "Mock schema providing all RetailTools endpoints for simulated execution. Hybrid mode can load write operations from this spec while real mode can reuse the same definitions if desired.",
+    "x-default-state": {
+      "tools": {
+        "find_user_id_by_name_zip": {
+          "state_access": "read",
+          "state_effects": [],
+          "behavior_hints": [
+            "Resolves a customer id from name and zip without mutation.",
+            "If a user provides a structured user identifier containing name parts plus ZIP, derive the lookup name from that identifier and verify the returned user_id against it."
+          ]
+        },
+        "find_user_id_by_email": {
+          "state_access": "read",
+          "state_effects": [],
+          "behavior_hints": [
+            "Resolves a customer id from email without mutation."
+          ]
+        },
+        "get_user_details": {
+          "state_access": "read",
+          "state_effects": [],
+          "behavior_hints": [
+            "Returns user profile, addresses, payment methods, and order ids without mutation."
+          ]
+        },
+        "get_order_details": {
+          "state_access": "read",
+          "state_effects": [],
+          "behavior_hints": [
+            "Returns order details without mutation."
+          ]
+        },
+        "get_product_details": {
+          "state_access": "read",
+          "state_effects": [],
+          "behavior_hints": [
+            "Returns product and variant catalog data without mutation.",
+            "For replacement selection, filter variants by explicit user constraints and tool constraints, then rank by the user's stated objective; do not preserve unspecified old options unless requested or fit-critical."
+          ]
+        },
+        "get_item_details": {
+          "state_access": "read",
+          "state_effects": [],
+          "behavior_hints": [
+            "Returns one item/variant catalog record without mutation."
+          ]
+        },
+        "list_all_product_types": {
+          "state_access": "read",
+          "state_effects": [],
+          "behavior_hints": [
+            "Returns product type catalog metadata without mutation."
+          ]
+        },
+        "calculate": {
+          "state_access": "read",
+          "state_effects": [],
+          "behavior_hints": [
+            "Pure arithmetic helper; does not mutate retail state."
+          ]
+        },
+        "cancel_pending_order": {
+          "state_access": "write",
+          "state_effects": [
+            "Mark a pending order as cancelled, record the cancellation reason, and add refund payment history when successful."
+          ],
+          "state_effects_on_success": [
+            "Mark a pending order as cancelled, record the cancellation reason, and add refund payment history when successful."
+          ],
+          "behavior_hints": [
+            "State-changing order cancellation; requires pending status, valid reason, and explicit user confirmation.",
+            "Use an allowed cancellation reason that matches the user's clear motive, then confirm it with the user; ask the user to choose only when the motive is ambiguous."
+          ]
+        },
+        "exchange_delivered_order_items": {
+          "state_access": "write",
+          "state_effects": [
+            "Exchange delivered order items for replacement item variants and record any payment adjustment when successful."
+          ],
+          "state_effects_on_success": [
+            "Exchange delivered order items for replacement item variants and record any payment adjustment when successful."
+          ],
+          "behavior_hints": [
+            "State-changing delivered-order exchange; requires delivered status, matching available replacement variants, sufficient gift-card balance when applicable, and explicit user confirmation."
+          ]
+        },
+        "modify_pending_order_address": {
+          "state_access": "write",
+          "state_effects": [
+            "Replace the shipping address on a pending order when successful."
+          ],
+          "state_effects_on_success": [
+            "Replace the shipping address on a pending order when successful."
+          ],
+          "behavior_hints": [
+            "State-changing pending-order update; requires pending status and explicit user confirmation."
+          ]
+        },
+        "modify_pending_order_items": {
+          "state_access": "write",
+          "state_effects": [
+            "Replace items in a pending order and record any payment adjustment when successful."
+          ],
+          "state_effects_on_success": [
+            "Replace items in a pending order and record any payment adjustment when successful."
+          ],
+          "behavior_hints": [
+            "State-changing pending-order update; requires product/variant details and explicit user confirmation."
+          ]
+        },
+        "modify_pending_order_payment": {
+          "state_access": "write",
+          "state_effects": [
+            "Change the payment method on a pending order when successful."
+          ],
+          "state_effects_on_success": [
+            "Change the payment method on a pending order when successful."
+          ],
+          "behavior_hints": [
+            "State-changing pending-order payment update; requires pending status, exactly one existing payment, a different valid payment method, sufficient gift-card balance when applicable, and explicit user confirmation."
+          ]
+        },
+        "modify_user_address": {
+          "state_access": "write",
+          "state_effects": [
+            "Update the stored default address on the user profile when successful."
+          ],
+          "state_effects_on_success": [
+            "Update the stored default address on the user profile when successful."
+          ],
+          "behavior_hints": [
+            "State-changing profile update; requires the user-provided address and explicit approval."
+          ]
+        },
+        "return_delivered_order_items": {
+          "state_access": "write",
+          "state_effects": [
+            "Mark delivered items for return and record refund destination/payment history when successful."
+          ],
+          "state_effects_on_success": [
+            "Mark delivered items for return and record refund destination/payment history when successful."
+          ],
+          "behavior_hints": [
+            "State-changing delivered-order return; requires delivered status, matching item quantities, an original-payment or gift-card refund destination, and explicit user confirmation."
+          ]
+        },
+        "transfer_to_human_agents": {
+          "state_access": "write",
+          "state_effects": [
+            "Escalate the current conversation to a human support agent."
+          ],
+          "state_effects_on_success": [
+            "Escalate the current conversation to a human support agent."
+          ],
+          "behavior_hints": [
+            "Escalation action; use when the user requests a human or available tools cannot complete the issue."
+          ]
+        }
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "Local mock server"
+    }
+  ],
+  "paths": {
+    "/find_user_id_by_name_zip": {
+      "post": {
+        "operationId": "find_user_id_by_name_zip",
+        "summary": "Mock: find user id by name and zip",
+        "description": "Locate an existing customer using first name, last name, and postal code. If the user cannot recall email but provides a structured user identifier or username that contains name parts plus a ZIP code, use the name parts for this lookup and verify that the returned user_id matches the provided identifier before continuing. This endpoint operates on the mock session state.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "first_name": {
+                    "type": "string",
+                    "description": "Customer first name."
+                  },
+                  "last_name": {
+                    "type": "string",
+                    "description": "Customer last name."
+                  },
+                  "zip": {
+                    "type": "string",
+                    "description": "Five digit postal code."
+                  }
+                },
+                "required": [
+                  "first_name",
+                  "last_name",
+                  "zip"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Lookup result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "description": "Matching user identifier when success=true."
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/find_user_id_by_email": {
+      "post": {
+        "operationId": "find_user_id_by_email",
+        "summary": "Mock: find user id by email",
+        "description": "Lookup a customer identifier from a stored email address. This endpoint operates on the mock session state.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "Customer email address."
+                  }
+                },
+                "required": [
+                  "email"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Lookup response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "description": "Matching user id when found."
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_user_details": {
+      "post": {
+        "operationId": "get_user_details",
+        "summary": "Mock: get user profile",
+        "description": "Return the stored profile, default address, payment methods, and order id list for a customer. This does not return full order records; use get_order_details for status, items, fulfillment, and payment history. The order id list is account-linked candidates, not a relevance ranking; if the user's reference is indirect or product-type based, inspect plausible order ids until the record is identified or ask a concise disambiguating question. If the user asks for the latest or most recent order and no explicit date field is available, treat later entries in the returned order id list as more recent after checking the relevant order record.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_id": {
+                    "type": "string",
+                    "description": "Existing user identifier."
+                  }
+                },
+                "required": [
+                  "user_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User profile data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "user": {
+                      "type": "object",
+                      "description": "User record with contact details, default address, payment methods, and order ids only. Order ids are candidates for follow-up lookups and are not relevance-ranked; when resolving latest/most recent without an explicit date field, later entries are the recency proxy.",
+                      "additionalProperties": false
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_order_details": {
+      "post": {
+        "operationId": "get_order_details",
+        "summary": "Mock: get order details",
+        "description": "Return full order details including address, items, shipment, and payment history. This endpoint operates on the mock session state.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "order_id": {
+                    "type": "string",
+                    "description": "Order IDs always start with '#'; add the '#' if the user omits it."
+                  }
+                },
+                "required": [
+                  "order_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Order data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "order": {
+                      "type": "object",
+                      "description": "Order object containing address, items, payment history, and derived fields.",
+                      "additionalProperties": false
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_product_details": {
+      "post": {
+        "operationId": "get_product_details",
+        "summary": "Mock: get product inventory",
+        "description": "Return a product catalog entry including variants keyed by item/variant id, with options, price, and availability. Product ids identify product families; item ids identify variants used by modification, exchange, and return tools. For replacement selection, filter by user/tool constraints, apply user-stated preferences, then rank by the requested objective. Numeric objectives require comparing all eligible available variants by price or the relevant numeric option. Current item options are baseline facts; preserve them only when the user asks to keep them.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "product_id": {
+                    "type": "string",
+                    "description": "Product identifier for a product family, not an item/variant id."
+                  }
+                },
+                "required": [
+                  "product_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Product info",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "product": {
+                      "type": "object",
+                      "description": "Product record including variants keyed by item/variant id.",
+                      "additionalProperties": false
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_item_details": {
+      "post": {
+        "operationId": "get_item_details",
+        "summary": "Mock: get item inventory",
+        "description": "Return one item/variant catalog record by item id. Item ids are variant ids and differ from product ids.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "item_id": {
+                    "type": "string",
+                    "description": "Item/variant identifier, not a product id."
+                  }
+                },
+                "required": [
+                  "item_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Item variant info",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "item": {
+                      "type": "object",
+                      "description": "Variant record with item_id, options, availability, and price.",
+                      "additionalProperties": false
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/list_all_product_types": {
+      "post": {
+        "operationId": "list_all_product_types",
+        "summary": "Mock: list all product types",
+        "description": "Return a mapping of product display names to product ids. This listing does not include variant item ids, options, prices, or availability; use get_product_details for those.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Catalog listing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "products": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "description": "Key/value pairs of product name → product_id."
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calculate": {
+      "post": {
+        "operationId": "calculate",
+        "summary": "Mock: evaluate expression",
+        "description": "Utility read operation to evaluate a math expression containing digits, +, -, *, /, parentheses, and spaces. Returns the stringified numeric result; any other characters cause an error.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expression": {
+                    "type": "string",
+                    "description": "Expression using digits, operators, parentheses."
+                  }
+                },
+                "required": [
+                  "expression"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Expression result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "result": {
+                      "type": "string",
+                      "description": "String representation of the numeric result."
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cancel_pending_order": {
+      "post": {
+        "operationId": "cancel_pending_order",
+        "summary": "Mock: cancel pending order",
+        "description": "Cancel an entire pending order after the user confirms the order and cancellation reason. This is not an item-level cancellation tool: if the user asked to cancel only one item, explain the broader whole-order effect and get consent or follow any stated fallback. Only status \"pending\" is supported. The reason must be one of \"no longer needed\" or \"ordered by mistake\" and should be explicitly stated or confirmed by the user. Gift-card refunds are applied immediately.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "order_id": {
+                    "type": "string",
+                    "description": "Order IDs always start with '#'; add the '#' if the user omits it."
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "Cancellation reason confirmed with the user; valid values: 'no longer needed' or 'ordered by mistake'. Ask when no allowed reason has been provided.",
+                    "enum": [
+                      "no longer needed",
+                      "ordered by mistake"
+                    ]
+                  }
+                },
+                "required": [
+                  "order_id",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Order after cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "order": {
+                      "type": "object",
+                      "description": "Order record reflecting status='cancelled' and refund entries.",
+                      "additionalProperties": false
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exchange_delivered_order_items": {
+      "post": {
+        "operationId": "exchange_delivered_order_items",
+        "summary": "Mock: exchange delivered items",
+        "description": "Request an exchange for a delivered order. Each delivered order can only be exchanged or returned once (status must be 'delivered'). item_ids may contain duplicates; new_item_ids align by position and must be available, in the same product family, and different from the original variant ids. Computes the price difference; gift-card payment must cover a positive difference. Sets status to 'exchange requested'. Requires explicit user confirmation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "order_id": {
+                    "type": "string",
+                    "description": "Order IDs always start with '#'; add the '#' if the user omits it."
+                  },
+                  "item_ids": {
+                    "type": "array",
+                    "description": "Item/variant ids to exchange; duplicates are allowed and count as quantities.",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "new_item_ids": {
+                    "type": "array",
+                    "description": "Replacement item/variant ids aligned with item_ids; each must be available, in the same product family, and different from its paired original. Satisfy user/tool constraints and user-stated preferences before ranking by price or other objectives. Preserve current options only when the user asks to keep them.",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "payment_method_id": {
+                    "type": "string",
+                    "description": "Payment method to pay or receive the price difference; gift cards must have enough balance when the exchange costs more."
+                  }
+                },
+                "required": [
+                  "order_id",
+                  "item_ids",
+                  "new_item_ids",
+                  "payment_method_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Order after exchange",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "order": {
+                      "type": "object",
+                      "description": "Order reflecting exchange request details and price adjustments.",
+                      "additionalProperties": false
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/modify_pending_order_address": {
+      "post": {
+        "operationId": "modify_pending_order_address",
+        "summary": "Mock: update pending order address",
+        "description": "Update only the shipping address for an order whose status contains 'pending' (for example, 'pending' or 'pending (item modified)'). This does not change order status and does not consume the item-modification opportunity. Requires explicit user confirmation. address2 is part of the address payload and can be an empty string.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "order_id": {
+                    "type": "string",
+                    "description": "Order IDs always start with '#'; add the '#' if the user omits it."
+                  },
+                  "address1": {
+                    "type": "string",
+                    "description": "Street line 1."
+                  },
+                  "address2": {
+                    "type": "string",
+                    "description": "Street line 2 or empty string."
+                  },
+                  "city": {
+                    "type": "string",
+                    "description": "City."
+                  },
+                  "state": {
+                    "type": "string",
+                    "description": "State or province."
+                  },
+                  "country": {
+                    "type": "string",
+                    "description": "Country."
+                  },
+                  "zip": {
+                    "type": "string",
+                    "description": "Postal code."
+                  }
+                },
+                "required": [
+                  "order_id",
+                  "address1",
+                  "address2",
+                  "city",
+                  "state",
+                  "country",
+                  "zip"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Order with updated address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "order": {
+                      "type": "object",
+                      "description": "Pending order reflecting the new shipping address.",
+                      "additionalProperties": false
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/modify_pending_order_items": {
+      "post": {
+        "operationId": "modify_pending_order_items",
+        "summary": "Mock: update pending order items",
+        "description": "Modify item options in a strictly pending order (status must be exactly 'pending') once. This sets status to 'pending (item modified)'. Further item modifications are not allowed after this call, but address/payment updates that accept any status containing 'pending' may still be possible through their own tools. item_ids may contain duplicates; new_item_ids must align by position, be different from the originals, belong to the same product family, and be available. Multiple items from the same order can be changed in one call by passing aligned lists. Computes the price difference and updates payment/refund history. Requires explicit user confirmation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "order_id": {
+                    "type": "string",
+                    "description": "Order IDs always start with '#'; add the '#' if the user omits it."
+                  },
+                  "item_ids": {
+                    "type": "array",
+                    "description": "Item/variant ids to replace; duplicates are allowed and count as quantities.",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "new_item_ids": {
+                    "type": "array",
+                    "description": "Replacement item/variant ids aligned with item_ids; each must be available, different from the paired original, and in the same product family. Satisfy user/tool constraints and user-stated preferences before ranking by price or other objectives. Preserve current options only when the user asks to keep them.",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "payment_method_id": {
+                    "type": "string",
+                    "description": "Payment method to debit or credit price differences; gift cards must have enough balance when the modification costs more."
+                  }
+                },
+                "required": [
+                  "order_id",
+                  "item_ids",
+                  "new_item_ids",
+                  "payment_method_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Order after item update",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "order": {
+                      "type": "object",
+                      "description": "Pending order with modified items and payment history entries.",
+                      "additionalProperties": false
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/modify_pending_order_payment": {
+      "post": {
+        "operationId": "modify_pending_order_payment",
+        "summary": "Mock: update pending order payment",
+        "description": "Change the stored payment method for an entire pending order with user consent. Supported only when the order has exactly one payment entry; gift cards must have enough balance and the new method must differ from the current one. Do not call this merely to choose the payment/refund method for an item modification; modify_pending_order_items has its own payment_method_id for that price difference.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "order_id": {
+                    "type": "string",
+                    "description": "Order IDs always start with '#'; add the '#' if the user omits it."
+                  },
+                  "payment_method_id": {
+                    "type": "string",
+                    "description": "New payment method id."
+                  }
+                },
+                "required": [
+                  "order_id",
+                  "payment_method_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Order after payment change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "order": {
+                      "type": "object",
+                      "description": "Order with updated payment history entries reflecting the change.",
+                      "additionalProperties": false
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/modify_user_address": {
+      "post": {
+        "operationId": "modify_user_address",
+        "summary": "Mock: modify user default address",
+        "description": "Update the default shipping address stored on a user profile after approval. This is an idempotent setter: calling it with the current value is allowed when the user asked to set/update/sync that stored field. address2 is part of the address payload and can be an empty string.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_id": {
+                    "type": "string",
+                    "description": "User identifier."
+                  },
+                  "address1": {
+                    "type": "string",
+                    "description": "Street line 1."
+                  },
+                  "address2": {
+                    "type": "string",
+                    "description": "Street line 2 or empty string."
+                  },
+                  "city": {
+                    "type": "string",
+                    "description": "City."
+                  },
+                  "state": {
+                    "type": "string",
+                    "description": "State or province."
+                  },
+                  "country": {
+                    "type": "string",
+                    "description": "Country."
+                  },
+                  "zip": {
+                    "type": "string",
+                    "description": "Postal code."
+                  }
+                },
+                "required": [
+                  "user_id",
+                  "address1",
+                  "address2",
+                  "city",
+                  "state",
+                  "country",
+                  "zip"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User profile with updated address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "user": {
+                      "type": "object",
+                      "description": "User record reflecting the new default address.",
+                      "additionalProperties": false
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/return_delivered_order_items": {
+      "post": {
+        "operationId": "return_delivered_order_items",
+        "summary": "Mock: request return for delivered items",
+        "description": "Mark delivered items for return and specify the refund destination. Only delivered orders are supported; the payment method must be the original method or a gift card; duplicate item quantities must match the order contents. If the requested refund destination is unsupported, explain the limitation and follow any stated fallback or ask for an allowed choice. Requires explicit user confirmation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "order_id": {
+                    "type": "string",
+                    "description": "Order IDs always start with '#'; add the '#' if the user omits it."
+                  },
+                  "item_ids": {
+                    "type": "array",
+                    "description": "Delivered item ids being returned.",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "payment_method_id": {
+                    "type": "string",
+                    "description": "Refund destination; must be the original method or a gift card."
+                  }
+                },
+                "required": [
+                  "order_id",
+                  "item_ids",
+                  "payment_method_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Order flagged for return",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "order": {
+                      "type": "object",
+                      "description": "Order showing return_requested status and refund routing.",
+                      "additionalProperties": false
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/transfer_to_human_agents": {
+      "post": {
+        "operationId": "transfer_to_human_agents",
+        "summary": "Mock: transfer to human agents",
+        "description": "Escalate the conversation to a human agent by sending a concise summary. Use only when the user explicitly asks to speak with a human agent or given the policy and the available tools, you cannot solve the user's issue. Do not use this tool merely because the user asks for an exception, escalation, internal review, or double-check of a policy-blocked action; give a direct policy refusal instead. When calling this tool, you should generate an empty response to the user to stop the conversation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "summary": {
+                    "type": "string",
+                    "description": "Concise summary of the current issue for the human agent."
+                  }
+                },
+                "required": [
+                  "summary"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transfer acknowledgement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Acknowledgement that the case was handed off."
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

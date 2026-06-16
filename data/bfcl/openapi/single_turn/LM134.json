@@ -1,0 +1,310 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM134",
+    "version": "1.0.0",
+    "description": "LM134 is a compact API collection offering simple, real-time retrieval of current weather (by city and country) and stock prices (by ticker and exchange); each endpoint accepts minimal identifying parameters and returns concise, structured data for straightforward integration into dashboards, alerts, or automation workflows, enabling quick, programmatic access to live environmental and market information."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM134"
+    }
+  ],
+  "paths": {
+    "/weather_get": {
+      "post": {
+        "operationId": "weather_get",
+        "summary": "Simulate current weather for a given city and country",
+        "description": "Return current weather (temperature, wind, precipitation) and optional 5-day forecast for the specified city and country.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "city": {
+                    "type": "string",
+                    "description": "The name of the city for which the weather is being requested, such as 'San Francisco'."
+                  },
+                  "country": {
+                    "type": "string",
+                    "description": "The country where the city is located, in ISO 3166-1 alpha-2 code format, such as 'US' for the United States."
+                  },
+                  "units": {
+                    "type": "string",
+                    "description": "The unit system for the temperature: 'metric' for Celsius, 'imperial' for Fahrenheit. Defaults to 'metric'.",
+                    "enum": [
+                      "metric",
+                      "imperial"
+                    ],
+                    "default": "metric"
+                  },
+                  "include_forecast": {
+                    "type": "boolean",
+                    "description": "A flag to indicate whether to include a weather forecast for the next 5 days. Defaults to false.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "city",
+                  "country"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful weather response payload",
+                  "properties": {
+                    "city": {
+                      "type": "string",
+                      "description": "City name as provided in the request."
+                    },
+                    "country": {
+                      "type": "string",
+                      "description": "Country code as provided in the request (ISO 3166-1 alpha-2)."
+                    },
+                    "units": {
+                      "type": "string",
+                      "description": "Unit system used for numeric fields. Mirrors the request 'units' field.",
+                      "enum": [
+                        "metric",
+                        "imperial"
+                      ],
+                      "default": "metric"
+                    },
+                    "temperature": {
+                      "type": "number",
+                      "description": "Current air temperature in the requested units. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "feels_like": {
+                      "type": "number",
+                      "description": "Human-perceived temperature in the requested units. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "humidity": {
+                      "type": "integer",
+                      "description": "Relative humidity as a percentage (0-100).",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "wind": {
+                      "type": "object",
+                      "description": "Wind observation",
+                      "properties": {
+                        "speed": {
+                          "type": "number",
+                          "description": "Wind speed in meters/second for 'metric' or miles/hour for 'imperial'. Use float format (e.g., 1.0 not 1).",
+                          "format": "double"
+                        },
+                        "direction": {
+                          "type": "integer",
+                          "description": "Wind direction in degrees (0-360).",
+                          "minimum": 0,
+                          "maximum": 360
+                        }
+                      },
+                      "required": [
+                        "speed",
+                        "direction"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "precipitation": {
+                      "type": "object",
+                      "description": "Current precipitation details when present",
+                      "properties": {
+                        "amount": {
+                          "type": "number",
+                          "description": "Precipitation amount in millimeters for 'metric' or inches for 'imperial'. Use float format (e.g., 1.0 not 1).",
+                          "format": "double"
+                        },
+                        "type": {
+                          "type": "string",
+                          "description": "Precipitation type when present (for example, 'rain' or 'snow')."
+                        }
+                      },
+                      "required": [
+                        "amount"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "observation_time": {
+                      "type": "string",
+                      "description": "Timestamp of the observation as a server-provided string."
+                    },
+                    "forecast": {
+                      "type": "array",
+                      "description": "Forecast for the next days when requested; up to 5 items (one per day).",
+                      "maxItems": 5,
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "date": {
+                            "type": "string",
+                            "description": "Date for the forecast day as a string (no specific format required)."
+                          },
+                          "min_temp": {
+                            "type": "number",
+                            "description": "Forecast minimum temperature for the day in requested units. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "max_temp": {
+                            "type": "number",
+                            "description": "Forecast maximum temperature for the day in requested units. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "precipitation_probability": {
+                            "type": "number",
+                            "description": "Probability of precipitation as a fraction between 0 and 1."
+                          }
+                        },
+                        "required": [
+                          "date",
+                          "min_temp",
+                          "max_temp"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "city",
+                    "country",
+                    "temperature",
+                    "units"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stock_price_get": {
+      "post": {
+        "operationId": "stock_price_get",
+        "summary": "Simulate retrieving current stock price for a ticker on a given exchange",
+        "description": "Return a simulated current market price and basic quote metadata for the provided ticker and exchange. This is a simulation-only response and should not call external services.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "ticker": {
+                    "type": "string",
+                    "description": "The unique ticker or stock symbol used to identify the publicly traded shares of a particular stock on a particular stock market."
+                  },
+                  "exchange": {
+                    "type": "string",
+                    "description": "The stock exchange where the stock is listed, such as 'NYSE' for New York Stock Exchange or 'NASDAQ'.",
+                    "enum": [
+                      "NYSE",
+                      "NASDAQ",
+                      "LSE",
+                      "TSX",
+                      "HKSE"
+                    ]
+                  }
+                },
+                "required": [
+                  "ticker",
+                  "exchange"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful stock quote payload",
+                  "properties": {
+                    "ticker": {
+                      "type": "string",
+                      "description": "The requested ticker symbol (echoed for clarity)."
+                    },
+                    "exchange": {
+                      "type": "string",
+                      "description": "The stock exchange where the ticker is listed."
+                    },
+                    "price": {
+                      "type": "number",
+                      "description": "Latest traded price. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "ISO currency code for the price (e.g., USD)."
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "description": "Timestamp of the price quote (ISO 8601 recommended)."
+                    },
+                    "open": {
+                      "type": "number",
+                      "description": "Opening price for the current trading period. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "high": {
+                      "type": "number",
+                      "description": "Highest price during the current trading period. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "low": {
+                      "type": "number",
+                      "description": "Lowest price during the current trading period. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "previousClose": {
+                      "type": "number",
+                      "description": "Previous trading session closing price. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "volume": {
+                      "type": "integer",
+                      "description": "Number of shares traded in the current trading period (if available)."
+                    },
+                    "marketCap": {
+                      "type": "number",
+                      "description": "Market capitalization (if available). Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    }
+                  },
+                  "required": [
+                    "ticker",
+                    "exchange",
+                    "price",
+                    "currency",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

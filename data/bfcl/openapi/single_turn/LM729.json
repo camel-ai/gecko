@@ -1,0 +1,493 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM729",
+    "version": "1.0.0",
+    "description": "LM729 is a compact API collection for integrated local services: property discovery and visit scheduling, real-time location sharing, and on-demand ride booking. Designed for simple RESTful calls with clear filters (area, beds, baths, amenities), scheduling endpoints, and booking parameters (seats, ride type). Use it to build seamless user flows—search, reserve a viewing, share coordinates with contacts, and request transportation—with consistent request/response patterns, pagination, and standard auth."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM729"
+    }
+  ],
+  "paths": {
+    "/Homes_2_FindHomeByArea": {
+      "post": {
+        "operationId": "Homes_2_FindHomeByArea",
+        "summary": "Find properties in a specified city with basic filters",
+        "description": "Simulate a search that returns matching properties for rent or sale in the requested area, filtered by bedrooms, bathrooms, garage, and in-unit laundry preferences.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "area": {
+                    "type": "string",
+                    "description": "The city where the search for properties is conducted, in the format of 'City, State' with state in abbreviated format (e.g., 'Los Angeles, CA')."
+                  },
+                  "intent": {
+                    "type": "string",
+                    "description": "The intention behind the property search, either to rent or to buy.",
+                    "enum": [
+                      "rent",
+                      "buy"
+                    ]
+                  },
+                  "number_of_beds": {
+                    "type": "integer",
+                    "description": "The number of bedrooms required in the property."
+                  },
+                  "number_of_baths": {
+                    "type": "integer",
+                    "description": "The number of bathrooms required in the property."
+                  },
+                  "has_garage": {
+                    "type": "boolean",
+                    "description": "Specifies if the property must have a garage.",
+                    "default": false
+                  },
+                  "in_unit_laundry": {
+                    "type": "string",
+                    "description": "Specifies if the property must have in-unit laundry facilities. The default is 'dontcare', which includes properties regardless of laundry facilities.",
+                    "enum": [
+                      "True",
+                      "False"
+                    ]
+                  }
+                },
+                "required": [
+                  "area",
+                  "intent",
+                  "number_of_beds",
+                  "number_of_baths"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search results payload containing matching property listings.",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "description": "List of matching property listings, ordered by relevance then price.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the property listing."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Short descriptive title for the listing."
+                          },
+                          "address": {
+                            "type": "object",
+                            "description": "Address information for the property.",
+                            "properties": {
+                              "area": {
+                                "type": "string",
+                                "description": "City and state (e.g., 'Los Angeles, CA')."
+                              },
+                              "street": {
+                                "type": "string",
+                                "description": "Street address or nearest cross streets, if available."
+                              },
+                              "postal_code": {
+                                "type": "string",
+                                "description": "Postal / ZIP code, if available."
+                              }
+                            },
+                            "required": [
+                              "area"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "price": {
+                            "type": "number",
+                            "description": "Listing price. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "currency": {
+                            "type": "string",
+                            "description": "Currency code for the price (e.g., 'USD')."
+                          },
+                          "bedrooms": {
+                            "type": "integer",
+                            "description": "Number of bedrooms available in the property."
+                          },
+                          "bathrooms": {
+                            "type": "number",
+                            "description": "Number of bathrooms; may include fractional values for half-baths."
+                          },
+                          "has_garage": {
+                            "type": "boolean",
+                            "description": "Whether the property has a garage."
+                          },
+                          "in_unit_laundry": {
+                            "type": "boolean",
+                            "description": "Whether the property has in-unit laundry facilities."
+                          },
+                          "listing_url": {
+                            "type": "string",
+                            "description": "URL to the full listing."
+                          },
+                          "source": {
+                            "type": "string",
+                            "description": "Data source or listing provider identifier."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "address",
+                          "price",
+                          "bedrooms",
+                          "bathrooms"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of matching results across all pages."
+                    },
+                    "page": {
+                      "type": "integer",
+                      "description": "Page number of these results (1-indexed)."
+                    },
+                    "page_size": {
+                      "type": "integer",
+                      "description": "Number of results returned on this page."
+                    }
+                  },
+                  "required": [
+                    "results",
+                    "total_results",
+                    "page",
+                    "page_size"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Homes_2_ScheduleVisit": {
+      "post": {
+        "operationId": "Homes_2_ScheduleVisit",
+        "summary": "Simulate scheduling a property visit and return a confirmation",
+        "description": "Simulate creating a scheduled visit for a property on a requested date. Validate date format and that the date is today or in the future; ensure the property name is provided.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "property_name": {
+                    "type": "string",
+                    "description": "The exact name of the property or apartment complex to be visited."
+                  },
+                  "visit_date": {
+                    "type": "string",
+                    "description": "The scheduled date for the property visit, in the format 'YYYY-MM-DD', such as '2023-04-15'."
+                  },
+                  "visitor_contact": {
+                    "type": "string",
+                    "description": "The contact information of the visitor, preferably a phone number or email address.",
+                    "default": null
+                  },
+                  "special_requests": {
+                    "type": "string",
+                    "description": "Any special requests or considerations for the visit, such as accessibility needs or time preferences.",
+                    "default": "None"
+                  }
+                },
+                "required": [
+                  "property_name",
+                  "visit_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Confirmation of a successfully scheduled visit",
+                  "properties": {
+                    "confirmation_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the scheduled visit."
+                    },
+                    "scheduled_date": {
+                      "type": "string",
+                      "description": "Scheduled date for the visit in 'YYYY-MM-DD' format."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Outcome status of the scheduling request (e.g., confirmation state)."
+                    },
+                    "instructions": {
+                      "type": "string",
+                      "description": "Optional instructions for the visit (e.g., meeting location, ID requirements).",
+                      "default": ""
+                    }
+                  },
+                  "required": [
+                    "confirmation_id",
+                    "scheduled_date",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Messaging_1_ShareLocation": {
+      "post": {
+        "operationId": "Messaging_1_ShareLocation",
+        "summary": "Share current GPS coordinates with a contact",
+        "description": "Simulates sharing the current geographic coordinates with a specified contact.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "The current location in the format of 'Latitude, Longitude' (e.g., '34.052235, -118.243683')."
+                  },
+                  "contact_name": {
+                    "type": "string",
+                    "description": "The full name of the contact to whom the location will be sent."
+                  }
+                },
+                "required": [
+                  "location",
+                  "contact_name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Result returned when a location is successfully shared.",
+                  "properties": {
+                    "share_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the share event."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "High-level status of the share request (for example: sent, delivered)."
+                    },
+                    "delivered": {
+                      "type": "boolean",
+                      "description": "Indicates whether the location was delivered to the recipient."
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "description": "Timestamp when the location was shared (for example: 2023-08-19T12:34:56Z)."
+                    }
+                  },
+                  "required": [
+                    "share_id",
+                    "status",
+                    "delivered",
+                    "timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/RideSharing_2_GetRide": {
+      "post": {
+        "operationId": "RideSharing_2_GetRide",
+        "summary": "Simulate booking a cab ride",
+        "description": "Simulate creating a cab booking for a given destination, number_of_seats, and ride_type. Returns a successful booking payload with ride details, driver, ETA and pricing.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "destination": {
+                    "type": "string",
+                    "description": "The destination address or location for the cab, in the format of 'Street, City, State'."
+                  },
+                  "number_of_seats": {
+                    "type": "string",
+                    "description": "The number of seats to reserve in the cab.",
+                    "enum": [
+                      "1",
+                      "2",
+                      "3",
+                      "4"
+                    ]
+                  },
+                  "ride_type": {
+                    "type": "string",
+                    "description": "The type of cab ride being requested.",
+                    "enum": [
+                      "Pool",
+                      "Regular",
+                      "Luxury"
+                    ]
+                  }
+                },
+                "required": [
+                  "destination",
+                  "number_of_seats",
+                  "ride_type"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful booking response",
+                  "properties": {
+                    "ride_id": {
+                      "type": "string",
+                      "description": "Unique booking identifier for the ride."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Current booking status.",
+                      "enum": [
+                        "confirmed",
+                        "pending",
+                        "cancelled"
+                      ]
+                    },
+                    "estimated_pickup_time": {
+                      "type": "string",
+                      "description": "Estimated pickup timestamp in RFC 3339 / ISO 8601 format.",
+                      "format": "date-time"
+                    },
+                    "eta_minutes": {
+                      "type": "integer",
+                      "description": "Estimated arrival time in whole minutes until pickup."
+                    },
+                    "driver": {
+                      "type": "object",
+                      "description": "Assigned driver details, when available.",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "Driver display name."
+                        },
+                        "phone": {
+                          "type": "string",
+                          "description": "Driver contact phone number (formatted for display)."
+                        },
+                        "rating": {
+                          "type": "number",
+                          "description": "Driver rating (0.0–5.0). Provide as a float (e.g., 4.7, not 4).",
+                          "format": "double"
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "vehicle": {
+                      "type": "object",
+                      "description": "Assigned vehicle details, when available.",
+                      "properties": {
+                        "make": {
+                          "type": "string",
+                          "description": "Vehicle manufacturer."
+                        },
+                        "model": {
+                          "type": "string",
+                          "description": "Vehicle model."
+                        },
+                        "plate": {
+                          "type": "string",
+                          "description": "License plate identifier."
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "seats_reserved": {
+                      "type": "string",
+                      "description": "Number of seats reserved (mirrors request.number_of_seats)."
+                    },
+                    "price": {
+                      "type": "number",
+                      "description": "Estimated total price for the ride in the account currency. Provide as a float (e.g., 12.50, not 12).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Currency code (ISO 4217) used for the price, e.g., USD."
+                    }
+                  },
+                  "required": [
+                    "ride_id",
+                    "status",
+                    "estimated_pickup_time",
+                    "eta_minutes",
+                    "seats_reserved",
+                    "price"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,239 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM786",
+    "version": "1.0.0",
+    "description": "LM786 provides property discovery and visit scheduling for rentals and purchases, enabling city-based searches filtered by bedrooms, bathrooms, garage availability, and in-unit laundry. Use Homes_2_FindHomeByArea to retrieve matching listings, then Homes_2_ScheduleVisit to arrange tours by specifying a YYYY-MM-DD visit date. The API favors simple, filter-driven calls for seamless integration into apps that support browsing, shortlist management, and coordinated property visits."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM786"
+    }
+  ],
+  "paths": {
+    "/Homes_2_FindHomeByArea": {
+      "post": {
+        "operationId": "Homes_2_FindHomeByArea",
+        "summary": "Find properties in a city filtered by beds, baths, garage, and in-unit laundry",
+        "description": "Simulate searching for a property to rent or buy in a specified city (area). Filter results by number of bedrooms and bathrooms, garage availability, and in-unit laundry. When boolean filters (has_garage, in_unit_laundry) are null, treat them as 'dontcare' (no filtering on that attribute).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "area": {
+                    "type": "string",
+                    "description": "The city where the property is located, in the format of 'City, State' (e.g., 'Berkeley, CA' or 'New York, NY')."
+                  },
+                  "intent": {
+                    "type": "string",
+                    "description": "The intent to either rent or buy the property.",
+                    "enum": [
+                      "rent",
+                      "buy"
+                    ]
+                  },
+                  "number_of_beds": {
+                    "type": "integer",
+                    "description": "The number of bedrooms in the property."
+                  },
+                  "number_of_baths": {
+                    "type": "integer",
+                    "description": "The number of bathrooms in the property."
+                  },
+                  "has_garage": {
+                    "type": "boolean",
+                    "description": "Indicates whether the property includes a garage. The default is 'dontcare' which includes properties regardless of garage availability.",
+                    "default": null
+                  },
+                  "in_unit_laundry": {
+                    "type": "boolean",
+                    "description": "Indicates whether the property has in-unit laundry facilities. The default is 'dontcare' which includes properties regardless of in-unit laundry facilities.",
+                    "default": null
+                  }
+                },
+                "required": [
+                  "area",
+                  "intent",
+                  "number_of_beds",
+                  "number_of_baths"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search results payload containing matching property listings.",
+                  "properties": {
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of matching listings returned by the search."
+                    },
+                    "results": {
+                      "type": "array",
+                      "description": "Array of property listings matching the query, ordered by relevance.",
+                      "items": {
+                        "type": "object",
+                        "description": "A single property listing.",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the listing."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Short title or headline for the listing."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Longer free-text description of the property."
+                          },
+                          "area": {
+                            "type": "string",
+                            "description": "City (and optionally state) where the property is located, e.g., 'Berkeley, CA'."
+                          },
+                          "intent": {
+                            "type": "string",
+                            "description": "Listing intent, usually 'rent' or 'buy'."
+                          },
+                          "number_of_beds": {
+                            "type": "integer",
+                            "description": "Number of bedrooms in the property."
+                          },
+                          "number_of_baths": {
+                            "type": "integer",
+                            "description": "Number of bathrooms in the property."
+                          },
+                          "has_garage": {
+                            "type": "boolean",
+                            "description": "Whether the property includes a garage."
+                          },
+                          "in_unit_laundry": {
+                            "type": "boolean",
+                            "description": "Whether the property has in-unit laundry facilities."
+                          },
+                          "price": {
+                            "type": "number",
+                            "description": "Listing price. Currency not enforced in this schema; represented as a numeric value."
+                          },
+                          "currency": {
+                            "type": "string",
+                            "description": "Currency code for the price (e.g., USD). Not strictly validated here."
+                          },
+                          "listing_url": {
+                            "type": "string",
+                            "description": "URL linking to the full listing (if available)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "area",
+                          "number_of_beds",
+                          "number_of_baths"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "total_results",
+                    "results"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Homes_2_ScheduleVisit": {
+      "post": {
+        "operationId": "Homes_2_ScheduleVisit",
+        "summary": "Schedule a property visit (simulation)",
+        "description": "Simulate scheduling a visit to a property on a specified date (YYYY-MM-DD). Returns a confirmation payload when the appointment is successfully created.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "property_name": {
+                    "type": "string",
+                    "description": "The exact name of the property or apartment complex to visit."
+                  },
+                  "visit_date": {
+                    "type": "string",
+                    "description": "The scheduled date for the property visit, in the format of 'YYYY-MM-DD'.",
+                    "format": "date"
+                  }
+                },
+                "required": [
+                  "property_name",
+                  "visit_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Confirmation of a successfully scheduled visit.",
+                  "properties": {
+                    "confirmation_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the scheduled visit (client or server generated)."
+                    },
+                    "property_name": {
+                      "type": "string",
+                      "description": "The exact name of the property for which the visit was scheduled."
+                    },
+                    "visit_date": {
+                      "type": "string",
+                      "description": "Scheduled visit date in YYYY-MM-DD format.",
+                      "format": "date"
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Outcome status for the scheduling request (e.g., a successful scheduling indicator)."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable confirmation or contextual message about the scheduled visit."
+                    }
+                  },
+                  "required": [
+                    "confirmation_id",
+                    "property_name",
+                    "visit_date",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

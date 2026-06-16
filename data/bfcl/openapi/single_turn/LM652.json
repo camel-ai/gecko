@@ -1,0 +1,642 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM652",
+    "version": "1.0.0",
+    "description": "LM652 provides unified device control and media discovery endpoints for alarms, movies, and music. Use Alarm endpoints to list and schedule device alarms with labels and statuses; Media endpoints to search and stream films with subtitle options; Music endpoints to look up tracks by artist, album, genre, or year and play selected tracks on a designated player. The collection favors straightforward synchronous calls for querying, creating, and streaming."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM652"
+    }
+  ],
+  "paths": {
+    "/Alarm_1_GetAlarms": {
+      "post": {
+        "operationId": "Alarm_1_GetAlarms",
+        "summary": "Simulate retrieving a user's configured alarms",
+        "description": "Return the list of alarms a user configured on the device, including time, label, enabled status, recurrence and optional date-specific alarms. This is a simulation-focused response shape only.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "user_id": {
+                    "type": "string",
+                    "description": "The unique identifier of the user whose alarms are to be retrieved."
+                  },
+                  "include_disabled": {
+                    "type": "boolean",
+                    "description": "Flag to include disabled alarms in the list.",
+                    "default": false
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "Filter alarms by the set date, in the format of 'YYYY-MM-DD'. If not provided, defaults to current date.",
+                    "default": null
+                  }
+                },
+                "required": [
+                  "user_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload containing the user's alarms.",
+                  "properties": {
+                    "alarms": {
+                      "type": "array",
+                      "description": "Array of alarm objects (may be empty).",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "alarm_id": {
+                            "type": "string",
+                            "description": "Unique identifier for the alarm."
+                          },
+                          "time": {
+                            "type": "string",
+                            "description": "Time of day the alarm is set to trigger (device-local time, e.g., '07:30')."
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "User-provided label for the alarm."
+                          },
+                          "enabled": {
+                            "type": "boolean",
+                            "description": "Whether the alarm is active."
+                          },
+                          "recurrence": {
+                            "type": "array",
+                            "description": "Recurrence rules or days for the alarm; free-form strings (e.g., ['Mon','Wed']). Do not assume a fixed enum.",
+                            "items": {
+                              "type": "string",
+                              "description": "Array item"
+                            }
+                          },
+                          "date": {
+                            "type": "string",
+                            "description": "Date associated with this alarm when it is date-specific (e.g., '2023-04-01'). Treat as a date string; format expectations mirror device behavior."
+                          },
+                          "snooze_duration_minutes": {
+                            "type": "string",
+                            "description": "Configured snooze duration in minutes, if applicable."
+                          },
+                          "next_trigger": {
+                            "type": "string",
+                            "description": "Device-local datetime or timestamp for the next scheduled trigger. Format may vary by device."
+                          }
+                        },
+                        "required": [
+                          "alarm_id",
+                          "time",
+                          "enabled"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "count": {
+                      "type": "integer",
+                      "description": "Number of alarms returned in the alarms array."
+                    }
+                  },
+                  "required": [
+                    "alarms",
+                    "count"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Alarm_1_AddAlarm": {
+      "post": {
+        "operationId": "Alarm_1_AddAlarm",
+        "summary": "Simulate setting a new alarm",
+        "description": "Create a new alarm at a specified 24-hour time with an optional custom name. Use default name if none provided.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "new_alarm_time": {
+                    "type": "string",
+                    "description": "The time to set for the new alarm, in 24-hour format 'HH:MM'."
+                  },
+                  "new_alarm_name": {
+                    "type": "string",
+                    "description": "The custom name to give to the new alarm.",
+                    "default": "New alarm"
+                  }
+                },
+                "required": [
+                  "new_alarm_time"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Response for a successfully created alarm",
+                  "properties": {
+                    "alarm_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the newly created alarm"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable confirmation that the alarm was created"
+                    }
+                  },
+                  "required": [
+                    "alarm_id",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Media_3_FindMovies": {
+      "post": {
+        "operationId": "Media_3_FindMovies",
+        "summary": "Find movies by genre with optional starring preference",
+        "description": "Simulate discovering movies that match the requested genre and optional starring preference. Returns an array of movie objects with key metadata (id, title, genre, release_year, synopsis, cast, director, rating, runtime_minutes, poster_url).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "genre": {
+                    "type": "string",
+                    "description": "The genre category of the movie.",
+                    "enum": [
+                      "World",
+                      "Fantasy",
+                      "Offbeat",
+                      "Mystery",
+                      "Musical",
+                      "Thriller",
+                      "Comedy",
+                      "Horror",
+                      "Animation",
+                      "Sci-fi",
+                      "War",
+                      "Drama",
+                      "Family",
+                      "Action"
+                    ]
+                  },
+                  "starring": {
+                    "type": "string",
+                    "description": "The name of a celebrity starring in the movie. Specify 'Any' if no preference.",
+                    "default": "Any"
+                  }
+                },
+                "required": [
+                  "genre"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing movies that match the request filters.",
+                  "properties": {
+                    "movies": {
+                      "type": "array",
+                      "description": "List of movies matching the query. May be empty if there are no matches.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the movie."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Movie title."
+                          },
+                          "genre": {
+                            "type": "string",
+                            "description": "Primary genre of the movie."
+                          },
+                          "release_year": {
+                            "type": "integer",
+                            "description": "Four-digit release year."
+                          },
+                          "synopsis": {
+                            "type": "string",
+                            "description": "Brief plot summary."
+                          },
+                          "cast": {
+                            "type": "array",
+                            "description": "Top-billed cast members.",
+                            "items": {
+                              "type": "string",
+                              "description": "Array item"
+                            }
+                          },
+                          "director": {
+                            "type": "string",
+                            "description": "Director name."
+                          },
+                          "rating": {
+                            "type": "number",
+                            "description": "Average user or critic rating. Provide as a float (e.g., 7.5, 1.0, not 1).",
+                            "format": "double"
+                          },
+                          "runtime_minutes": {
+                            "type": "integer",
+                            "description": "Runtime in minutes."
+                          },
+                          "poster_url": {
+                            "type": "string",
+                            "description": "URL to a poster or thumbnail image for the movie."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "genre"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "movies"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Media_3_PlayMovie": {
+      "post": {
+        "operationId": "Media_3_PlayMovie",
+        "summary": "Simulate streaming a selected movie",
+        "description": "Simulate starting an online stream for the requested movie and return streaming metadata (URL, token, expiry, and available subtitle languages).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "description": "The exact title of the movie to be streamed."
+                  },
+                  "subtitle_language": {
+                    "type": "string",
+                    "description": "The preferred language for the movie subtitles.",
+                    "enum": [
+                      "English",
+                      "Spanish",
+                      "Hindi",
+                      "French"
+                    ],
+                    "default": "English"
+                  }
+                },
+                "required": [
+                  "title"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Streaming session information returned after a successful request to play a movie.",
+                  "properties": {
+                    "streaming_url": {
+                      "type": "string",
+                      "description": "A URL that the client can use to start playback (manifest or direct stream). Use HTTPS when possible."
+                    },
+                    "playback_token": {
+                      "type": "string",
+                      "description": "A short-lived opaque token required to authorize playback requests."
+                    },
+                    "expires_in": {
+                      "type": "integer",
+                      "description": "Time in seconds until the streaming URL and playback token expire."
+                    },
+                    "available_subtitle_languages": {
+                      "type": "array",
+                      "description": "List of subtitle languages actually available for this title on the selected stream.",
+                      "items": {
+                        "type": "string",
+                        "description": "Array item"
+                      }
+                    },
+                    "recommended_bitrate_kbps": {
+                      "type": "integer",
+                      "description": "Optional recommended starting bitrate in kilobits per second for smooth playback on this stream."
+                    },
+                    "maintenance_notice": {
+                      "type": "string",
+                      "description": "Optional human-readable notice about scheduled maintenance or temporary degradations, if applicable."
+                    }
+                  },
+                  "required": [
+                    "streaming_url",
+                    "playback_token",
+                    "expires_in",
+                    "available_subtitle_languages"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Music_3_PlayMedia": {
+      "post": {
+        "operationId": "Music_3_PlayMedia",
+        "summary": "Simulate playing a track on a specified media player device.",
+        "description": "Simulates playing a specified track on a media player device. Use this only when the user already named the specific track to play now. If the user only gives artist, album, genre, or year preferences and wants something matching those preferences, use Music_3_LookupMusic instead.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "track": {
+                    "type": "string",
+                    "description": "The title of the song to be played."
+                  },
+                  "artist": {
+                    "type": "string",
+                    "description": "The name of the artist performing the song. If unspecified, any artist's version of the song may be played.",
+                    "default": "any"
+                  },
+                  "device": {
+                    "type": "string",
+                    "description": "The name of the media player device where the song will be played, such as 'Living room' or 'Kitchen'.",
+                    "enum": [
+                      "Living room",
+                      "Kitchen",
+                      "Patio"
+                    ],
+                    "default": "Living room"
+                  },
+                  "album": {
+                    "type": "string",
+                    "description": "The name of the album that the song belongs to. If unspecified, songs from any album may be played.",
+                    "default": "any"
+                  }
+                },
+                "required": [
+                  "track"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful playback start response.",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "description": "Playback status (for example: 'playing')."
+                    },
+                    "device": {
+                      "type": "string",
+                      "description": "Name of the device where playback started (e.g., 'Living room')."
+                    },
+                    "track": {
+                      "type": "string",
+                      "description": "Title of the track that started playing."
+                    },
+                    "artist": {
+                      "type": "string",
+                      "description": "Artist of the track, if known or applicable."
+                    },
+                    "album": {
+                      "type": "string",
+                      "description": "Album of the track, if known or applicable."
+                    },
+                    "started_at": {
+                      "type": "string",
+                      "description": "Timestamp when playback started (RFC3339 / ISO 8601).",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "device",
+                    "track"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Music_3_LookupMusic": {
+      "post": {
+        "operationId": "Music_3_LookupMusic",
+        "summary": "Simulate lookup of songs matching artist/album/genre/year preferences",
+        "description": "Simulate retrieving songs matching user preferences by artist, album, genre, and year. Use this for broad music requests driven by artist, album, genre, or year preferences, even when the user says they want to hear or listen to something, as long as they did not name an exact track to play immediately.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "artist": {
+                    "type": "string",
+                    "description": "The first and last name of the artist or the name of the band. Use 'dontcare' if artist preference is not specified.",
+                    "default": "dontcare"
+                  },
+                  "album": {
+                    "type": "string",
+                    "description": "The name of the album. Use 'dontcare' if album preference is not specified.",
+                    "default": "dontcare"
+                  },
+                  "genre": {
+                    "type": "string",
+                    "description": "The genre of music. Select from a predefined list of genres or use 'dontcare' for no preference.",
+                    "enum": [
+                      "Reggae",
+                      "Holiday",
+                      "Electropop",
+                      "Pop",
+                      "Asia",
+                      "House",
+                      "Electronica",
+                      "Funk",
+                      "Rock",
+                      "Metal",
+                      "Dubstep",
+                      "Country"
+                    ]
+                  },
+                  "year": {
+                    "type": "string",
+                    "description": "The year the song was released. Use an integer value or 'dontcare' for no specific year preference.",
+                    "enum": [
+                      "2010",
+                      "2011",
+                      "2012",
+                      "2013",
+                      "2014",
+                      "2015",
+                      "2016",
+                      "2017",
+                      "2018",
+                      "2019",
+                      "2020",
+                      "2021",
+                      "2022",
+                      "2023",
+                      "2024"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "A list of matching songs",
+                  "properties": {
+                    "songs": {
+                      "type": "array",
+                      "description": "An array of songs matching the request criteria, ordered by relevance then popularity.",
+                      "items": {
+                        "type": "object",
+                        "description": "Song record",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the song (catalog ID)."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "The track title."
+                          },
+                          "artist": {
+                            "type": "string",
+                            "description": "The artist or band name."
+                          },
+                          "album": {
+                            "type": "string",
+                            "description": "The album name the track appears on, if any."
+                          },
+                          "genre": {
+                            "type": "string",
+                            "description": "The song's genre."
+                          },
+                          "year": {
+                            "type": "integer",
+                            "description": "The four-digit year the song was released."
+                          },
+                          "duration_seconds": {
+                            "type": "integer",
+                            "description": "Track duration in seconds."
+                          },
+                          "popularity_score": {
+                            "type": "number",
+                            "description": "A relative popularity score (higher is more popular). Use float format (e.g., 1.0 not 1).",
+                            "format": "float"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "artist",
+                          "genre",
+                          "year"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "songs"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,277 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM299",
+    "version": "1.0.0",
+    "description": "LM299 provides a simple REST-style interface for discovering and booking short-term houses. Use Hotels_2_SearchHouse to locate accommodations by location and refine results by laundry availability, adult count, or review rating; then call Hotels_2_BookHouse to reserve a chosen house for specified dates and number of adults. Designed for programmatic integration into booking flows, it emphasizes straightforward search-to-book sequences and predictable parameter-driven calls."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM299"
+    }
+  ],
+  "paths": {
+    "/Hotels_2_BookHouse": {
+      "post": {
+        "operationId": "Hotels_2_BookHouse",
+        "summary": "Book a house (simulation)",
+        "description": "Simulate booking a selected house for the requested dates and adult count. Validates dates and guest count before creating a booking record.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "where_to": {
+                    "type": "string",
+                    "description": "The location of the house to book, in the format of 'City, State', such as 'San Francisco, CA'."
+                  },
+                  "number_of_adults": {
+                    "type": "integer",
+                    "description": "The number of adults to include in the reservation.",
+                    "minimum": 1
+                  },
+                  "check_in_date": {
+                    "type": "string",
+                    "description": "The check-in date for the reservation in the format 'MM/DD/YYYY'.",
+                    "pattern": "^(0[1-9]|1[0-2])/(0[1-9]|[12][0-9]|3[01])/\\d{4}$"
+                  },
+                  "check_out_date": {
+                    "type": "string",
+                    "description": "The check-out date for the reservation in the format 'MM/DD/YYYY'.",
+                    "pattern": "^(0[1-9]|1[0-2])/(0[1-9]|[12][0-9]|3[01])/\\d{4}$"
+                  }
+                },
+                "required": [
+                  "where_to",
+                  "number_of_adults",
+                  "check_in_date",
+                  "check_out_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful booking payload",
+                  "properties": {
+                    "booking_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the created booking."
+                    },
+                    "where_to": {
+                      "type": "string",
+                      "description": "The location of the booked house (same as request)."
+                    },
+                    "check_in_date": {
+                      "type": "string",
+                      "description": "Check-in date in MM/DD/YYYY format.",
+                      "pattern": "^(0[1-9]|1[0-2])/(0[1-9]|[12][0-9]|3[01])/\\d{4}$"
+                    },
+                    "check_out_date": {
+                      "type": "string",
+                      "description": "Check-out date in MM/DD/YYYY format.",
+                      "pattern": "^(0[1-9]|1[0-2])/(0[1-9]|[12][0-9]|3[01])/\\d{4}$"
+                    },
+                    "number_of_adults": {
+                      "type": "integer",
+                      "description": "Number of adults for the reservation."
+                    },
+                    "total_price": {
+                      "type": "number",
+                      "description": "Total price charged for the booking. Provide as a float (e.g., 123.45 or 1.0, not 1).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Three-letter currency code for total_price (e.g., USD)."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Booking status.",
+                      "enum": [
+                        "confirmed",
+                        "pending",
+                        "cancelled"
+                      ]
+                    },
+                    "confirmation_url": {
+                      "type": "string",
+                      "description": "A URL where the user can view booking details (if available)."
+                    }
+                  },
+                  "required": [
+                    "booking_id",
+                    "where_to",
+                    "check_in_date",
+                    "check_out_date",
+                    "number_of_adults",
+                    "total_price",
+                    "currency",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Hotels_2_SearchHouse": {
+      "post": {
+        "operationId": "Hotels_2_SearchHouse",
+        "summary": "Simulate house search by location with optional filters",
+        "description": "Simulate searching for house accommodations at a specified location. Apply optional filters for laundry service availability, number of adults, and minimum rating. Use 0 or 'dontcare' in inputs to indicate no filter.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "where_to": {
+                    "type": "string",
+                    "description": "The destination where the house is searched for, in the format of 'City, State' or 'City, Country', such as 'Austin, TX', 'Paris, France', or 'San Francisco, CA'. State has to be abbrieviated"
+                  },
+                  "has_laundry_service": {
+                    "type": "string",
+                    "description": "Indicates if the house should have laundry service available.",
+                    "enum": [
+                      "True",
+                      "False"
+                    ]
+                  },
+                  "number_of_adults": {
+                    "type": "integer",
+                    "description": "The number of adults for the reservation. Use 0 to indicate 'dontcare'.",
+                    "default": 0
+                  },
+                  "rating": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The minimum review rating of the house on a scale from 1.0 to 5.0, with 5.0 being the highest. Use 0 to indicate 'dontcare'.. Use float format (e.g., 1.0 not 1).",
+                    "default": 0.0
+                  }
+                },
+                "required": [
+                  "where_to"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search response containing matching house accommodations.",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "description": "Array of matching house accommodations ordered by relevance and rating (descending) by default.",
+                      "maxItems": 50,
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the property."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Display name of the property."
+                          },
+                          "address": {
+                            "type": "object",
+                            "description": "Address details for the property.",
+                            "properties": {
+                              "raw": {
+                                "type": "string",
+                                "description": "Full address string (e.g., 'Austin, TX' or 'Paris, France')."
+                              },
+                              "city": {
+                                "type": "string",
+                                "description": "City portion of the address when available."
+                              },
+                              "region": {
+                                "type": "string",
+                                "description": "Region/state or country portion of the address when available."
+                              }
+                            },
+                            "required": [
+                              "raw"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "has_laundry_service": {
+                            "type": "string",
+                            "description": "Indicates whether laundry service is available for this property. Values: 'True', 'False', or 'dontcare'.",
+                            "enum": [
+                              "True",
+                              "False",
+                              "dontcare"
+                            ]
+                          },
+                          "max_adults": {
+                            "type": "integer",
+                            "description": "Maximum number of adults the property can accommodate."
+                          },
+                          "rating": {
+                            "type": "number",
+                            "description": "Average review rating on a scale from 1.0 to 5.0. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "price_per_night": {
+                            "type": "number",
+                            "description": "Price per night in the property's local currency. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "address"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of properties matching the search criteria."
+                    },
+                    "returned_results": {
+                      "type": "integer",
+                      "description": "Number of results returned in this response (should equal results.length)."
+                    }
+                  },
+                  "required": [
+                    "results",
+                    "total_results",
+                    "returned_results"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

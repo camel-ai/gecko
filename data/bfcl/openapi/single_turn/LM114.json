@@ -1,0 +1,791 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM114",
+    "version": "1.0.0",
+    "description": "LM114 is a compact API collection for managing Data Artifex projects and server connections—register RDS or PostgreSQL servers, test or establish connections, rename or enumerate servers, and list project files; it also supports opening and closing projects. Usage is environment-scoped, API-key authenticated for server registration, and designed for predictable, idempotent operations with clear, helper-driven guidance available via dartfx_help to explain next steps and suggest user actions."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM114"
+    }
+  ],
+  "paths": {
+    "/dartfx_help": {
+      "post": {
+        "operationId": "dartfx_help",
+        "summary": "Generate help content for a given topic",
+        "description": "Simulate a concise help response: provide a short title, a clear explanation, concrete next steps, and a list of suggestions. Optionally include practical examples when requested.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "topic": {
+                    "type": "string",
+                    "description": "The subject, topic, keywords, or action to help the user with. For example, 'password reset' or 'booking a flight'."
+                  },
+                  "include_examples": {
+                    "type": "boolean",
+                    "description": "Determines whether to include examples in the help message. When set to true, the response includes practical examples.",
+                    "default": false
+                  },
+                  "language": {
+                    "type": "string",
+                    "description": "The language in which the help information should be provided.",
+                    "enum": [
+                      "English",
+                      "Spanish",
+                      "French",
+                      "German",
+                      "Chinese"
+                    ],
+                    "default": "English"
+                  }
+                },
+                "required": [
+                  "topic"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful help response payload",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "description": "A short, attention-grabbing headline summarizing the help topic."
+                    },
+                    "explanation": {
+                      "type": "string",
+                      "description": "A brief explanation of the topic and the immediate rationale or context the user needs to know."
+                    },
+                    "next_steps": {
+                      "type": "array",
+                      "description": "A prioritized list of concrete next steps the user can take.",
+                      "items": {
+                        "type": "string",
+                        "description": "One actionable step."
+                      }
+                    },
+                    "suggestions": {
+                      "type": "array",
+                      "description": "Complementary suggestions or alternatives the user may consider.",
+                      "items": {
+                        "type": "string",
+                        "description": "One suggestion or alternative to consider."
+                      }
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "explanation",
+                    "next_steps"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/add_mtnards_server": {
+      "post": {
+        "operationId": "add_mtnards_server",
+        "summary": "Register MTNA RDS server",
+        "description": "Simulate registering a new MTNA Rich Data Services (RDS) server using the provided host and api_key. On success return the created server object.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "nickname": {
+                    "type": "string",
+                    "description": "A friendly name to identify the RDS server, allowing for easier reference.",
+                    "default": "rds1"
+                  },
+                  "host": {
+                    "type": "string",
+                    "description": "The fully qualified domain name or IP address of the RDS server."
+                  },
+                  "api_key": {
+                    "type": "string",
+                    "description": "The unique API key required to authenticate with the RDS server. This key should be kept confidential."
+                  }
+                },
+                "required": [
+                  "host",
+                  "api_key"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Details of the newly registered RDS server.",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "System-generated unique identifier for the RDS server."
+                    },
+                    "nickname": {
+                      "type": "string",
+                      "description": "Friendly name for the RDS server (same as provided or assigned by the system)."
+                    },
+                    "host": {
+                      "type": "string",
+                      "description": "The fully qualified domain name or IP address of the RDS server."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Creation timestamp (ISO 8601 recommended, e.g., 2023-01-23T10:20:30Z)."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Human-readable registration status (for example, 'registered')."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "host",
+                    "nickname"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/add_postgres_server": {
+      "post": {
+        "operationId": "add_postgres_server",
+        "summary": "Register a PostgreSQL server",
+        "description": "Simulate registering a PostgreSQL server using the provided connection details. This validates basic fields and returns a created-server record (no input echo).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "nickname": {
+                    "type": "string",
+                    "description": "A unique alias for the server that will be used for identification within the environment.",
+                    "default": "postgres1"
+                  },
+                  "host": {
+                    "type": "string",
+                    "description": "The hostname or IP address of the PostgreSQL server."
+                  },
+                  "port": {
+                    "type": "integer",
+                    "description": "The port number on which the PostgreSQL server is listening. Typically, PostgreSQL uses port 5432."
+                  },
+                  "database": {
+                    "type": "string",
+                    "description": "The name of the default database to connect to on the PostgreSQL server."
+                  },
+                  "username": {
+                    "type": "string",
+                    "description": "The username required for authentication with the PostgreSQL server."
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "The password associated with the username for authentication with the PostgreSQL server."
+                  }
+                },
+                "required": [
+                  "host",
+                  "port",
+                  "database",
+                  "username",
+                  "password"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Representation of the newly registered PostgreSQL server (successful response).",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Unique identifier for the registered PostgreSQL server."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp when the server was registered (ISO 8601).",
+                      "format": "date-time"
+                    },
+                    "connection_tested": {
+                      "type": "boolean",
+                      "description": "Indicates whether a live connection test to the provided server details was performed."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable informational message about the registration result."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "created_at",
+                    "connection_tested"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/connect_to_server": {
+      "post": {
+        "operationId": "connect_to_server",
+        "summary": "Simulate establishing or testing a connection to a server",
+        "description": "Simulate a connection attempt to the named server. Honor the request defaults (timeout = 30, use_ssl = true) and return a concise success payload describing the result. Do not modify request fields — nickname is required.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "nickname": {
+                    "type": "string",
+                    "description": "The unique identifier or friendly name used to refer to the target server."
+                  },
+                  "timeout": {
+                    "type": "integer",
+                    "description": "The maximum amount of time in seconds to wait for the connection attempt before timing out.",
+                    "default": 30
+                  },
+                  "use_ssl": {
+                    "type": "boolean",
+                    "description": "Determines whether to use SSL encryption for the connection.",
+                    "default": true
+                  }
+                },
+                "required": [
+                  "nickname"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Result of the connection attempt",
+                  "properties": {
+                    "connected": {
+                      "type": "boolean",
+                      "description": "True when a connection to the server was successfully established; false otherwise."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable status or error message describing the outcome of the connection attempt."
+                    },
+                    "latency_seconds": {
+                      "type": "number",
+                      "description": "Measured round-trip time for the connection attempt in seconds. Use float format (e.g., 1.0 not 1). This field may be absent if the connection failed.",
+                      "format": "double"
+                    },
+                    "server_version": {
+                      "type": "string",
+                      "description": "Optional server-reported version string or banner, if available."
+                    }
+                  },
+                  "required": [
+                    "connected",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rename_server": {
+      "post": {
+        "operationId": "rename_server",
+        "summary": "Rename server identifier",
+        "description": "Simulate renaming a server by updating its identifier from the current value to a new value. Validate basic input integrity (non-empty identifiers) and reject no-op renames where source and target are identical.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "_from": {
+                    "type": "string",
+                    "description": "The current server identifier, such as a name or nickname, that uniquely identifies the server to be renamed."
+                  },
+                  "to": {
+                    "type": "string",
+                    "description": "The new server identifier, such as a name or nickname, that the server will be renamed to."
+                  }
+                },
+                "required": [
+                  "_from",
+                  "to"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Result of a successful rename operation.",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "True when the rename operation completed successfully."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable summary of the operation outcome; do not rely on this for programmatic decisions."
+                    },
+                    "server_id": {
+                      "type": "string",
+                      "description": "Opaque identifier for the server after renaming (may differ from the user-supplied visible identifier)."
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/list_servers": {
+      "post": {
+        "operationId": "list_servers",
+        "summary": "List servers in environment",
+        "description": "Simulate retrieving servers within the specified environment. When server_type is provided, return only servers of that type; when omitted, return servers of all types.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "server_type": {
+                    "type": "string",
+                    "description": "The type of servers to be listed. If not specified, all server types are included.",
+                    "enum": [
+                      "all",
+                      "graphql",
+                      "mtna",
+                      "openapi",
+                      "postgres",
+                      "rds",
+                      "sql"
+                    ],
+                    "default": "all"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "A successful response containing the list of servers that match the request filter.",
+                  "properties": {
+                    "servers": {
+                      "type": "array",
+                      "description": "Array of server objects matching the filter.",
+                      "items": {
+                        "type": "object",
+                        "description": "A server record.",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the server."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Human-readable name of the server."
+                          },
+                          "type": {
+                            "type": "string",
+                            "description": "Server type (e.g., values like those accepted by the request's server_type parameter)."
+                          },
+                          "status": {
+                            "type": "string",
+                            "description": "Operational status of the server (for example: running, stopped)."
+                          },
+                          "region": {
+                            "type": "string",
+                            "description": "Geographic or logical region where the server is located, if applicable."
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "description": "Timestamp when the server was created."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "type",
+                          "status"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_count": {
+                      "type": "integer",
+                      "description": "Total number of servers that match the filter."
+                    }
+                  },
+                  "required": [
+                    "servers",
+                    "total_count"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/list_files": {
+      "post": {
+        "operationId": "list_files",
+        "summary": "Simulate listing project files by extension",
+        "description": "Simulate listing files in the current project directory that match the requested file extension. When include_subdirectories is true, include matches from subdirectories.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "file_type": {
+                    "type": "string",
+                    "description": "The type of files to list, based on file extension. Possible extensions include 'py' for Python files, 'txt' for text files, 'md' for Markdown files, and 'json' for JSON files.",
+                    "enum": [
+                      "py",
+                      "txt",
+                      "md",
+                      "json"
+                    ]
+                  },
+                  "include_subdirectories": {
+                    "type": "boolean",
+                    "description": "Whether to include files from subdirectories.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "file_type"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing matching files.",
+                  "properties": {
+                    "files": {
+                      "type": "array",
+                      "description": "Array of matching files (each item is metadata for one file). Paths are relative to the project root.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "description": "Relative path to the file from the project root (e.g., \"src/utils/helper.py\")."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "File name including extension (e.g., \"helper.py\")."
+                          },
+                          "size_bytes": {
+                            "type": "integer",
+                            "description": "Size of the file in bytes.",
+                            "minimum": 0
+                          },
+                          "last_modified": {
+                            "type": "string",
+                            "description": "Last modification timestamp, if available (ISO 8601 recommended, e.g., 2023-06-01T12:34:56Z)."
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "name"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_count": {
+                      "type": "integer",
+                      "description": "Total number of files returned in the files array.",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "files",
+                    "total_count"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/open_project": {
+      "post": {
+        "operationId": "open_project",
+        "summary": "Open or create a Data Artifex project",
+        "description": "Simulates initializing a new Data Artifex project or opening an existing one at the given filesystem path.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "description": "The file system path to the directory where the project will be created or where the existing project is located. The path should be absolute or relative to the current working directory."
+                  },
+                  "create_new": {
+                    "type": "boolean",
+                    "description": "A flag indicating whether to create a new project if one does not exist at the given path.",
+                    "default": false
+                  },
+                  "access_mode": {
+                    "type": "string",
+                    "description": "The mode of access for the project.",
+                    "enum": [
+                      "readonly",
+                      "readwrite"
+                    ],
+                    "default": "readwrite"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload for opening or creating a project.",
+                  "properties": {
+                    "project_id": {
+                      "type": "string",
+                      "description": "A unique identifier for the project (e.g., a UUID string)."
+                    },
+                    "path": {
+                      "type": "string",
+                      "description": "The filesystem path where the project was opened or created."
+                    },
+                    "created": {
+                      "type": "boolean",
+                      "description": "True if a new project was created as part of this operation; false if an existing project was opened."
+                    },
+                    "access_mode": {
+                      "type": "string",
+                      "description": "The effective access mode for the opened project. Allowed values are the same as the request: \"readonly\" or \"readwrite\".",
+                      "enum": [
+                        "readonly",
+                        "readwrite"
+                      ]
+                    },
+                    "opened_at": {
+                      "type": "string",
+                      "description": "Timestamp when the project was opened or created. ISO 8601 format is recommended (example: 2023-01-01T12:00:00Z)."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable status message about the operation (e.g., 'Project created', 'Project opened')."
+                    }
+                  },
+                  "required": [
+                    "project_id",
+                    "path",
+                    "created",
+                    "access_mode"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/close_project": {
+      "post": {
+        "operationId": "close_project",
+        "summary": "Close project and (optionally) archive its files",
+        "description": "Simulate closing the specified data artifex project. If archival is requested, simulate creating an archive and returning archive metadata.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "project_id": {
+                    "type": "string",
+                    "description": "Unique identifier of the project to be closed."
+                  },
+                  "archive": {
+                    "type": "boolean",
+                    "description": "Flag to determine whether the project should be archived.",
+                    "default": true
+                  },
+                  "archive_format": {
+                    "type": "string",
+                    "description": "The file format to be used for archiving project files.",
+                    "enum": [
+                      "zip",
+                      "tar",
+                      "tar.gz"
+                    ],
+                    "default": "zip"
+                  }
+                },
+                "required": [
+                  "project_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Payload returned on successful project close.",
+                  "properties": {
+                    "closed": {
+                      "type": "boolean",
+                      "description": "Indicates whether the project was successfully closed."
+                    },
+                    "archived": {
+                      "type": "boolean",
+                      "description": "True if an archive was created for the project (depends on the request's archive flag)."
+                    },
+                    "archive_format": {
+                      "type": "string",
+                      "description": "The archive file format used when archived. Present only when archived is true.",
+                      "enum": [
+                        "zip",
+                        "tar",
+                        "tar.gz"
+                      ]
+                    },
+                    "archive_url": {
+                      "type": "string",
+                      "description": "A URL where the created archive can be downloaded. Present only when archived is true."
+                    },
+                    "closed_at": {
+                      "type": "string",
+                      "description": "Timestamp (ISO 8601) when the project was closed.",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "closed",
+                    "archived"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

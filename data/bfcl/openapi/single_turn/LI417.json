@@ -1,0 +1,1197 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI417",
+    "version": "1.0.0",
+    "description": "LI417 is a concise API collection exposing endpoints for order processing, financial transactions, multiple authentication flows and user registration, weather forecasts, report generation, and document archiving. It emphasizes token-based authentication, consistent JSON request/response patterns, server-side validation and logging, and idempotent operations where appropriate; call sequencing is straightforward—authenticate, perform secure operations, then retrieve generated artifacts or reports. Ideal for integrating commerce, identity, reporting, and archival workflows."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI417"
+    }
+  ],
+  "paths": {
+    "/order_processing_handle_order": {
+      "post": {
+        "operationId": "order_processing_handle_order",
+        "summary": "Simulate processing an order: update inventory, compute totals, and generate a shipment label.",
+        "description": "Simulate processing an order by validating inputs, reserving inventory, calculating line and order totals (including discounts, taxes, and shipping), and producing shipment label details.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "order_id": {
+                    "type": "string",
+                    "description": "Unique identifier for the order, in the format 'ORDxxx'."
+                  },
+                  "items": {
+                    "type": "array",
+                    "description": "List of unique identifiers for items included in the order.",
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  },
+                  "customer_info": {
+                    "type": "object",
+                    "description": "Information about the customer including their unique ID and addresses for shipping and billing.",
+                    "properties": {
+                      "customer_id": {
+                        "type": "string",
+                        "description": "Unique identifier for the customer."
+                      },
+                      "shipping_address": {
+                        "type": "string",
+                        "description": "Customer's shipping address, in the format 'Street, City, State, Zip Code'."
+                      },
+                      "billing_address": {
+                        "type": "string",
+                        "description": "Customer's billing address, in the format 'Street, City, State, Zip Code'."
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "apply_discount": {
+                    "type": "boolean",
+                    "description": "Whether to apply a discount to the order.",
+                    "default": false
+                  },
+                  "discount_code": {
+                    "type": "string",
+                    "description": "Discount code to apply, if applicable. Must be a valid code.",
+                    "default": null
+                  },
+                  "notify_customer": {
+                    "type": "boolean",
+                    "description": "Whether to send an order confirmation to the customer.",
+                    "default": true
+                  },
+                  "item_quantities": {
+                    "type": "array",
+                    "description": "List of quantities for each item in the order, corresponding to the item identifiers in the 'items' array.",
+                    "default": [],
+                    "items": {
+                      "type": "integer",
+                      "description": "Array item"
+                    }
+                  },
+                  "item_prices": {
+                    "type": "array",
+                    "description": "List of prices per unit for each item in the order, in USD, corresponding to the item identifiers in the 'items' array.",
+                    "default": [],
+                    "items": {
+                      "type": "number",
+                      "format": "double",
+                      "description": "Array item. Use float format (e.g., 1.0 not 1)."
+                    }
+                  }
+                },
+                "required": [
+                  "order_id",
+                  "items",
+                  "customer_info"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful order processing result",
+                  "properties": {
+                    "order_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the order (echoed from the request)."
+                    },
+                    "processed": {
+                      "type": "boolean",
+                      "description": "Whether the order was processed successfully."
+                    },
+                    "items": {
+                      "type": "array",
+                      "description": "Line items included in the processed order.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "item_id": {
+                            "type": "string",
+                            "description": "Identifier of the item (corresponds to request items array)."
+                          },
+                          "quantity": {
+                            "type": "integer",
+                            "description": "Quantity reserved for this item."
+                          },
+                          "unit_price": {
+                            "type": "number",
+                            "description": "Unit price used for this item. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "line_total": {
+                            "type": "number",
+                            "description": "quantity * unit_price for this line. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          }
+                        },
+                        "required": [
+                          "item_id",
+                          "quantity",
+                          "unit_price",
+                          "line_total"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_amount": {
+                      "type": "number",
+                      "description": "Total order amount (sum of line totals, minus discounts, plus taxes and shipping). Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Currency for monetary values (e.g., 'USD')."
+                    },
+                    "discount_applied": {
+                      "type": "boolean",
+                      "description": "Whether a discount was applied to the order."
+                    },
+                    "discount_code": {
+                      "type": "string",
+                      "description": "Discount code that was applied, if any."
+                    },
+                    "discount_amount": {
+                      "type": "number",
+                      "description": "Monetary amount deducted due to discount. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "taxes": {
+                      "type": "number",
+                      "description": "Taxes applied to the order. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "shipping_label": {
+                      "type": "object",
+                      "description": "Shipment label and tracking details generated for this order.",
+                      "properties": {
+                        "carrier": {
+                          "type": "string",
+                          "description": "Shipping carrier name."
+                        },
+                        "tracking_number": {
+                          "type": "string",
+                          "description": "Carrier tracking number."
+                        },
+                        "label_url": {
+                          "type": "string",
+                          "description": "URL to download or view the printable shipping label, if available."
+                        }
+                      },
+                      "required": [
+                        "carrier",
+                        "tracking_number"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "estimated_delivery_days": {
+                      "type": "integer",
+                      "description": "Estimated number of calendar days until delivery."
+                    }
+                  },
+                  "required": [
+                    "order_id",
+                    "processed",
+                    "items",
+                    "total_amount",
+                    "currency",
+                    "shipping_label"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/process_transaction": {
+      "post": {
+        "operationId": "process_transaction",
+        "summary": "Simulate executing a financial transaction between accounts",
+        "description": "Simulates processing a transaction: validates accounts, fees, and amount; returns a transaction outcome.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "source_account": {
+                    "type": "string",
+                    "description": "The account number from which funds will be debited."
+                  },
+                  "destination_account": {
+                    "type": "string",
+                    "description": "The account number to which funds will be credited."
+                  },
+                  "amount": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The amount of money to be transferred in dollars.. Use float format (e.g., 1.0 not 1)."
+                  },
+                  "transaction_date": {
+                    "type": "string",
+                    "description": "The date of the transaction in the format of 'MM/DD/YYYY', such as '04/15/2023'.",
+                    "default": null
+                  },
+                  "currency": {
+                    "type": "string",
+                    "description": "The currency in which the transaction will be executed.",
+                    "enum": [
+                      "USD",
+                      "EUR",
+                      "GBP",
+                      "JPY"
+                    ],
+                    "default": "USD"
+                  },
+                  "transaction_fee": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The transaction fee in dollars, if applicable.. Use float format (e.g., 1.0 not 1).",
+                    "default": 0.0
+                  },
+                  "memo": {
+                    "type": "string",
+                    "description": "An optional memo or note associated with the transaction.",
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "source_account",
+                  "destination_account",
+                  "amount"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful transaction result payload",
+                  "properties": {
+                    "transaction_id": {
+                      "type": "string",
+                      "description": "A server-generated unique identifier for the executed transaction."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Execution outcome.",
+                      "enum": [
+                        "completed",
+                        "pending",
+                        "failed"
+                      ]
+                    },
+                    "processed_at": {
+                      "type": "string",
+                      "description": "Timestamp when the transaction was processed in RFC 3339 format.",
+                      "format": "date-time"
+                    },
+                    "amount": {
+                      "type": "number",
+                      "description": "The amount transferred (in dollars). Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "transaction_fee": {
+                      "type": "number",
+                      "description": "The transaction fee applied (in dollars). Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Currency used for the transaction.",
+                      "enum": [
+                        "USD",
+                        "EUR",
+                        "GBP",
+                        "JPY"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "transaction_id",
+                    "status",
+                    "processed_at",
+                    "amount",
+                    "transaction_fee",
+                    "currency"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user_authentication_login": {
+      "post": {
+        "operationId": "user_authentication_login",
+        "summary": "Authenticate user and return access token",
+        "description": "Simulate user authentication: validate credentials and return an access token payload on success.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "description": "The username of the user attempting to log in."
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "The password associated with the username."
+                  },
+                  "remember_me": {
+                    "type": "boolean",
+                    "description": "Whether to keep the user logged in for longer periods; defaults to false.",
+                    "default": false
+                  },
+                  "login_type": {
+                    "type": "string",
+                    "description": "The type of login being performed.",
+                    "enum": [
+                      "standard",
+                      "guest",
+                      "admin"
+                    ],
+                    "default": "standard"
+                  },
+                  "redirect_url": {
+                    "type": "string",
+                    "description": "URL to redirect the user after successful login; defaults to the home page.",
+                    "default": "https://www.example.com/home"
+                  }
+                },
+                "required": [
+                  "username",
+                  "password"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful authentication response",
+                  "properties": {
+                    "access_token": {
+                      "type": "string",
+                      "description": "Opaque access token to be used for authenticated requests."
+                    },
+                    "token_type": {
+                      "type": "string",
+                      "description": "Type of the token issued (e.g., Bearer)."
+                    },
+                    "expires_in": {
+                      "type": "integer",
+                      "description": "Numeric lifetime of the access token.",
+                      "format": "int32"
+                    },
+                    "refresh_token": {
+                      "type": "string",
+                      "description": "Optional refresh token that can be used to obtain new access tokens; may be omitted if not issued."
+                    }
+                  },
+                  "required": [
+                    "access_token",
+                    "token_type",
+                    "expires_in"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api_name_get_weather_forecast": {
+      "post": {
+        "operationId": "api_name_get_weather_forecast",
+        "summary": "Retrieve weather forecast for a location and date",
+        "description": "Simulate retrieval of a weather forecast (temperature, optional humidity, optional condition) for the specified location and date.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "The geographic location for which the weather forecast is requested, in the format of 'City, State' or 'City, Country', such as 'Berkeley, CA' or 'Berlin, Germany'."
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "The date for the requested weather forecast, formatted as 'YYYY-MM-DD'."
+                  },
+                  "temperature_unit": {
+                    "type": "string",
+                    "description": "The unit of temperature to be used in the forecast report.",
+                    "enum": [
+                      "Celsius",
+                      "Fahrenheit"
+                    ],
+                    "default": "Fahrenheit"
+                  },
+                  "include_humidity": {
+                    "type": "boolean",
+                    "description": "A boolean indicating whether humidity data should be included in the forecast.",
+                    "default": true
+                  },
+                  "include_condition": {
+                    "type": "boolean",
+                    "description": "A boolean indicating whether the weather condition (e.g., sunny, rainy) should be included in the forecast.",
+                    "default": true
+                  }
+                },
+                "required": [
+                  "location",
+                  "date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful weather forecast payload",
+                  "properties": {
+                    "location": {
+                      "type": "string",
+                      "description": "The geographic location for which the weather forecast is provided, in the format of 'City, State' or 'City, Country', such as 'Berkeley, CA' or 'Berlin, Germany'."
+                    },
+                    "date": {
+                      "type": "string",
+                      "description": "The date for the forecast, formatted as 'YYYY-MM-DD'."
+                    },
+                    "temperature": {
+                      "type": "number",
+                      "description": "Forecast temperature. Use float format (e.g., 1.0 not 1). See 'temperature_unit' for the unit used.",
+                      "format": "double"
+                    },
+                    "temperature_unit": {
+                      "type": "string",
+                      "description": "The unit used for the temperature value in this response.",
+                      "enum": [
+                        "Celsius",
+                        "Fahrenheit"
+                      ]
+                    },
+                    "humidity": {
+                      "type": "number",
+                      "description": "Relative humidity as a numeric value (for example, 55). Presence depends on the request's include_humidity flag."
+                    },
+                    "weather_condition": {
+                      "type": "string",
+                      "description": "Short description of the expected weather condition (for example, 'sunny' or 'rainy'). Presence depends on the request's include_condition flag."
+                    }
+                  },
+                  "required": [
+                    "location",
+                    "date",
+                    "temperature",
+                    "temperature_unit"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user_authentication": {
+      "post": {
+        "operationId": "user_authentication",
+        "summary": "Simulate user authentication and token issuance",
+        "description": "Authenticates a user using provided credentials, logs the attempt, and returns a successful authentication payload (access token and related fields) when credentials are valid. Validation rules cover required fields, login-attempts limits, and last_login format.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "description": "The username of the user attempting to authenticate."
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "The password for the user attempting to authenticate."
+                  },
+                  "remember_me": {
+                    "type": "boolean",
+                    "description": "Whether to keep the user logged in across sessions.",
+                    "default": false
+                  },
+                  "login_attempts": {
+                    "type": "integer",
+                    "description": "The number of consecutive login attempts. After 5 failed attempts, the account is locked.",
+                    "default": 0
+                  },
+                  "last_login": {
+                    "type": "string",
+                    "description": "The timestamp of the last successful login in UTC, formatted as 'YYYY-MM-DD HH:MM:SS'.",
+                    "default": null
+                  }
+                },
+                "required": [
+                  "username",
+                  "password"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful authentication response payload",
+                  "properties": {
+                    "access_token": {
+                      "type": "string",
+                      "description": "A bearer access token (for example, a JWT or opaque token string)."
+                    },
+                    "token_type": {
+                      "type": "string",
+                      "description": "Type of the token issued (for example, \"Bearer\")."
+                    },
+                    "expires_in": {
+                      "type": "integer",
+                      "description": "Lifetime of the access token as an integer value (e.g., numeric duration)."
+                    },
+                    "refresh_token": {
+                      "type": "string",
+                      "description": "Optional refresh token that can be used to obtain a new access token."
+                    },
+                    "scope": {
+                      "type": "string",
+                      "description": "Optional scope granted to the access token."
+                    }
+                  },
+                  "required": [
+                    "access_token",
+                    "token_type"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/generate_report": {
+      "post": {
+        "operationId": "generate_report",
+        "summary": "Generate comprehensive user activity and performance report",
+        "description": "Simulate generating a report for a user over a specified date range. Optionally include system performance data and produce a downloadable report in the requested format.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "user_id": {
+                    "type": "integer",
+                    "description": "The unique identifier of the user for whom the report is generated."
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "description": "The start date for the report period, in the format 'YYYY-MM-DD'."
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "description": "The end date for the report period, in the format 'YYYY-MM-DD'."
+                  },
+                  "include_performance_data": {
+                    "type": "boolean",
+                    "description": "Flag to determine whether to include system performance data in the report.",
+                    "default": false
+                  },
+                  "report_format": {
+                    "type": "string",
+                    "description": "The format in which the report will be generated.",
+                    "enum": [
+                      "pdf",
+                      "html",
+                      "csv"
+                    ],
+                    "default": "pdf"
+                  }
+                },
+                "required": [
+                  "user_id",
+                  "start_date",
+                  "end_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful report generation payload",
+                  "properties": {
+                    "report_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the generated report."
+                    },
+                    "download_url": {
+                      "type": "string",
+                      "description": "Temporary URL where the generated report can be downloaded.",
+                      "format": "uri"
+                    },
+                    "format": {
+                      "type": "string",
+                      "description": "Format of the generated report.",
+                      "enum": [
+                        "pdf",
+                        "html",
+                        "csv"
+                      ]
+                    },
+                    "generated_at": {
+                      "type": "string",
+                      "description": "Timestamp when the report was generated (RFC 3339 / ISO 8601).",
+                      "format": "date-time"
+                    },
+                    "summary": {
+                      "type": "string",
+                      "description": "Concise human-readable summary of the report contents."
+                    }
+                  },
+                  "required": [
+                    "report_id",
+                    "download_url",
+                    "format",
+                    "generated_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/archive_documents": {
+      "post": {
+        "operationId": "archive_documents",
+        "summary": "Archive documents into a compressed file",
+        "description": "Compress the specified documents into a single archive file at the provided storage_path and return metadata about the created archive.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "document_ids": {
+                    "type": "array",
+                    "description": "A list of unique identifiers for the documents to be archived.",
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true
+                  },
+                  "archive_format": {
+                    "type": "string",
+                    "description": "The format for the archive file. Options include 'zip', 'tar', 'gzip', and '7z'.",
+                    "enum": [
+                      "zip",
+                      "tar",
+                      "gzip",
+                      "7z"
+                    ]
+                  },
+                  "storage_path": {
+                    "type": "string",
+                    "description": "The file path where the archive will be stored, including the file name and extension. For example, '/path/to/archive.zip'."
+                  },
+                  "compression_level": {
+                    "type": "integer",
+                    "description": "The level of compression to apply to the archive, ranging from 0 (no compression) to 9 (maximum compression). The higher the number, the more compressed the archive will be.",
+                    "default": 5,
+                    "minimum": 0,
+                    "maximum": 9
+                  },
+                  "include_metadata": {
+                    "type": "boolean",
+                    "description": "Whether to include additional metadata about the documents in the archive. If set to true, metadata such as the creation date and the author of the documents will be included.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "document_ids",
+                  "archive_format",
+                  "storage_path"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Response returned on successful creation and storage of the archive.",
+                  "properties": {
+                    "archive_id": {
+                      "type": "string",
+                      "description": "A server-generated identifier for the created archive."
+                    },
+                    "archive_path": {
+                      "type": "string",
+                      "description": "The storage path where the archive file was saved (matches the request's storage_path if used as provided)."
+                    },
+                    "archive_format": {
+                      "type": "string",
+                      "description": "The archive format used for the created file.",
+                      "enum": [
+                        "zip",
+                        "tar",
+                        "gzip",
+                        "7z"
+                      ]
+                    },
+                    "size_bytes": {
+                      "type": "integer",
+                      "description": "Total size in bytes of the input documents before compression."
+                    },
+                    "compressed_size_bytes": {
+                      "type": "integer",
+                      "description": "Size in bytes of the resulting archive file after compression."
+                    },
+                    "compression_level": {
+                      "type": "integer",
+                      "description": "Compression level applied to the archive (0-9).",
+                      "minimum": 0,
+                      "maximum": 9
+                    },
+                    "included_metadata": {
+                      "type": "boolean",
+                      "description": "Whether additional metadata about the documents was included in the archive."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp when the archive was created.",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "archive_id",
+                    "archive_path",
+                    "archive_format",
+                    "size_bytes",
+                    "compressed_size_bytes",
+                    "compression_level",
+                    "included_metadata",
+                    "created_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user_authentication_validate": {
+      "post": {
+        "operationId": "user_authentication_validate",
+        "summary": "Validate user login credentials",
+        "description": "Simulates validating username and password, applying CAPTCHA requirements after multiple failed attempts, and returning an authentication payload on success.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "description": "The user's unique identifier."
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "The user's secret password."
+                  },
+                  "remember_me": {
+                    "type": "boolean",
+                    "description": "Flag to determine if the user's session should be remembered across browser restarts.",
+                    "default": false
+                  },
+                  "login_attempts": {
+                    "type": "integer",
+                    "description": "The number of consecutive failed login attempts by the user. After a certain limit, the account may be locked.",
+                    "default": 0
+                  },
+                  "captcha_response": {
+                    "type": "string",
+                    "description": "The user's response to the CAPTCHA challenge, if required after multiple failed login attempts.",
+                    "default": null
+                  }
+                },
+                "required": [
+                  "username",
+                  "password"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful authentication response",
+                  "properties": {
+                    "access_token": {
+                      "type": "string",
+                      "description": "Access token (for example, a JWT or opaque token) to use for authenticated requests."
+                    },
+                    "token_type": {
+                      "type": "string",
+                      "description": "Type of the token (for example, Bearer)."
+                    },
+                    "expires_in": {
+                      "type": "integer",
+                      "description": "Time until the access token expires."
+                    },
+                    "refresh_token": {
+                      "type": "string",
+                      "description": "Token that can be used to obtain a new access token without re-entering credentials.",
+                      "nullable": true
+                    },
+                    "scopes": {
+                      "type": "array",
+                      "description": "List of scopes or permissions granted to the token.",
+                      "items": {
+                        "type": "string",
+                        "description": "Array item"
+                      }
+                    }
+                  },
+                  "required": [
+                    "access_token",
+                    "token_type",
+                    "expires_in"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user_registration_create_account": {
+      "post": {
+        "operationId": "user_registration_create_account",
+        "summary": "Create user account",
+        "description": "Simulate creation of a new user account using provided credentials, contact info, and preferences. Do not return sensitive secrets (password).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "description": "The chosen username for the new account."
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "A secure password for the new account. It should contain a mix of letters, numbers, and special characters."
+                  },
+                  "email": {
+                    "type": "string",
+                    "description": "The user's email address which will be used for account verification and communication."
+                  },
+                  "phone_number": {
+                    "type": "string",
+                    "description": "The user's phone number in international format, e.g., '+1234567890'.",
+                    "default": null
+                  },
+                  "preferences": {
+                    "type": "object",
+                    "description": "User's preferences for account settings.",
+                    "default": {
+                      "newsletter": false,
+                      "privacy_level": "medium"
+                    },
+                    "properties": {
+                      "newsletter": {
+                        "type": "boolean",
+                        "description": "Indicates whether the user wishes to subscribe to the newsletter.",
+                        "default": false
+                      },
+                      "privacy_level": {
+                        "type": "string",
+                        "description": "The user's preferred privacy level for their account.",
+                        "enum": [
+                          "open",
+                          "medium",
+                          "strict"
+                        ],
+                        "default": "medium"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "birthdate": {
+                    "type": "string",
+                    "description": "The user's birthdate in the format 'YYYY-MM-DD'.",
+                    "default": null
+                  },
+                  "referral_code": {
+                    "type": "string",
+                    "description": "A referral code if the user was referred by another user. Leave empty if not applicable.",
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "username",
+                  "password",
+                  "email"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Response payload for a successfully created user account.",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Unique identifier for the created user account."
+                    },
+                    "username": {
+                      "type": "string",
+                      "description": "The created user's username."
+                    },
+                    "email": {
+                      "type": "string",
+                      "description": "The user's email address (for communication/verification)."
+                    },
+                    "phone_number": {
+                      "type": "string",
+                      "description": "The user's phone number in international format if provided; otherwise null."
+                    },
+                    "preferences": {
+                      "type": "object",
+                      "description": "User preferences applied to the account.",
+                      "properties": {
+                        "newsletter": {
+                          "type": "boolean",
+                          "description": "Indicates whether the user is subscribed to the newsletter."
+                        },
+                        "privacy_level": {
+                          "type": "string",
+                          "description": "The user's privacy level for their account.",
+                          "enum": [
+                            "open",
+                            "medium",
+                            "strict"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "newsletter",
+                        "privacy_level"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "birthdate": {
+                      "type": "string",
+                      "description": "The user's birthdate if provided (format described by API: 'YYYY-MM-DD'); otherwise null."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp when the account was created (ISO 8601 recommended)."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "username",
+                    "email",
+                    "preferences",
+                    "created_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user_authenticate": {
+      "post": {
+        "operationId": "user_authenticate",
+        "summary": "Authenticate user credentials and return an access token",
+        "description": "Simulate authentication using provided username and password; handle remember_me and login_attempts behaviors and return an access token on success.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "description": "The unique identifier for the user, typically an email address."
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "The secret phrase or string used to gain access to the account."
+                  },
+                  "remember_me": {
+                    "type": "boolean",
+                    "description": "Flag to determine whether the user session should be persistent across browser restarts.",
+                    "default": false
+                  },
+                  "login_attempts": {
+                    "type": "integer",
+                    "description": "The number of consecutive failed login attempts. After a certain threshold, additional security measures may be triggered.",
+                    "default": 0
+                  },
+                  "last_login": {
+                    "type": "string",
+                    "description": "The date and time of the user's last successful login, formatted as 'YYYY-MM-DD HH:MM:SS'.",
+                    "default": null
+                  }
+                },
+                "required": [
+                  "username",
+                  "password"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful authentication response",
+                  "properties": {
+                    "access_token": {
+                      "type": "string",
+                      "description": "A token (e.g., JWT or opaque string) that can be used to authenticate subsequent requests."
+                    },
+                    "token_type": {
+                      "type": "string",
+                      "description": "The type of the token. Example: \"Bearer\"."
+                    },
+                    "expires_in": {
+                      "type": "integer",
+                      "description": "Number of seconds until the access token expires."
+                    },
+                    "refresh_token": {
+                      "type": "string",
+                      "description": "Optional token that can be used to obtain a new access token when the current one expires. May be omitted if refresh tokens are not issued."
+                    }
+                  },
+                  "required": [
+                    "access_token",
+                    "token_type",
+                    "expires_in"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

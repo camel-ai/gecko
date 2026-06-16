@@ -1,0 +1,206 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI579",
+    "version": "1.0.0",
+    "description": "LI579 is an API collection that provides programmatic access to detailed component and product specifications by identifier; use the mpn_specs tool to request specs for Manufacturer Part Numbers (MPNs), Item Numbers, SKUs, or other part numbers. Clients submit one or more identifiers and optional query parameters, and receive normalized, structured specification data for integration, validation, inventory, or procurement workflows."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI579"
+    }
+  ],
+  "paths": {
+    "/mpn_specs": {
+      "post": {
+        "operationId": "mpn_specs",
+        "summary": "Retrieve specifications for a provided MPN/Item/SKU/Part Number",
+        "description": "Simulated retrieval of detailed specifications and related metadata for a provided identifier. Returns one or more matching parts with their specifications, manufacturer information, availability, and optional images.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "identifier": {
+                    "type": "string",
+                    "description": "The unique identifier, which can be an MPN, Item Number, SKU, or Part Number, for searching the corresponding specs."
+                  },
+                  "search_type": {
+                    "type": "string",
+                    "description": "The type of the provided identifier.",
+                    "enum": [
+                      "MPN",
+                      "ItemNo",
+                      "SKU",
+                      "PartNumber"
+                    ],
+                    "default": "MPN"
+                  },
+                  "include_images": {
+                    "type": "boolean",
+                    "description": "Specify whether to include images in the search results.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "identifier"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing matched parts and their specifications.",
+                  "properties": {
+                    "total_matches": {
+                      "type": "integer",
+                      "description": "Total number of matching parts returned."
+                    },
+                    "matches": {
+                      "type": "array",
+                      "description": "Array of matched parts ordered by relevance.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "mpn": {
+                            "type": "string",
+                            "description": "Manufacturer Part Number, when available."
+                          },
+                          "item_number": {
+                            "type": "string",
+                            "description": "Item Number, when available."
+                          },
+                          "sku": {
+                            "type": "string",
+                            "description": "Stock Keeping Unit, when available."
+                          },
+                          "part_number": {
+                            "type": "string",
+                            "description": "Part Number, when available."
+                          },
+                          "manufacturer": {
+                            "type": "object",
+                            "description": "Information about the part's manufacturer.",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "description": "Manufacturer name."
+                              },
+                              "country": {
+                                "type": "string",
+                                "description": "Manufacturer country, when available."
+                              },
+                              "website": {
+                                "type": "string",
+                                "description": "Manufacturer website URL, when available.",
+                                "format": "uri"
+                              }
+                            },
+                            "required": [
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "specifications": {
+                            "type": "object",
+                            "description": "Key-value map of specification attributes. Values may be strings, numbers, booleans, or arrays of strings depending on the attribute.",
+                            "properties": {},
+                            "additionalProperties": {
+                              "oneOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          "images": {
+                            "type": "array",
+                            "description": "If include_images=true was requested, this may contain image objects for the part. May be empty or omitted when images are not requested/found.",
+                            "minItems": 0,
+                            "items": {
+                              "type": "object",
+                              "description": "Array item",
+                              "properties": {
+                                "url": {
+                                  "type": "string",
+                                  "description": "Direct URL to the image.",
+                                  "format": "uri"
+                                },
+                                "alt_text": {
+                                  "type": "string",
+                                  "description": "Alternative text or short description for the image.",
+                                  "nullable": true
+                                },
+                                "caption": {
+                                  "type": "string",
+                                  "description": "Optional caption for the image.",
+                                  "nullable": true
+                                }
+                              },
+                              "required": [
+                                "url"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "availability": {
+                            "type": "object",
+                            "description": "Availability information, if available.",
+                            "properties": {
+                              "in_stock": {
+                                "type": "boolean",
+                                "description": "Whether the item is currently in stock."
+                              },
+                              "estimated_lead_time_days": {
+                                "type": "integer",
+                                "description": "Estimated lead time in days when out of stock; may be absent if unknown."
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "manufacturer",
+                          "specifications"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "total_matches",
+                    "matches"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

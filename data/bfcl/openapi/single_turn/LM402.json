@@ -1,0 +1,425 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM402",
+    "version": "1.0.0",
+    "description": "LM402 is an API collection for discovering cultural events, buying tickets, and booking rides. It exposes endpoints to find events in a city on a date, purchase tickets for selected events, and request cab rides with seat and ride-type options. Designed for transactional flows, it supports search-to-purchase sequences and integrates ride booking for end-to-end event planning. Use synchronous calls with clear identifiers for events, dates, seat counts, and ride preferences to orchestrate user journeys."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM402"
+    }
+  ],
+  "paths": {
+    "/Events_3_FindEvents": {
+      "post": {
+        "operationId": "Events_3_FindEvents",
+        "summary": "Simulate finding cultural events (concerts, plays) in a city on a date",
+        "description": "Return a list of cultural events matching the requested event_type and city for the given date. If date is null or omitted, treat it as the current date.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "event_type": {
+                    "type": "string",
+                    "description": "The type of cultural event to find. Events include concerts and plays.",
+                    "enum": [
+                      "Music",
+                      "Theater"
+                    ]
+                  },
+                  "city": {
+                    "type": "string",
+                    "description": "The city where the event is taking place, in the format 'City, State' or 'City, Country' (e.g., 'New York, NY' or 'London, UK')."
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "Concrete event date in 'YYYY-MM-DD'. Use this field only when the user gives a concrete calendar date in that format or a directly mappable calendar date. If the user does not provide a concrete calendar date, leave this parameter unset or at its schema default instead of inventing a current date. Relative requests like 'today', 'tonight', or 'this weekend' should use the tool's default/open-date behavior unless a concrete date is explicitly provided.",
+                    "default": null
+                  }
+                },
+                "required": [
+                  "event_type",
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload containing matching events",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "description": "Array of matching events (may be empty).",
+                      "maxItems": 100,
+                      "items": {
+                        "type": "object",
+                        "description": "An event entry",
+                        "properties": {
+                          "event_id": {
+                            "type": "string",
+                            "description": "Unique identifier for the event"
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Title or name of the event"
+                          },
+                          "event_type": {
+                            "type": "string",
+                            "description": "Type of event (for example: Music, Theater)"
+                          },
+                          "city": {
+                            "type": "string",
+                            "description": "City where the event is taking place (same format as request)"
+                          },
+                          "date": {
+                            "type": "string",
+                            "description": "Event date (YYYY-MM-DD)"
+                          },
+                          "start_time": {
+                            "type": "string",
+                            "description": "Local start time (e.g., '19:30')"
+                          },
+                          "venue": {
+                            "type": "object",
+                            "description": "Venue details",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "description": "Venue name"
+                              },
+                              "address": {
+                                "type": "string",
+                                "description": "Venue street address or location"
+                              }
+                            },
+                            "required": [
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Optional longer description or program notes"
+                          },
+                          "price": {
+                            "type": "number",
+                            "description": "Ticket price as a decimal. Provide as a float (e.g., 1.0, not 1)",
+                            "format": "double"
+                          },
+                          "booking_url": {
+                            "type": "string",
+                            "description": "Optional URL to purchase tickets or view more details"
+                          }
+                        },
+                        "required": [
+                          "event_id",
+                          "title",
+                          "event_type",
+                          "city",
+                          "date",
+                          "start_time",
+                          "venue"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of matching events (may be greater than the returned array length when results are paginated)"
+                    }
+                  },
+                  "required": [
+                    "events",
+                    "total_results"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Events_3_BuyEventTickets": {
+      "post": {
+        "operationId": "Events_3_BuyEventTickets",
+        "summary": "Simulate purchasing event tickets and return a booking confirmation",
+        "description": "Simulate reserving tickets for a cultural event on a chosen date and city. The simulator will allocate tickets, compute a total amount, and return a confirmation payload. Payment is simulated (no real payment processing).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "event_name": {
+                    "type": "string",
+                    "description": "The official title of the event, such as an artist's name or a play title."
+                  },
+                  "number_of_tickets": {
+                    "type": "integer",
+                    "description": "The quantity of tickets to be reserved, must be an integer from 1 to 9.",
+                    "enum": [
+                      1,
+                      2,
+                      3,
+                      4,
+                      5,
+                      6,
+                      7,
+                      8,
+                      9
+                    ]
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "The date of the event, formatted as 'YYYY-MM-DD'."
+                  },
+                  "city": {
+                    "type": "string",
+                    "description": "The name of the city where the event will take place, formatted as 'City, State' (e.g., 'New York, NY')."
+                  }
+                },
+                "required": [
+                  "event_name",
+                  "number_of_tickets",
+                  "date",
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful ticket purchase confirmation payload",
+                  "properties": {
+                    "confirmation_id": {
+                      "type": "string",
+                      "description": "Unique booking confirmation identifier created by the system."
+                    },
+                    "tickets_reserved": {
+                      "type": "integer",
+                      "description": "The number of tickets that were successfully reserved."
+                    },
+                    "total_amount": {
+                      "type": "number",
+                      "description": "Total charged amount in the specified currency (decimal)."
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Currency code for the amount (ISO 4217, e.g., \"USD\")."
+                    },
+                    "purchase_timestamp": {
+                      "type": "string",
+                      "description": "Timestamp when the purchase was completed in ISO 8601 format.",
+                      "format": "date-time"
+                    },
+                    "venue": {
+                      "type": "object",
+                      "description": "Optional venue information associated with the booking.",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "Venue or theater name."
+                        },
+                        "address": {
+                          "type": "string",
+                          "description": "Human-readable venue address."
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "confirmation_id",
+                    "tickets_reserved",
+                    "total_amount",
+                    "currency",
+                    "purchase_timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/RideSharing_2_GetRide": {
+      "post": {
+        "operationId": "RideSharing_2_GetRide",
+        "summary": "Simulate booking a cab ride",
+        "description": "Simulate creating a cab booking to the specified destination, returning assignment and ETA information.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "destination": {
+                    "type": "string",
+                    "description": "The exact address or location for the cab to arrive at, in the format 'Street, City, State, Zip'. For example, '123 Main St, Springfield, IL, 62701'."
+                  },
+                  "number_of_seats": {
+                    "type": "integer",
+                    "description": "The total number of seats to reserve in the cab.",
+                    "enum": [
+                      1,
+                      2,
+                      3,
+                      4
+                    ]
+                  },
+                  "ride_type": {
+                    "type": "string",
+                    "description": "The category of cab service to book.",
+                    "enum": [
+                      "Pool",
+                      "Regular",
+                      "Luxury"
+                    ]
+                  }
+                },
+                "required": [
+                  "destination",
+                  "number_of_seats",
+                  "ride_type"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful ride booking response",
+                  "properties": {
+                    "ride_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the booked ride."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Current booking status (e.g., confirmed, pending, scheduled)."
+                    },
+                    "driver": {
+                      "type": "object",
+                      "description": "Assigned driver information.",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "Driver's display name."
+                        },
+                        "phone": {
+                          "type": "string",
+                          "description": "Driver contact number (may be masked)."
+                        },
+                        "rating": {
+                          "type": "number",
+                          "description": "Driver rating (scale 0-5)."
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "rating"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "vehicle": {
+                      "type": "object",
+                      "description": "Assigned vehicle details.",
+                      "properties": {
+                        "make": {
+                          "type": "string",
+                          "description": "Vehicle manufacturer (e.g., Toyota)."
+                        },
+                        "model": {
+                          "type": "string",
+                          "description": "Vehicle model (e.g., Camry)."
+                        },
+                        "plate_number": {
+                          "type": "string",
+                          "description": "Vehicle license plate identifier."
+                        }
+                      },
+                      "required": [
+                        "make",
+                        "model",
+                        "plate_number"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "estimated_pickup_time": {
+                      "type": "string",
+                      "description": "Estimated pickup time as an ISO 8601 timestamp or human-readable string."
+                    },
+                    "estimated_arrival_minutes": {
+                      "type": "integer",
+                      "description": "Estimated minutes until arrival."
+                    },
+                    "fare_estimate": {
+                      "type": "object",
+                      "description": "Estimated fare for the ride.",
+                      "properties": {
+                        "amount": {
+                          "type": "number",
+                          "description": "Estimated fare amount."
+                        },
+                        "currency": {
+                          "type": "string",
+                          "description": "Currency code for the fare (e.g., USD)."
+                        }
+                      },
+                      "required": [
+                        "amount",
+                        "currency"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ride_id",
+                    "status",
+                    "driver",
+                    "vehicle",
+                    "estimated_pickup_time",
+                    "fare_estimate"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

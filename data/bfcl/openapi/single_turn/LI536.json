@@ -1,0 +1,220 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI536",
+    "version": "1.0.0",
+    "description": "LI536 provides simple REST-style weather functions: retrieve current conditions for a specified city and request N-day forecasts with daily temperature predictions in Celsius or Fahrenheit. It's designed for quick integration into apps that need real-time conditions and short-term planning, using straightforward city and days parameters and returning structured temperature and condition fields for easy parsing and display."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI536"
+    }
+  ],
+  "paths": {
+    "/get_current_weather": {
+      "post": {
+        "operationId": "get_current_weather",
+        "summary": "Simulate current weather for a city",
+        "description": "Return a plausible current-weather payload for the requested city. Match temperature units to the request 'format' (or its default). Use realistic values and a recent observation timestamp.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "The city for which to get the weather, in the format of 'City, State' or 'City, Country'; for example, 'Austin, TX' or 'Paris, France'."
+                  },
+                  "format": {
+                    "type": "string",
+                    "description": "The temperature unit for the weather report.",
+                    "enum": [
+                      "celsius",
+                      "fahrenheit"
+                    ],
+                    "default": "fahrenheit"
+                  }
+                },
+                "required": [
+                  "location"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Current weather response payload",
+                  "properties": {
+                    "location": {
+                      "type": "string",
+                      "description": "Normalized location name returned by the service (for example, 'Austin, TX, US')."
+                    },
+                    "temperature": {
+                      "type": "number",
+                      "description": "Current temperature at the location. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "unit": {
+                      "type": "string",
+                      "description": "Temperature unit used for the temperature value.",
+                      "enum": [
+                        "celsius",
+                        "fahrenheit"
+                      ]
+                    },
+                    "humidity": {
+                      "type": "integer",
+                      "description": "Relative humidity as a percentage.",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "condition": {
+                      "type": "string",
+                      "description": "Short human-readable description of the current weather (e.g., 'Partly cloudy')."
+                    },
+                    "observed_at": {
+                      "type": "string",
+                      "description": "ISO 8601 timestamp when the observation was recorded.",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "location",
+                    "temperature",
+                    "unit",
+                    "condition",
+                    "observed_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_n_day_weather_forecast": {
+      "post": {
+        "operationId": "get_n_day_weather_forecast",
+        "summary": "Simulate N-day weather forecast for a city",
+        "description": "Return a simulated weather forecast for the requested city for the specified number of days. Temperatures should be provided in the requested format (celsius or fahrenheit).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "The name of the city for which the weather forecast is being requested, in the format of 'City, Country' (e.g., 'New York, USA')."
+                  },
+                  "format": {
+                    "type": "string",
+                    "description": "The temperature format for the weather forecast. This is auto computed based on the city location.",
+                    "enum": [
+                      "celsius",
+                      "fahrenheit"
+                    ],
+                    "default": "celsius"
+                  },
+                  "num_days": {
+                    "type": "integer",
+                    "description": "The number of days for which the weather forecast is required. Must be a positive integer."
+                  }
+                },
+                "required": [
+                  "location",
+                  "num_days"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload containing the requested forecast.",
+                  "properties": {
+                    "location": {
+                      "type": "string",
+                      "description": "The requested city for the forecast, e.g., 'New York, USA'."
+                    },
+                    "format": {
+                      "type": "string",
+                      "description": "Temperature unit used for the forecast. Matches the request 'format' when provided.",
+                      "enum": [
+                        "celsius",
+                        "fahrenheit"
+                      ]
+                    },
+                    "forecasts": {
+                      "type": "array",
+                      "description": "Array of daily forecast entries. Entries cover consecutive days (starting from today or the next full day) and the array length should match the requested num_days.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "date": {
+                            "type": "string",
+                            "description": "Date for this daily forecast. ISO 8601 date is recommended (e.g., 2023-08-01)."
+                          },
+                          "temp_high": {
+                            "type": "number",
+                            "description": "Predicted daytime high temperature. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "temp_low": {
+                            "type": "number",
+                            "description": "Predicted nighttime low temperature. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "precipitation_chance": {
+                            "type": "number",
+                            "description": "Chance of precipitation as a numeric percentage (e.g., 20). Do not assume a specific unit beyond 'percent' implied by the description."
+                          },
+                          "summary": {
+                            "type": "string",
+                            "description": "Short textual summary of the day's weather (free-text, e.g., 'Partly cloudy')."
+                          }
+                        },
+                        "required": [
+                          "date",
+                          "temp_high",
+                          "temp_low"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "location",
+                    "format",
+                    "forecasts"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

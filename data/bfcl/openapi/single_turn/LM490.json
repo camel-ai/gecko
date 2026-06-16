@@ -1,0 +1,481 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM490",
+    "version": "1.0.0",
+    "description": "LM490 is an integrated API for discovering and transacting around cultural events: search concerts and plays by city and date, purchase tickets, and handle money flows via payment requests and direct payments with optional private visibility. It is designed for synchronous, programmatic workflows where clients query events, reserve and buy tickets, and confirm or request funds through secure payment methods, allowing straightforward orchestration of user-facing ticketing and payment experiences."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM490"
+    }
+  ],
+  "paths": {
+    "/Events_3_FindEvents": {
+      "post": {
+        "operationId": "Events_3_FindEvents",
+        "summary": "Simulate finding cultural events in a city on a given date",
+        "description": "Return a list of cultural events (e.g., concerts, plays) for the specified city and optional date. If date is omitted, assume the current date.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "event_type": {
+                    "type": "string",
+                    "description": "The type of cultural event to find.",
+                    "enum": [
+                      "Music",
+                      "Theater"
+                    ]
+                  },
+                  "city": {
+                    "type": "string",
+                    "description": "The city where the event is taking place, in the format of 'City, State', such as 'Berkeley, CA' or 'New York, NY'. State names must be abbreviated"
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "Concrete event date in 'YYYY-MM-DD'. Use this field only when the user gives a concrete calendar date in that format or a directly mappable calendar date. If the user does not provide a concrete calendar date, leave this parameter unset or at its schema default instead of inventing a current date. Relative requests like 'today', 'tonight', or 'this weekend' should use the tool's default/open-date behavior unless a concrete date is explicitly provided.",
+                    "default": "null"
+                  }
+                },
+                "required": [
+                  "event_type",
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search results for cultural events",
+                  "properties": {
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of matching events returned in this response."
+                    },
+                    "events": {
+                      "type": "array",
+                      "description": "Array of matching events sorted by date and time (earliest first).",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the event."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Name or title of the event."
+                          },
+                          "event_type": {
+                            "type": "string",
+                            "description": "Type of the event; mirrors request event_type when possible.",
+                            "enum": [
+                              "Music",
+                              "Theater"
+                            ]
+                          },
+                          "date": {
+                            "type": "string",
+                            "description": "Event date in 'YYYY-MM-DD' (ISO-like date string)."
+                          },
+                          "time": {
+                            "type": "string",
+                            "description": "Start time for the event (local time). May be an approximate value or omitted."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Brief description or blurb about the event."
+                          },
+                          "venue": {
+                            "type": "object",
+                            "description": "Parameter venue",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "description": "Venue or location name."
+                              },
+                              "address": {
+                                "type": "string",
+                                "description": "Street address of the venue (free-text)."
+                              },
+                              "city": {
+                                "type": "string",
+                                "description": "City where the venue is located, typically matching the requested city."
+                              },
+                              "state": {
+                                "type": "string",
+                                "description": "State abbreviation (2-letter) where the venue is located."
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "city",
+                              "state"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "tickets_url": {
+                            "type": "string",
+                            "description": "URL where tickets or additional event details can be obtained (if available)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "event_type",
+                          "date",
+                          "venue"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "events"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Events_3_BuyEventTickets": {
+      "post": {
+        "operationId": "Events_3_BuyEventTickets",
+        "summary": "Simulate purchase of event tickets",
+        "description": "Simulate purchasing tickets for a named cultural event on a specific date and city. Validate request semantics and return a confirmed purchase payload when successful.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "event_name": {
+                    "type": "string",
+                    "description": "The name of the artist or play for which the tickets are being purchased."
+                  },
+                  "number_of_tickets": {
+                    "type": "integer",
+                    "description": "The total number of tickets to be reserved for the event.",
+                    "minimum": 1
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "The date of the event, in the format 'MM/DD/YYYY'."
+                  },
+                  "city": {
+                    "type": "string",
+                    "description": "The city where the event will take place, in the format of 'City, State', such as 'Berkeley, CA' or 'New York, NY'."
+                  }
+                },
+                "required": [
+                  "event_name",
+                  "number_of_tickets",
+                  "date",
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful ticket purchase result",
+                  "properties": {
+                    "confirmation_id": {
+                      "type": "string",
+                      "description": "Unique identifier for this purchase (opaque)."
+                    },
+                    "event_name": {
+                      "type": "string",
+                      "description": "The name of the event as provided in the request."
+                    },
+                    "number_of_tickets": {
+                      "type": "integer",
+                      "description": "The number of tickets purchased."
+                    },
+                    "date": {
+                      "type": "string",
+                      "description": "The event date as provided in the request."
+                    },
+                    "city": {
+                      "type": "string",
+                      "description": "The event city as provided in the request."
+                    },
+                    "total_price": {
+                      "type": "number",
+                      "description": "Total price for the purchase in USD. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Currency code for total_price (ISO 4217, e.g., \"USD\")."
+                    },
+                    "tickets": {
+                      "type": "array",
+                      "description": "Array of individual ticket records created for this purchase.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "ticket_id": {
+                            "type": "string",
+                            "description": "Unique identifier for the individual ticket."
+                          },
+                          "seat": {
+                            "type": "string",
+                            "description": "Seat assignment or area (may be 'General Admission')."
+                          },
+                          "price": {
+                            "type": "number",
+                            "description": "Price for this individual ticket. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          }
+                        },
+                        "required": [
+                          "ticket_id",
+                          "price"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "confirmation_id",
+                    "event_name",
+                    "number_of_tickets",
+                    "date",
+                    "city",
+                    "total_price",
+                    "currency",
+                    "tickets"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Payment_1_RequestPayment": {
+      "post": {
+        "operationId": "Payment_1_RequestPayment",
+        "summary": "Initiate a payment request",
+        "description": "Simulate initiating a payment to a receiver for a specified amount. The transaction may be marked private.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "receiver": {
+                    "type": "string",
+                    "description": "The name or identifier of the contact or account to receive the payment."
+                  },
+                  "amount": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The monetary value to be requested, specified in dollars.. Use float format (e.g., 1.0 not 1)."
+                  },
+                  "private_visibility": {
+                    "type": "boolean",
+                    "description": "Indicates if the transaction should be private (true) or public (false).",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "receiver",
+                  "amount"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful payment creation result",
+                  "properties": {
+                    "payment_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the created payment."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Current state of the payment (for example: pending, completed)."
+                    },
+                    "amount": {
+                      "type": "number",
+                      "description": "The monetary value requested in dollars. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "private_visibility": {
+                      "type": "boolean",
+                      "description": "Whether the transaction is private (true) or public (false)."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp when the payment was created (ISO 8601 recommended)."
+                    }
+                  },
+                  "required": [
+                    "payment_id",
+                    "status",
+                    "amount",
+                    "created_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Payment_1_MakePayment": {
+      "post": {
+        "operationId": "Payment_1_MakePayment",
+        "summary": "Simulate initiating a payment",
+        "description": "Simulate a payment transfer from the user to a receiver using the specified payment method. This is a simulation of the initiation step and must not perform any real money movement.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "payment_method": {
+                    "type": "string",
+                    "description": "The source of funds for the payment, such as a linked bank account or card.",
+                    "enum": [
+                      "app balance",
+                      "debit card",
+                      "credit card"
+                    ]
+                  },
+                  "amount": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The monetary amount to send, represented as a floating-point number in USD.. Use float format (e.g., 1.0 not 1)."
+                  },
+                  "receiver": {
+                    "type": "string",
+                    "description": "The unique identifier of the contact or account to which the money is being sent."
+                  },
+                  "private_visibility": {
+                    "type": "boolean",
+                    "description": "A flag indicating whether the transaction should be private (true) or public (false).",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "payment_method",
+                  "amount",
+                  "receiver"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful payment initiation response",
+                  "properties": {
+                    "transaction_id": {
+                      "type": "string",
+                      "description": "Unique identifier assigned to the transaction by the system."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Outcome of the payment initiation.",
+                      "enum": [
+                        "completed",
+                        "pending",
+                        "failed"
+                      ]
+                    },
+                    "amount": {
+                      "type": "number",
+                      "description": "The monetary amount that was requested to be sent in USD. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Currency code for the transaction (ISO 4217).",
+                      "default": "USD"
+                    },
+                    "payment_method": {
+                      "type": "string",
+                      "description": "The payment method used for this simulated transaction."
+                    },
+                    "receiver": {
+                      "type": "string",
+                      "description": "Identifier of the contact or account that received the payment."
+                    },
+                    "private_visibility": {
+                      "type": "boolean",
+                      "description": "Whether the transaction is marked as private."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp (RFC 3339) when the payment initiation was recorded.",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "transaction_id",
+                    "status",
+                    "amount",
+                    "currency",
+                    "payment_method",
+                    "receiver",
+                    "created_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

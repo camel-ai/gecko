@@ -1,0 +1,160 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI461",
+    "version": "1.0.0",
+    "description": "LI461 is a compact tax calculation API collection centered on the calculate_tax tool to compute total tax from income, incorporating multiple tax brackets, deductions, credits and filing options. Consumers send JSON requests with income, filing status and deduction details and receive structured breakdowns (tax per bracket, taxable income, effective rate). Designed for synchronous REST calls, it returns clear error codes for invalid inputs and can be embedded into payroll, reporting or financial planning workflows."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI461"
+    }
+  ],
+  "paths": {
+    "/calculate_tax": {
+      "post": {
+        "operationId": "calculate_tax",
+        "summary": "Simulate tax calculation from income, deductions, exemptions, and credits",
+        "description": "Given an individual's income, filing status, deductions, exemptions, and tax credits, compute the taxable income, total tax owed, effective tax rate, and a per-bracket tax breakdown. This is a simulation-focused response describing the successful calculation output.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "income": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The total income of the individual for which tax needs to be calculated, in dollars.. Use float format (e.g., 1.0 not 1)."
+                  },
+                  "filing_status": {
+                    "type": "string",
+                    "description": "The filing status of the individual, which affects the tax brackets.",
+                    "enum": [
+                      "single",
+                      "married_filing_jointly",
+                      "married_filing_separately",
+                      "head_of_household"
+                    ]
+                  },
+                  "deductions": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The total value of deductions the individual is claiming, in dollars.. Use float format (e.g., 1.0 not 1).",
+                    "default": 0.0
+                  },
+                  "exemptions": {
+                    "type": "integer",
+                    "description": "The number of exemptions the individual is claiming.",
+                    "default": 1
+                  },
+                  "tax_credits": {
+                    "type": "array",
+                    "description": "A list of tax credits the individual is eligible for, each in dollars.",
+                    "default": [],
+                    "items": {
+                      "type": "number",
+                      "format": "double",
+                      "description": "Array item. Use float format (e.g., 1.0 not 1)."
+                    }
+                  }
+                },
+                "required": [
+                  "income",
+                  "filing_status"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful tax calculation result",
+                  "properties": {
+                    "taxable_income": {
+                      "type": "number",
+                      "description": "Computed taxable income after applying deductions and exemptions. Use float format (e.g., 1.0 not 1). Rounded to two decimal places.",
+                      "format": "double"
+                    },
+                    "total_tax": {
+                      "type": "number",
+                      "description": "Total tax owed before applying refundable credits. Use float format (e.g., 1.0 not 1). Rounded to two decimal places.",
+                      "format": "double"
+                    },
+                    "total_credits": {
+                      "type": "number",
+                      "description": "Sum of applicable tax credits applied to the tax liability. Use float format (e.g., 1.0 not 1). Rounded to two decimal places.",
+                      "format": "double"
+                    },
+                    "net_tax_due": {
+                      "type": "number",
+                      "description": "Net tax due after applying non-refundable credits (total_tax minus total_credits, not less than zero) and after refundable credits if applicable. Use float format (e.g., 1.0 not 1). Rounded to two decimal places.",
+                      "format": "double"
+                    },
+                    "effective_tax_rate": {
+                      "type": "number",
+                      "description": "Effective tax rate computed as net_tax_due divided by income (expressed as a decimal, e.g., 0.25 for 25%). Use float format (e.g., 1.0 not 1). Rounded to four decimal places when appropriate.",
+                      "format": "double"
+                    },
+                    "bracket_breakdown": {
+                      "type": "array",
+                      "description": "Breakdown of tax computed per bracket in the progressive schedule applied for the filing_status. Each item lists the bracket bounds, the marginal rate, and the tax amount allocated to that bracket.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "bracket_lower": {
+                            "type": "number",
+                            "description": "Lower bound of the bracket, inclusive. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "bracket_upper": {
+                            "type": "number",
+                            "description": "Upper bound of the bracket, exclusive. For the top bracket, this property may be omitted. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "rate": {
+                            "type": "number",
+                            "description": "Marginal tax rate for this bracket expressed as a decimal (e.g., 0.22 for 22%). Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "tax_amount": {
+                            "type": "number",
+                            "description": "Amount of tax attributable to this bracket. Use float format (e.g., 1.0 not 1). Rounded to two decimal places.",
+                            "format": "double"
+                          }
+                        },
+                        "required": [
+                          "bracket_lower",
+                          "rate",
+                          "tax_amount"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "taxable_income",
+                    "total_tax",
+                    "net_tax_due",
+                    "effective_tax_rate",
+                    "bracket_breakdown"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

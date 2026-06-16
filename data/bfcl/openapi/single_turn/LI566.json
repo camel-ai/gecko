@@ -1,0 +1,422 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI566",
+    "version": "1.0.0",
+    "description": "LI566 is a concise parcel-support API suite for tracking parcels, lodging and monitoring complaints, and escalating sessions to human agents. Use GET_PARCEL_STATE with a tracking ID to fetch current parcel status, submit_complaint to create ticketed issues, GET_COMPLAINT_STATE to poll complaint progress, and handover_to_agent to transfer a session to an agent when needed. Designed for synchronous, ID-driven calls with straightforward JSON inputs and predictable status responses."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI566"
+    }
+  ],
+  "paths": {
+    "/GET_PARCEL_STATE": {
+      "post": {
+        "operationId": "GET_PARCEL_STATE",
+        "summary": "Get parcel state by tracking ID",
+        "description": "Simulate determining the current state of a parcel from its tracking ID. If includeHistory is true, include a chronological list of past states.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "parcelTrackingId": {
+                    "type": "string",
+                    "description": "The unique identifier for the parcel, used to track its status."
+                  },
+                  "includeHistory": {
+                    "type": "boolean",
+                    "description": "Specifies whether to include the parcel's state history in the response.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "parcelTrackingId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful parcel state payload",
+                  "properties": {
+                    "parcelTrackingId": {
+                      "type": "string",
+                      "description": "The unique identifier for the parcel, echoing the requested tracking ID."
+                    },
+                    "currentState": {
+                      "type": "string",
+                      "description": "A short, human-readable description of the parcel's current state (e.g., 'In Transit', 'Delivered', 'Out for Delivery')."
+                    },
+                    "lastUpdated": {
+                      "type": "string",
+                      "description": "Timestamp when the currentState was recorded. ISO 8601 is recommended but not enforced by the schema."
+                    },
+                    "location": {
+                      "type": "string",
+                      "description": "Optional human-readable location where the parcel was last scanned or reported."
+                    },
+                    "estimatedDelivery": {
+                      "type": "string",
+                      "description": "Estimated delivery date/time if available. Format is not enforced; ISO 8601 is recommended. May be null when unknown.",
+                      "nullable": true
+                    },
+                    "history": {
+                      "type": "array",
+                      "description": "Optional chronological list of past states, present only when includeHistory=true. Most recent events appear first.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "description": "A short description of the historical state."
+                          },
+                          "timestamp": {
+                            "type": "string",
+                            "description": "When this historical state was recorded. ISO 8601 is recommended but not enforced."
+                          },
+                          "location": {
+                            "type": "string",
+                            "description": "Optional human-readable location associated with this historical state."
+                          },
+                          "notes": {
+                            "type": "string",
+                            "description": "Optional free-text notes about this history entry."
+                          }
+                        },
+                        "required": [
+                          "state",
+                          "timestamp"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "parcelTrackingId",
+                    "currentState"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/submit_complaint": {
+      "post": {
+        "operationId": "submit_complaint",
+        "summary": "Simulate submitting a parcel-delivery complaint",
+        "description": "Simulate creating a complaint record for parcel delivery issues (non-delivery, incorrect data entry, damage, loss, etc.). The simulation should validate required fields and apply additional business checks described in validation_rules, then return a successful complaint payload.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "userName": {
+                    "type": "string",
+                    "description": "The user's full name in Persian script."
+                  },
+                  "userMobileNumber": {
+                    "type": "string",
+                    "description": "The user's mobile number, expected to be in the format +[country code][number] (e.g., +989123456789)."
+                  },
+                  "parcelTrackingId": {
+                    "type": "string",
+                    "description": "The unique tracking number of the parcel in question."
+                  },
+                  "subject": {
+                    "type": "string",
+                    "description": "The subject of the complaint.",
+                    "enum": [
+                      "NON_DELIVERY",
+                      "INCORRECT_DATA_ENTRY",
+                      "LACK_OF_NOTIFICATION",
+                      "INAPPROPRIATE_BEHAVIOR",
+                      "DELAYED_PAYMENT",
+                      "ADDITIONAL_FEE",
+                      "ONLINE_LINK",
+                      "DELAY_COMPLAINT",
+                      "PACKAGE_LOSS",
+                      "PACKAGE_DAMAGE",
+                      "PACKAGE_CONTENT_DEDUCTION",
+                      "RECIPIENT_DISCREPANCY",
+                      "DELAYED_LOADS",
+                      "INCORRECT_DIMENSION",
+                      "INCORRECT_ADDRESS",
+                      "INCORRECT_INFORMATION",
+                      "NON_REGISTRATION",
+                      "DELAY_IN_COLLECTION",
+                      "DELAY_IN_SENDING",
+                      "DELAY_IN_DISTRIBUTION",
+                      "REFUND",
+                      "DELAY_NON_COLLECTION"
+                    ]
+                  },
+                  "statement": {
+                    "type": "string",
+                    "description": "A detailed description of the issue from the user's perspective.",
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "userName",
+                  "userMobileNumber",
+                  "parcelTrackingId",
+                  "subject"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful complaint creation payload.",
+                  "properties": {
+                    "complaintId": {
+                      "type": "string",
+                      "description": "A unique identifier assigned to the created complaint."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Current processing status of the complaint.",
+                      "enum": [
+                        "RECEIVED",
+                        "UNDER_REVIEW",
+                        "ACTION_REQUIRED",
+                        "RESOLVED"
+                      ]
+                    },
+                    "submittedAt": {
+                      "type": "string",
+                      "description": "Timestamp when the complaint was recorded (RFC 3339 / ISO 8601 recommended)."
+                    },
+                    "estimatedResolutionDays": {
+                      "type": "integer",
+                      "description": "Estimated number of days until the complaint is resolved, if available.",
+                      "nullable": true
+                    },
+                    "notes": {
+                      "type": "string",
+                      "description": "Optional agent-facing notes about the complaint or next steps. May be empty.",
+                      "default": ""
+                    }
+                  },
+                  "required": [
+                    "complaintId",
+                    "status",
+                    "submittedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/GET_COMPLAINT_STATE": {
+      "post": {
+        "operationId": "GET_COMPLAINT_STATE",
+        "summary": "Retrieve complaint state",
+        "description": "Simulate retrieving the current state of a complaint by its tracking ID for the specified user.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "userMobileNumber": {
+                    "type": "string",
+                    "description": "The mobile number of the user, formatted as a string without spaces or special characters (e.g., '1234567890')."
+                  },
+                  "complaintTrackingId": {
+                    "type": "string",
+                    "description": "A unique identifier for the complaint, used to track the status of the complaint."
+                  }
+                },
+                "required": [
+                  "userMobileNumber",
+                  "complaintTrackingId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Current complaint state payload",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "description": "Current state of the complaint. Provide a concise status label; examples include 'Open', 'In Progress', 'Resolved'. Do not assume this list is exhaustive."
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "description": "Timestamp when the complaint last changed state. Use an ISO 8601 timestamp string (for example, 2023-08-01T12:34:56Z)."
+                    },
+                    "assignedTo": {
+                      "type": "string",
+                      "description": "Identifier or name of the agent or team currently handling the complaint, if available."
+                    },
+                    "estimatedResolution": {
+                      "type": "string",
+                      "description": "Estimated time to resolution, if available. This may be free-text (for example, '2 business days')."
+                    },
+                    "history": {
+                      "type": "array",
+                      "description": "Chronological list of significant state changes for the complaint, newest first.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "description": "State label at this history entry."
+                          },
+                          "timestamp": {
+                            "type": "string",
+                            "description": "Timestamp for this history entry (ISO 8601 string recommended)."
+                          },
+                          "note": {
+                            "type": "string",
+                            "description": "Optional short note describing the change or context."
+                          }
+                        },
+                        "required": [
+                          "status",
+                          "timestamp"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/handover_to_agent": {
+      "post": {
+        "operationId": "handover_to_agent",
+        "summary": "Initiate handover to a human agent",
+        "description": "Simulate initiating a handover that transfers the ongoing chat session from the virtual assistant to a human agent. On success, returns an identifier and status describing how the handover was accepted or queued.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "agent_id": {
+                    "type": "string",
+                    "description": "The unique identifier of the human agent to whom the chat will be transferred."
+                  },
+                  "session_id": {
+                    "type": "string",
+                    "description": "The session identifier of the current chat that needs to be handed over."
+                  },
+                  "priority": {
+                    "type": "string",
+                    "description": "The priority level for the handover request.",
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high"
+                    ],
+                    "default": "medium"
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "An optional message from the virtual assistant to the human agent.",
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "agent_id",
+                  "session_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful handover initiation payload.",
+                  "properties": {
+                    "handover_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the initiated handover."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Current handover status (for example: initiated, queued, assigned)."
+                    },
+                    "queue_position": {
+                      "type": "integer",
+                      "description": "1-based position in the agent queue if the handover was queued. Omitted when not applicable."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp when the handover was created (ISO 8601 / RFC 3339 recommended).",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "handover_id",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

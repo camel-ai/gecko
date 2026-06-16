@@ -1,0 +1,444 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI738",
+    "version": "1.0.0",
+    "description": "LI738 is a Jira administration API collection for managing and auditing time tracking providers and configurations. It exposes endpoints to list available providers, select the active provider, retrieve the active selection and shared time tracking configuration, and query audit records with filtering by fields or dates. All operations require 'Administer Jira' global permission and are intended for administrative automation, configuration management, and auditing workflows."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI738"
+    }
+  ],
+  "paths": {
+    "/TimeTrackingApi_select_time_tracking_implementation": {
+      "post": {
+        "operationId": "TimeTrackingApi_select_time_tracking_implementation",
+        "summary": "Select time tracking provider",
+        "description": "Simulate selecting a time tracking provider. Caller must have the Administer Jira global permission. The operation applies the provider selection and any provider-supplied configuration.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "provider_id": {
+                    "type": "string",
+                    "description": "Unique identifier for the time tracking provider."
+                  },
+                  "enable": {
+                    "type": "boolean",
+                    "description": "Flag to enable or disable the selected time tracking provider. Defaults to true if not specified.",
+                    "default": true
+                  },
+                  "configuration": {
+                    "type": "string",
+                    "description": "Configuration details for the provider in JSON format. Optional and provider-dependent.",
+                    "default": "{}"
+                  }
+                },
+                "required": [
+                  "provider_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Result returned when a time tracking provider selection has been applied successfully.",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "description": "Outcome of the operation, e.g., a short machine-readable status such as 'success' or 'applied'."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable summary of the outcome suitable for logs or display."
+                    },
+                    "applied_at": {
+                      "type": "string",
+                      "description": "Timestamp when the selection was applied. Recommended to use an ISO 8601 timestamp string."
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_available_time_tracking_implementations": {
+      "post": {
+        "operationId": "get_available_time_tracking_implementations",
+        "summary": "List available Jira time tracking providers",
+        "description": "Simulate retrieving the list of time-tracking providers available in a Jira instance. Administer Jira global permission is required to access this information. The provider list may include the built-in Jira provider and providers added by apps.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "List of available time tracking providers.",
+                  "properties": {
+                    "timeTrackingProviders": {
+                      "type": "array",
+                      "description": "Array of time tracking provider objects available in the Jira instance.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the time tracking provider."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Display name of the provider."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Optional human-readable description of the provider."
+                          },
+                          "pluginKey": {
+                            "type": "string",
+                            "description": "Identifier of the plugin or app that supplies this provider, if applicable."
+                          },
+                          "isDefault": {
+                            "type": "boolean",
+                            "description": "Whether this provider is the default Jira time tracking provider."
+                          },
+                          "enabled": {
+                            "type": "boolean",
+                            "description": "Whether this provider is currently enabled in the Jira instance."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "startAt": {
+                      "type": "integer",
+                      "description": "Index of the first item returned (pagination)."
+                    },
+                    "maxResults": {
+                      "type": "integer",
+                      "description": "Maximum number of items returned per page (pagination)."
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "Total number of available time tracking providers."
+                    }
+                  },
+                  "required": [
+                    "timeTrackingProviders"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_selected_time_tracking_implementation": {
+      "post": {
+        "operationId": "get_selected_time_tracking_implementation",
+        "summary": "Get currently selected time tracking provider",
+        "description": "Simulate retrieval of the currently selected time tracking provider. If time tracking is disabled, an empty response is returned. Requires 'Administer Jira' global permission.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "description": "Empty response returned when time tracking is disabled.",
+                      "properties": {}
+                    },
+                    {
+                      "type": "object",
+                      "description": "Object describing the selected time tracking provider.",
+                      "properties": {
+                        "implementationKey": {
+                          "type": "string",
+                          "description": "Unique key identifying the selected time tracking implementation."
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "Human-readable name of the selected provider."
+                        },
+                        "description": {
+                          "type": "string",
+                          "description": "Optional human-readable description provided by the provider."
+                        },
+                        "enabled": {
+                          "type": "boolean",
+                          "description": "Whether the provider is currently enabled."
+                        },
+                        "settings": {
+                          "type": "object",
+                          "description": "Provider-specific configuration object. Structure is provider-dependent.",
+                          "properties": {},
+                          "additionalProperties": true
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ],
+                  "properties": {}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/AuditRecordsApi_get_audit_records": {
+      "post": {
+        "operationId": "AuditRecordsApi_get_audit_records",
+        "summary": "Retrieve audit records (simulated)",
+        "description": "Simulate retrieval of audit records, optionally filtered by text and/or a creation date range. Requires 'Administer Jira' global permission.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "offset": {
+                    "type": "integer",
+                    "description": "The number of records to skip before returning the first result.",
+                    "minimum": 0
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "The maximum number of results to return, to limit the size of the returned list.",
+                    "minimum": 0
+                  },
+                  "filter": {
+                    "type": "string",
+                    "description": "A space-separated string to match with audit field content. Filters results to include items where each item has at least one match in fields like 'summary', 'category', 'eventSource', etc.",
+                    "default": ""
+                  },
+                  "_from": {
+                    "type": "string",
+                    "description": "The start date and time for filtering audit records, in ISO 8601 format (e.g., '2023-01-01T00:00:00Z'). If 'to' is provided, 'from' must be earlier, or no records are returned.",
+                    "default": null,
+                    "format": "date-time"
+                  },
+                  "to": {
+                    "type": "string",
+                    "description": "The end date and time for filtering audit records, in ISO 8601 format (e.g., '2023-01-31T23:59:59Z'). If 'from' is provided, 'to' must be later, or no records are returned.",
+                    "default": null,
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "offset",
+                  "limit"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "A page of audit records matching the request filters.",
+                  "properties": {
+                    "offset": {
+                      "type": "integer",
+                      "description": "The number of records skipped before this page.",
+                      "minimum": 0
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "description": "The maximum number of records returned in this page.",
+                      "minimum": 0
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "Total number of records that match the filters."
+                    },
+                    "values": {
+                      "type": "array",
+                      "description": "List of audit records.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "description": "Unique identifier for the audit record."
+                          },
+                          "summary": {
+                            "type": "string",
+                            "description": "Short summary of the audit event."
+                          },
+                          "category": {
+                            "type": "string",
+                            "description": "Category of the audit event."
+                          },
+                          "eventSource": {
+                            "type": "string",
+                            "description": "Source of the event."
+                          },
+                          "created": {
+                            "type": "string",
+                            "description": "Creation date/time in ISO 8601 format.",
+                            "format": "date-time"
+                          },
+                          "details": {
+                            "type": "object",
+                            "description": "Event-specific details. Structure varies by event type.",
+                            "properties": {},
+                            "additionalProperties": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "summary",
+                          "created"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "offset",
+                    "limit",
+                    "values"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/TimeTrackingApi_get_shared_time_tracking_configuration": {
+      "post": {
+        "operationId": "TimeTrackingApi_get_shared_time_tracking_configuration",
+        "summary": "Retrieve shared time tracking configuration (simulation)",
+        "description": "Simulate retrieving time tracking configuration for a project. Requires 'Administer Jira' global permission. Returns common configuration fields such as time format, default time unit, and additional settings.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "project_id": {
+                    "type": "string",
+                    "description": "The ID of the project for which time tracking settings are being retrieved. The format should be a string of alphanumeric characters, such as 'PRJ123'."
+                  },
+                  "include_inactive": {
+                    "type": "boolean",
+                    "description": "Specifies whether to include settings for inactive projects in the results. By default, only active projects are included.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "project_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Time tracking configuration for the requested project.",
+                  "properties": {
+                    "time_format": {
+                      "type": "string",
+                      "description": "The time display format as returned by the server (free-text value)."
+                    },
+                    "default_time_unit": {
+                      "type": "string",
+                      "description": "The default time unit identifier used when none is provided (free-text value returned by the server)."
+                    },
+                    "time_tracking_enabled": {
+                      "type": "boolean",
+                      "description": "Whether time tracking is enabled for the project."
+                    },
+                    "additional_settings": {
+                      "type": "object",
+                      "description": "A map of additional, provider-specific time-tracking settings. Keys and value types vary by installation.",
+                      "properties": {},
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "time_format",
+                    "default_time_unit",
+                    "time_tracking_enabled"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

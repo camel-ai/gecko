@@ -1,0 +1,506 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM161",
+    "version": "1.0.0",
+    "description": "LM161 is an API collection providing read-oriented endpoints to fetch Adriel's professional profile data — current projects, detailed project records, work experiences, and education history. Designed for simple REST-style integrations, it returns structured metadata (names, statuses, dates, roles) for building resumes, team dashboards, or search indexes. Endpoints support targeted lookups (project ID) and optional user-scoped education queries."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM161"
+    }
+  ],
+  "paths": {
+    "/get_adriel_projects": {
+      "post": {
+        "operationId": "get_adriel_projects",
+        "summary": "List Adriel projects",
+        "description": "Simulate retrieval of Adriel projects for a user. Return each project's id, name, status, and start date. Apply filters for archived inclusion and start date range.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "user_id": {
+                    "type": "integer",
+                    "description": "The unique identifier of the user for whom the projects are being retrieved."
+                  },
+                  "include_archived": {
+                    "type": "boolean",
+                    "description": "Determines whether to include projects that are archived.",
+                    "default": false
+                  },
+                  "status_filter": {
+                    "type": "string",
+                    "description": "Filter projects based on their current status.",
+                    "enum": [
+                      "active",
+                      "completed",
+                      "on_hold"
+                    ],
+                    "default": "active"
+                  },
+                  "start_date_from": {
+                    "type": "string",
+                    "description": "Filter projects that started on or after this date. The date should be in the format 'YYYY-MM-DD'.",
+                    "default": null
+                  },
+                  "start_date_to": {
+                    "type": "string",
+                    "description": "Filter projects that started on or before this date. The date should be in the format 'YYYY-MM-DD'.",
+                    "default": null
+                  }
+                },
+                "required": [
+                  "user_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing an array of projects.",
+                  "properties": {
+                    "projects": {
+                      "type": "array",
+                      "description": "Array of project objects matching the query.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "description": "Unique project identifier."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Human-readable project name."
+                          },
+                          "status": {
+                            "type": "string",
+                            "description": "Current project status. Typical values include active, completed, and on_hold.",
+                            "enum": [
+                              "active",
+                              "completed",
+                              "on_hold"
+                            ]
+                          },
+                          "start_date": {
+                            "type": "string",
+                            "description": "Project start date in YYYY-MM-DD format.",
+                            "format": "date"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "status",
+                          "start_date"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "projects"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_detail_adriel_project": {
+      "post": {
+        "operationId": "get_detail_adriel_project",
+        "summary": "Retrieve full Adriel project details",
+        "description": "Simulate returning full project details that Adriel was involved in, including status, Adriel's role, dates formatted per the request.date_format, and optional financials when requested.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "project_name": {
+                    "type": "string",
+                    "description": "The exact name of the project to fetch details for."
+                  },
+                  "include_financials": {
+                    "type": "boolean",
+                    "description": "Determines whether to include financial information such as budget and expenses in the project details.",
+                    "default": false
+                  },
+                  "date_format": {
+                    "type": "string",
+                    "description": "The format for any date fields in the project details, such as 'MM/DD/YYYY'.",
+                    "default": "YYYY-MM-DD"
+                  }
+                },
+                "required": [
+                  "project_name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Project details payload (successful response only).",
+                  "properties": {
+                    "project_name": {
+                      "type": "string",
+                      "description": "The exact name of the project."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Current project status (for example: completed, in_progress, cancelled)."
+                    },
+                    "role": {
+                      "type": "string",
+                      "description": "Role Adriel played in the project."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "Detailed narrative describing the project, goals, and outcomes."
+                    },
+                    "start_date": {
+                      "type": "string",
+                      "description": "Project start date formatted according to request.date_format (default YYYY-MM-DD)."
+                    },
+                    "end_date": {
+                      "type": "string",
+                      "description": "Project end date formatted according to request.date_format (default YYYY-MM-DD). May be null for ongoing projects.",
+                      "nullable": true
+                    },
+                    "financials": {
+                      "type": "object",
+                      "description": "Financial information; present only when request.include_financials is true.",
+                      "properties": {
+                        "budget": {
+                          "type": "number",
+                          "description": "Allocated budget. Use float format (e.g., 1.0 not 1).",
+                          "format": "double"
+                        },
+                        "expenses": {
+                          "type": "number",
+                          "description": "Actual expenses to date. Use float format (e.g., 1.0 not 1).",
+                          "format": "double"
+                        },
+                        "currency": {
+                          "type": "string",
+                          "description": "Currency code for the financial numbers, if available (e.g., USD)."
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "team_members": {
+                      "type": "array",
+                      "description": "Key team members and their roles/contributions.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "description": "Team member full name."
+                          },
+                          "role": {
+                            "type": "string",
+                            "description": "Team member role on the project."
+                          },
+                          "contributions": {
+                            "type": "string",
+                            "description": "Summary of the member's contributions."
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "role"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "project_name",
+                    "status",
+                    "role"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_adriel_experiences": {
+      "post": {
+        "operationId": "get_adriel_experiences",
+        "summary": "Simulate retrieving Adriel's professional experiences",
+        "description": "Return a simulated list of Adriel's professional experiences (job titles, employers, and employment dates). Respect request flags such as include_education and date_format when constructing the response.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "user_id": {
+                    "type": "string",
+                    "description": "The unique identifier of the user whose experiences are being retrieved."
+                  },
+                  "include_education": {
+                    "type": "boolean",
+                    "description": "A flag indicating whether educational experiences should be included in the list.",
+                    "default": false
+                  },
+                  "date_format": {
+                    "type": "string",
+                    "description": "The format for dates in the response, such as 'YYYY-MM-DD'.",
+                    "enum": [
+                      "YYYY-MM-DD",
+                      "MM/DD/YYYY",
+                      "DD-MM-YYYY"
+                    ],
+                    "default": "YYYY-MM-DD"
+                  }
+                },
+                "required": [
+                  "user_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "experiences": {
+                      "type": "array",
+                      "description": "An ordered list of experience records. Include educational experiences only when include_education is true in the request.",
+                      "minItems": 0,
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "title": {
+                            "type": "string",
+                            "description": "Job title or degree name."
+                          },
+                          "company": {
+                            "type": "string",
+                            "description": "Employer or educational institution name."
+                          },
+                          "start_date": {
+                            "type": "string",
+                            "description": "Start date formatted according to the request.date_format (for example, 'YYYY-MM-DD' when that format is requested)."
+                          },
+                          "end_date": {
+                            "type": "string",
+                            "description": "End date formatted according to the request.date_format, or null if the role is ongoing."
+                          },
+                          "is_current": {
+                            "type": "boolean",
+                            "description": "True if this role is ongoing."
+                          },
+                          "location": {
+                            "type": "string",
+                            "description": "Location of the role or institution, if available."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Free-text summary of responsibilities, accomplishments, or coursework."
+                          },
+                          "type": {
+                            "type": "string",
+                            "description": "Qualifier for the entry (e.g., professional or educational). Presence of educational items should follow include_education."
+                          }
+                        },
+                        "required": [
+                          "title",
+                          "company",
+                          "start_date"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "experiences"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_adriel_education": {
+      "post": {
+        "operationId": "get_adriel_education",
+        "summary": "Retrieve Adriel's education history",
+        "description": "Simulate fetching a list of educational institutions attended by Adriel (or the supplied username). Each entry should include degree and field of study; optionally include certifications when requested.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "description": "The unique identifier for the user whose education history is being requested. Defaults to Adriel's username.",
+                    "default": "adriel_user_id"
+                  },
+                  "include_certifications": {
+                    "type": "boolean",
+                    "description": "A flag to determine whether to include certifications along with formal education.",
+                    "default": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "description": "An array of educational entries (one per institution/experience). When include_certifications is true, entries may include a certifications array.",
+                  "maxItems": 50,
+                  "items": {
+                    "type": "object",
+                    "description": "Array item",
+                    "properties": {
+                      "institution": {
+                        "type": "string",
+                        "description": "The full name of the educational institution."
+                      },
+                      "degree": {
+                        "type": "string",
+                        "description": "The degree or credential obtained (e.g., Bachelor of Science, MSc, PhD)."
+                      },
+                      "field_of_study": {
+                        "type": "string",
+                        "description": "Primary field or major of study."
+                      },
+                      "start_year": {
+                        "type": "integer",
+                        "description": "The year the program began (ISO year number)."
+                      },
+                      "end_year": {
+                        "type": "object",
+                        "description": "The year the program ended, or null if ongoing.",
+                        "oneOf": [
+                          {
+                            "type": "integer",
+                            "description": "Parameter end_year option 1"
+                          },
+                          {
+                            "type": "null",
+                            "description": "Parameter end_year option 2"
+                          }
+                        ],
+                        "properties": {}
+                      },
+                      "gpa": {
+                        "type": "number",
+                        "description": "Grade point average where available. Use float format (e.g., 1.0 not 1).",
+                        "format": "double"
+                      },
+                      "city": {
+                        "type": "string",
+                        "description": "City where the institution is located."
+                      },
+                      "country": {
+                        "type": "string",
+                        "description": "Country where the institution is located."
+                      },
+                      "notes": {
+                        "type": "string",
+                        "description": "Optional free-text notes about the study (honors, thesis topic, etc.)."
+                      },
+                      "certifications": {
+                        "type": "array",
+                        "description": "Optional list of certifications related to this entry. Present when include_certifications is true.",
+                        "maxItems": 20,
+                        "items": {
+                          "type": "object",
+                          "description": "Array item",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "description": "Name of the certification."
+                            },
+                            "issuing_organization": {
+                              "type": "string",
+                              "description": "Organization that issued the certification."
+                            },
+                            "year": {
+                              "type": "integer",
+                              "description": "Year the certification was awarded."
+                            },
+                            "credential_id": {
+                              "type": "string",
+                              "description": "Optional identifier or credential code for the certification."
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "issuing_organization"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "institution",
+                      "degree",
+                      "field_of_study"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

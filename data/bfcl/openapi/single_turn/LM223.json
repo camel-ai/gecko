@@ -1,0 +1,413 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM223",
+    "version": "1.0.0",
+    "description": "LM223 is a compact API collection for location-aware services, image analysis, and filesystem inspection. Use uber_ride to match customers with appropriate ride options by location, vehicle type, and wait constraints; segment_all_objects to detect and return boundaries for every identifiable object in supplied images; and list_directory_contents to enumerate files and subdirectories at a given path. Designed for synchronous request/response integration in server or edge applications."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM223"
+    }
+  ],
+  "paths": {
+    "/uber_ride": {
+      "post": {
+        "operationId": "uber_ride",
+        "summary": "Simulate finding suitable Uber rides for a user",
+        "description": "Given a pickup location, ride type, and maximum wait time, return one or more matching ride options. Simulation should prefer options that meet the requested type and are within the requested wait time.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "loc": {
+                    "type": "string",
+                    "description": "The starting location for the Uber ride in the format of 'Street, City, State'. For example, '50 Memorial Drive, Cambridge, MA'."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "The type of Uber ride the user is ordering.",
+                    "enum": [
+                      "plus",
+                      "comfort",
+                      "black"
+                    ]
+                  },
+                  "time": {
+                    "type": "integer",
+                    "description": "The maximum amount of time the customer is willing to wait for the ride, in minutes."
+                  }
+                },
+                "required": [
+                  "loc",
+                  "type",
+                  "time"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "A list of matching ride options (one or more).",
+                  "properties": {
+                    "rides": {
+                      "type": "array",
+                      "description": "Matching ride options sorted by estimated time of arrival (fastest first).",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "ride_id": {
+                            "type": "string",
+                            "description": "Unique identifier for this ride option."
+                          },
+                          "driver_name": {
+                            "type": "string",
+                            "description": "Driver's display name."
+                          },
+                          "vehicle": {
+                            "type": "object",
+                            "description": "Vehicle details.",
+                            "properties": {
+                              "make": {
+                                "type": "string",
+                                "description": "Vehicle make (manufacturer)."
+                              },
+                              "model": {
+                                "type": "string",
+                                "description": "Vehicle model."
+                              },
+                              "license_plate": {
+                                "type": "string",
+                                "description": "Vehicle license plate identifier."
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "eta_minutes": {
+                            "type": "integer",
+                            "description": "Estimated time of arrival in whole minutes."
+                          },
+                          "distance_miles": {
+                            "type": "number",
+                            "description": "Estimated distance from pickup to driver's current location in miles. Use float format (e.g., 1.0 not 1)."
+                          },
+                          "price": {
+                            "type": "object",
+                            "description": "Estimated price for the ride, if available.",
+                            "properties": {
+                              "amount": {
+                                "type": "number",
+                                "description": "Monetary amount for the estimated price. Use float format (e.g., 1.0 not 1)."
+                              },
+                              "currency": {
+                                "type": "string",
+                                "description": "Three-letter currency code (for example, USD)."
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "surge_multiplier": {
+                            "type": "number",
+                            "description": "Surge multiplier applied to the base fare, if any. Use float format (e.g., 1.0 not 1)."
+                          },
+                          "vehicle_type": {
+                            "type": "string",
+                            "description": "The service type for this option (for example, 'plus', 'comfort', 'black')."
+                          }
+                        },
+                        "required": [
+                          "ride_id",
+                          "eta_minutes"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "rides"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/segment_all_objects": {
+      "post": {
+        "operationId": "segment_all_objects",
+        "summary": "Simulate segmentation of all identifiable objects in an image",
+        "description": "Given an image path, return a list of segmented objects with their boundaries and related metadata (bounding boxes, polygons, optional masks and confidence).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "img_path": {
+                    "type": "string",
+                    "description": "The file system path to the image that will be processed for object segmentation. The path should be absolute or relative to the execution directory."
+                  }
+                },
+                "required": [
+                  "img_path"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Segmentation result for the provided image.",
+                  "properties": {
+                    "segments": {
+                      "type": "array",
+                      "description": "Array of detected objects and their segmentation data.",
+                      "items": {
+                        "type": "object",
+                        "description": "Single detected object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the segmented object."
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "Optional semantic label or class name for the object, if available."
+                          },
+                          "confidence": {
+                            "type": "number",
+                            "description": "Confidence score for this detection. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "bbox": {
+                            "type": "object",
+                            "description": "Axis-aligned bounding box in image pixel coordinates.",
+                            "properties": {
+                              "x": {
+                                "type": "number",
+                                "description": "X coordinate of the top-left corner in pixels. Use float format (e.g., 1.0 not 1).",
+                                "format": "double"
+                              },
+                              "y": {
+                                "type": "number",
+                                "description": "Y coordinate of the top-left corner in pixels. Use float format (e.g., 1.0 not 1).",
+                                "format": "double"
+                              },
+                              "width": {
+                                "type": "number",
+                                "description": "Width of the bounding box in pixels. Use float format (e.g., 1.0 not 1).",
+                                "format": "double"
+                              },
+                              "height": {
+                                "type": "number",
+                                "description": "Height of the bounding box in pixels. Use float format (e.g., 1.0 not 1).",
+                                "format": "double"
+                              }
+                            },
+                            "required": [
+                              "x",
+                              "y",
+                              "width",
+                              "height"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "polygon": {
+                            "type": "array",
+                            "description": "Optional ordered array of polygon vertices outlining the object, in image pixel coordinates.",
+                            "items": {
+                              "type": "object",
+                              "description": "Array item",
+                              "properties": {
+                                "x": {
+                                  "type": "number",
+                                  "description": "X coordinate of the vertex in pixels. Use float format (e.g., 1.0 not 1).",
+                                  "format": "double"
+                                },
+                                "y": {
+                                  "type": "number",
+                                  "description": "Y coordinate of the vertex in pixels. Use float format (e.g., 1.0 not 1).",
+                                  "format": "double"
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "mask": {
+                            "type": "string",
+                            "description": "Optional binary segmentation mask for this object, encoded as base64 (e.g., PNG or single-channel image)."
+                          }
+                        },
+                        "required": [
+                          "id"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "image_width": {
+                      "type": "integer",
+                      "description": "Width of the source image in pixels."
+                    },
+                    "image_height": {
+                      "type": "integer",
+                      "description": "Height of the source image in pixels."
+                    }
+                  },
+                  "required": [
+                    "segments",
+                    "image_width",
+                    "image_height"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/list_directory_contents": {
+      "post": {
+        "operationId": "list_directory_contents",
+        "summary": "List directory contents",
+        "description": "Simulate listing the files and directories contained in the provided dir_path. Returns a stable array of entries with metadata; respects include_hidden and sort_order flags.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "dir_path": {
+                    "type": "string",
+                    "description": "The file system path to the directory whose contents are to be listed. The path should be absolute or relative to the current working directory."
+                  },
+                  "include_hidden": {
+                    "type": "boolean",
+                    "description": "A flag to determine whether hidden files and directories should be included in the list.",
+                    "default": false
+                  },
+                  "sort_order": {
+                    "type": "string",
+                    "description": "The order in which the directory contents are listed. Ascending or descending by name.",
+                    "enum": [
+                      "asc",
+                      "desc"
+                    ],
+                    "default": "asc"
+                  }
+                },
+                "required": [
+                  "dir_path"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Directory listing result",
+                  "properties": {
+                    "entries": {
+                      "type": "array",
+                      "description": "Array of directory entries. Each item represents a file system node directly contained in the specified directory.",
+                      "minItems": 0,
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "description": "Base name of the entry (file or directory name)."
+                          },
+                          "path": {
+                            "type": "string",
+                            "description": "Path to the entry, expressed relative to the requested directory_path when possible, or as an absolute path when necessary."
+                          },
+                          "type": {
+                            "type": "string",
+                            "description": "Type of the entry.",
+                            "enum": [
+                              "file",
+                              "directory",
+                              "symlink",
+                              "other"
+                            ]
+                          },
+                          "size": {
+                            "type": "integer",
+                            "description": "Size of the entry in bytes. For directories this may be 0 or an implementation-defined value.",
+                            "minimum": 0
+                          },
+                          "is_hidden": {
+                            "type": "boolean",
+                            "description": "Whether the entry is considered hidden on the host file system."
+                          },
+                          "last_modified": {
+                            "type": "string",
+                            "description": "Timestamp of last modification in RFC 3339 / ISO 8601 format, when available.",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "path",
+                          "type",
+                          "is_hidden"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_count": {
+                      "type": "integer",
+                      "description": "Total number of entries returned in this response (equals entries.length).",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "entries",
+                    "total_count"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

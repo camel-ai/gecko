@@ -1,0 +1,796 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM44",
+    "version": "1.0.0",
+    "description": "LM44 is a comprehensive financial management API collection designed to handle transaction processing, retrieval, and summarization. It enables recording detailed transactions, fetching all transactions within specified periods, and generating summaries and overviews of bank statements. Additionally, it supports managing client information such as company details, customer names, and addresses, while providing tools to calculate total transactions and balances for effective financial tracking and reporting."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM44"
+    }
+  ],
+  "paths": {
+    "/TransactionsV2": {
+      "post": {
+        "operationId": "TransactionsV2",
+        "summary": "Simulate processing a financial transaction with debit, credit, vendor, and date.",
+        "description": "Simulates recording a financial transaction by accepting debit and credit amounts, vendor information, and the transaction date.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "debit": {
+                    "type": "number",
+                    "description": "The amount debited from the account in US dollars. Only one debit amount is recorded per transaction.",
+                    "minimum": 0
+                  },
+                  "credit": {
+                    "type": "number",
+                    "description": "The amount credited to the account in US dollars. Only one credit amount is recorded per transaction.",
+                    "minimum": 0
+                  },
+                  "vendor": {
+                    "type": "string",
+                    "description": "The vendor name or description associated with the transaction.",
+                    "minLength": 1
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "The exact date when the transaction occurred, formatted as 'YYYY-MM-DD'.",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  }
+                },
+                "required": [
+                  "debit",
+                  "credit",
+                  "vendor",
+                  "date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "transactionId": {
+                      "type": "string",
+                      "description": "Unique identifier for the processed transaction."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The status of the transaction processing.",
+                      "enum": [
+                        "processed",
+                        "failed"
+                      ]
+                    },
+                    "processedAt": {
+                      "type": "string",
+                      "description": "Timestamp when the transaction was processed.",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "transactionId",
+                    "status",
+                    "processedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Alltransactions": {
+      "post": {
+        "operationId": "Alltransactions",
+        "summary": "Retrieve all transactions for a given statement period",
+        "description": "Simulates retrieval of all transactions within the specified statement period, optionally including pending transactions.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "statement_period": {
+                    "type": "string",
+                    "description": "The statement period for which transactions are to be retrieved, in the format 'YYYY-MM'.",
+                    "pattern": "^(\\d{4})-(0[1-9]|1[0-2])$"
+                  },
+                  "include_pending": {
+                    "type": "boolean",
+                    "description": "A flag to determine if pending transactions should be included in the list.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "statement_period"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "transactions": {
+                      "type": "array",
+                      "description": "Parameter transactions",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "transaction_id": {
+                            "type": "string",
+                            "description": "Unique identifier for the transaction"
+                          },
+                          "date": {
+                            "type": "string",
+                            "description": "Date of the transaction",
+                            "format": "date"
+                          },
+                          "amount": {
+                            "type": "number",
+                            "description": "Transaction amount"
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Description of the transaction"
+                          },
+                          "status": {
+                            "type": "string",
+                            "description": "Status of the transaction",
+                            "enum": [
+                              "posted",
+                              "pending"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "transaction_id",
+                          "date",
+                          "amount",
+                          "description",
+                          "status"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "transactions"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_company_info": {
+      "post": {
+        "operationId": "get_company_info",
+        "summary": "Retrieve official company name for formal use",
+        "description": "Simulates retrieval of the official or DBA company name used in legal and formal documents.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "company_name": {
+                    "type": "string",
+                    "description": "The official name or DBA (Doing Business As) of the company. This should be the legal name used in contracts and formal agreements."
+                  }
+                },
+                "required": [
+                  "company_name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "official_company_name": {
+                      "type": "string",
+                      "description": "The official registered name or DBA of the company."
+                    }
+                  },
+                  "required": [
+                    "official_company_name"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/collect_customer_names": {
+      "post": {
+        "operationId": "collect_customer_names",
+        "summary": "Collect customer full and company names for account identification.",
+        "description": "Simulates gathering the customer's first, middle, and last names along with their associated company name for account identification purposes.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "firstname": {
+                    "type": "string",
+                    "description": "The first name of the customer as recorded on official documents.",
+                    "minLength": 1
+                  },
+                  "middlename": {
+                    "type": "string",
+                    "description": "The middle name of the customer, if any, as recorded on official documents. Leave blank if the customer does not have a middle name.",
+                    "default": "",
+                    "minLength": 0
+                  },
+                  "lastname": {
+                    "type": "string",
+                    "description": "The surname or family name of the customer as recorded on official documents.",
+                    "minLength": 1
+                  },
+                  "company_name": {
+                    "type": "string",
+                    "description": "The legal name of the company with which the customer is associated. Provide the full registered name. If the company name is not applicable or unknown, leave blank.",
+                    "default": "",
+                    "minLength": 0
+                  }
+                },
+                "required": [
+                  "firstname",
+                  "lastname"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "firstname": {
+                      "type": "string",
+                      "description": "The first name of the customer as recorded on official documents.",
+                      "minLength": 1
+                    },
+                    "middlename": {
+                      "type": "string",
+                      "description": "The middle name of the customer, if any, as recorded on official documents. Leave blank if the customer does not have a middle name.",
+                      "default": "",
+                      "minLength": 0
+                    },
+                    "lastname": {
+                      "type": "string",
+                      "description": "The surname or family name of the customer as recorded on official documents.",
+                      "minLength": 1
+                    },
+                    "company_name": {
+                      "type": "string",
+                      "description": "The legal name of the company with which the customer is associated. Provide the full registered name. If the company name is not applicable or unknown, leave blank.",
+                      "default": "",
+                      "minLength": 0
+                    }
+                  },
+                  "required": [
+                    "firstname",
+                    "lastname"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ClientAddress_set_address": {
+      "post": {
+        "operationId": "ClientAddress_set_address",
+        "summary": "Set client's full address",
+        "description": "Simulates setting the full address for a client profile with a properly formatted address string.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "full_address": {
+                    "type": "string",
+                    "description": "The complete address of the client, including street, city, state, and postal code, in the format 'Street, City, State, Postal Code' (e.g., '1234 Elm St, Springfield, IL, 62704').",
+                    "minLength": 10,
+                    "pattern": "^.+,\\s*.+,\\s*[A-Z]{2},\\s*\\d{5}(-\\d{4})?$"
+                  }
+                },
+                "required": [
+                  "full_address"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "Indicates if the address was set successfully",
+                      "default": true
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/TotalTransactions_calculate": {
+      "post": {
+        "operationId": "TotalTransactions_calculate",
+        "summary": "Calculate total transactions and balances over a period",
+        "description": "Simulates calculation of total deposits, withdrawals, and computes starting and ending balances within the specified date range.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "starting_date": {
+                    "type": "string",
+                    "description": "The starting date for the transaction period, in ISO 8601 format (e.g., '2023-01-01T00:00:00Z').",
+                    "format": "date-time"
+                  },
+                  "ending_date": {
+                    "type": "string",
+                    "description": "The ending date for the transaction period, in ISO 8601 format (e.g., '2023-01-31T23:59:59Z').",
+                    "format": "date-time"
+                  },
+                  "total_deposits": {
+                    "type": "number",
+                    "description": "The total amount of deposits made during the transaction period in dollars."
+                  },
+                  "total_withdrawals": {
+                    "type": "number",
+                    "description": "The total amount of withdrawals made during the transaction period in dollars."
+                  },
+                  "starting_balance": {
+                    "type": "number",
+                    "description": "The balance of the account at the start of the transaction period in dollars."
+                  },
+                  "ending_balance": {
+                    "type": "number",
+                    "description": "The balance of the account at the end of the transaction period in dollars."
+                  }
+                },
+                "required": [
+                  "starting_date",
+                  "ending_date",
+                  "total_deposits",
+                  "total_withdrawals",
+                  "starting_balance",
+                  "ending_balance"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "total_deposits": {
+                      "type": "number",
+                      "description": "The total amount of deposits made during the transaction period in dollars."
+                    },
+                    "total_withdrawals": {
+                      "type": "number",
+                      "description": "The total amount of withdrawals made during the transaction period in dollars."
+                    },
+                    "starting_balance": {
+                      "type": "number",
+                      "description": "The balance of the account at the start of the transaction period in dollars."
+                    },
+                    "ending_balance": {
+                      "type": "number",
+                      "description": "The balance of the account at the end of the transaction period in dollars."
+                    }
+                  },
+                  "required": [
+                    "total_deposits",
+                    "total_withdrawals",
+                    "starting_balance",
+                    "ending_balance"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/BankStatementOverView": {
+      "post": {
+        "operationId": "BankStatementOverView",
+        "summary": "Simulates a bank statement overview with account and transaction summary.",
+        "description": "Generates an overview of a bank statement including account details and transaction totals for a specified period.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "bank_name": {
+                    "type": "string",
+                    "description": "The official name of the bank as it appears on the bank statement.",
+                    "minLength": 1
+                  },
+                  "account_number": {
+                    "type": "string",
+                    "description": "The unique identifier for the account, typically found at the top of the statement.",
+                    "minLength": 1
+                  },
+                  "account_type": {
+                    "type": "string",
+                    "description": "The classification of the account, such as 'checking', 'savings', or 'credit'.",
+                    "enum": [
+                      "checking",
+                      "savings",
+                      "credit",
+                      "loan",
+                      "investment"
+                    ]
+                  },
+                  "full_name": {
+                    "type": "string",
+                    "description": "The complete name of the account holder as recorded by the bank.",
+                    "minLength": 1
+                  },
+                  "transaction_overview": {
+                    "type": "object",
+                    "description": "A summary of transactions within the statement period, including totals and counts.",
+                    "properties": {
+                      "total_deposits": {
+                        "type": "number",
+                        "description": "The total amount deposited in the account during the statement period, in dollars.",
+                        "minimum": 0
+                      },
+                      "total_withdrawals": {
+                        "type": "number",
+                        "description": "The total amount withdrawn from the account during the statement period, in dollars.",
+                        "minimum": 0
+                      },
+                      "start_date": {
+                        "type": "string",
+                        "description": "The starting date of the statement period, in the format 'YYYY-MM-DD'.",
+                        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                      },
+                      "end_date": {
+                        "type": "string",
+                        "description": "The ending date of the statement period, in the format 'YYYY-MM-DD'.",
+                        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "bank_name",
+                  "account_number",
+                  "account_type",
+                  "full_name",
+                  "transaction_overview"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "bank_name": {
+                      "type": "string",
+                      "description": "The official name of the bank as it appears on the bank statement."
+                    },
+                    "account_number": {
+                      "type": "string",
+                      "description": "The unique identifier for the account, typically found at the top of the statement."
+                    },
+                    "account_type": {
+                      "type": "string",
+                      "description": "The classification of the account, such as 'checking', 'savings', or 'credit'.",
+                      "enum": [
+                        "checking",
+                        "savings",
+                        "credit",
+                        "loan",
+                        "investment"
+                      ]
+                    },
+                    "full_name": {
+                      "type": "string",
+                      "description": "The complete name of the account holder as recorded by the bank."
+                    },
+                    "transaction_overview": {
+                      "type": "object",
+                      "description": "A summary of transactions within the statement period, including totals and counts.",
+                      "properties": {
+                        "total_deposits": {
+                          "type": "number",
+                          "description": "The total amount deposited in the account during the statement period, in dollars."
+                        },
+                        "total_withdrawals": {
+                          "type": "number",
+                          "description": "The total amount withdrawn from the account during the statement period, in dollars."
+                        },
+                        "start_date": {
+                          "type": "string",
+                          "description": "The starting date of the statement period, in the format 'YYYY-MM-DD'."
+                        },
+                        "end_date": {
+                          "type": "string",
+                          "description": "The ending date of the statement period, in the format 'YYYY-MM-DD'."
+                        }
+                      },
+                      "required": [
+                        "total_deposits",
+                        "total_withdrawals",
+                        "start_date",
+                        "end_date"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "bank_name",
+                    "account_number",
+                    "account_type",
+                    "full_name",
+                    "transaction_overview"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/transaction_summary_generate": {
+      "post": {
+        "operationId": "transaction_summary_generate",
+        "summary": "Generate a detailed financial transaction summary for a specified period.",
+        "description": "Simulates generating a summary of financial transactions including individual transaction details and aggregated totals within the given date range.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "transactions": {
+                    "type": "array",
+                    "description": "A list of individual transaction details, each transaction includes the amount debited or credited, the associated vendor, and the date.",
+                    "items": {
+                      "type": "object",
+                      "description": "Array item",
+                      "properties": {},
+                      "additionalProperties": false
+                    }
+                  },
+                  "starting_date": {
+                    "type": "string",
+                    "description": "The starting date for the transaction period, in ISO 8601 format 'YYYY-MM-DD'."
+                  },
+                  "ending_date": {
+                    "type": "string",
+                    "description": "The ending date for the transaction period, in ISO 8601 format 'YYYY-MM-DD'."
+                  },
+                  "total_deposits": {
+                    "type": "number",
+                    "description": "The total amount of deposits made during the transaction period, in USD."
+                  },
+                  "total_withdrawals": {
+                    "type": "number",
+                    "description": "The total amount of withdrawals made during the transaction period, in USD."
+                  },
+                  "starting_balance": {
+                    "type": "number",
+                    "description": "The balance of the account at the start of the transaction period, in USD."
+                  },
+                  "ending_balance": {
+                    "type": "number",
+                    "description": "The balance of the account at the end of the transaction period, in USD."
+                  },
+                  "firstname": {
+                    "type": "string",
+                    "description": "First name of the customer."
+                  },
+                  "lastname": {
+                    "type": "string",
+                    "description": "Last name of the customer."
+                  },
+                  "middlename": {
+                    "type": "string",
+                    "description": "Middle name of the customer, if applicable.",
+                    "default": null
+                  },
+                  "company_name": {
+                    "type": "string",
+                    "description": "The official name or DBA of the company associated with the account, if applicable.",
+                    "default": null
+                  }
+                },
+                "required": [
+                  "transactions",
+                  "starting_date",
+                  "ending_date",
+                  "total_deposits",
+                  "total_withdrawals",
+                  "starting_balance",
+                  "ending_balance",
+                  "firstname",
+                  "lastname"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Summary of financial transactions and balances for the specified period.",
+                  "properties": {
+                    "summary": {
+                      "type": "string",
+                      "description": "A textual summary of the transaction period and account activity."
+                    },
+                    "transactions": {
+                      "type": "array",
+                      "description": "List of individual transactions included in the summary.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "amount": {
+                            "type": "number",
+                            "description": "The amount debited or credited in the transaction, in USD."
+                          },
+                          "vendor": {
+                            "type": "string",
+                            "description": "The vendor or payee associated with the transaction."
+                          },
+                          "date": {
+                            "type": "string",
+                            "description": "The date of the transaction in ISO 8601 format 'YYYY-MM-DD'.",
+                            "format": "date"
+                          }
+                        },
+                        "required": [
+                          "amount",
+                          "vendor",
+                          "date"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_deposits": {
+                      "type": "number",
+                      "description": "Total deposits made during the transaction period, in USD."
+                    },
+                    "total_withdrawals": {
+                      "type": "number",
+                      "description": "Total withdrawals made during the transaction period, in USD."
+                    },
+                    "starting_balance": {
+                      "type": "number",
+                      "description": "Account balance at the start of the transaction period, in USD."
+                    },
+                    "ending_balance": {
+                      "type": "number",
+                      "description": "Account balance at the end of the transaction period, in USD."
+                    }
+                  },
+                  "required": [
+                    "summary",
+                    "transactions",
+                    "total_deposits",
+                    "total_withdrawals",
+                    "starting_balance",
+                    "ending_balance"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

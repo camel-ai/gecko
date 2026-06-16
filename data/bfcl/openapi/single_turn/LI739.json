@@ -1,0 +1,191 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI739",
+    "version": "1.0.0",
+    "description": "LI739 is a lightweight parcel-support API collection designed to integrate conversational bots with parcel-tracking and escalation workflows. It exposes two atomic tools, GET_PARCEL_STATE to retrieve status by tracking ID and handover_to_agent to transfer active sessions to live agents, enabling synchronous checks and graceful human escalation within chat flows. Use it for automated status queries, conditional routing, and minimal-touch handoffs while preserving context and auditability."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI739"
+    }
+  ],
+  "paths": {
+    "/handover_to_agent": {
+      "post": {
+        "operationId": "handover_to_agent",
+        "summary": "Simulate initiating a handover to a live human agent",
+        "description": "Simulate the handover process that transfers an active chat session from an automated bot to a live human agent. The request must include chat_id and agent_id. The operation may return a handover identifier and current handover state information (such as queue position or estimated wait time) when successful.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "chat_id": {
+                    "type": "string",
+                    "description": "Unique identifier of the chat session that needs to be transferred."
+                  },
+                  "agent_id": {
+                    "type": "string",
+                    "description": "Unique identifier of the human agent to whom the chat will be transferred."
+                  },
+                  "priority": {
+                    "type": "string",
+                    "description": "The priority level for the chat handover.",
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high"
+                    ],
+                    "default": "medium"
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "An optional message to the agent about the chat or customer.",
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "chat_id",
+                  "agent_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful handover response payload",
+                  "properties": {
+                    "handover_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the created handover transaction."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Current state of the handover (for example: queued, assigned, completed)."
+                    },
+                    "queue_position": {
+                      "type": "integer",
+                      "description": "Optional: the chat's position in the agent queue, if applicable."
+                    },
+                    "estimated_wait_seconds": {
+                      "type": "integer",
+                      "description": "Optional: estimated wait time before an agent takes the chat. Provide as whole seconds."
+                    }
+                  },
+                  "required": [
+                    "handover_id",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/GET_PARCEL_STATE": {
+      "post": {
+        "operationId": "GET_PARCEL_STATE",
+        "summary": "Get parcel current state",
+        "description": "Simulate and return the parcel's current state based on the provided tracking ID. Optionally include historical state entries when includeHistory is true.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "parcelTrackingId": {
+                    "type": "string",
+                    "description": "Unique identifier for the parcel used to track its movement and status."
+                  },
+                  "includeHistory": {
+                    "type": "boolean",
+                    "description": "Determines if the historical states of the parcel should be included in the response.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "parcelTrackingId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing the parcel state information.",
+                  "properties": {
+                    "currentState": {
+                      "type": "string",
+                      "description": "Human-readable current state of the parcel (e.g., 'In Transit', 'Delivered', 'Awaiting Pickup')."
+                    },
+                    "lastUpdated": {
+                      "type": "string",
+                      "description": "Timestamp of the latest state update in ISO 8601 format (UTC recommended)."
+                    },
+                    "estimatedDeliveryDate": {
+                      "type": "string",
+                      "description": "Estimated delivery date if available; may be absent or approximate."
+                    },
+                    "history": {
+                      "type": "array",
+                      "description": "Chronological list of past states. Present only when includeHistory=true in the request.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "description": "State name at this history entry."
+                          },
+                          "timestamp": {
+                            "type": "string",
+                            "description": "Timestamp when the parcel entered this state (ISO 8601 format recommended)."
+                          },
+                          "location": {
+                            "type": "string",
+                            "description": "Optional human-readable location associated with this history entry."
+                          }
+                        },
+                        "required": [
+                          "state",
+                          "timestamp"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "currentState",
+                    "lastUpdated"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

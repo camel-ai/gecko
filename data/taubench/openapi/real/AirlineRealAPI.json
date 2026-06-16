@@ -1,0 +1,1448 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Airline Tools Real API",
+    "version": "1.0.0",
+    "description": "Canonical schema for AirlineTools real operations. Each endpoint mirrors the Python toolkit methods so GATS can load all tools in real mode.",
+    "x-default-state": {
+      "tools": {
+        "search_direct_flight": {
+          "state_access": "read",
+          "state_effects": [],
+          "behavior_hints": [
+            "Read-only search for available direct flights. Use returned flight_number/date/prices/seats as inputs for booking or flight updates."
+          ]
+        },
+        "search_onestop_flight": {
+          "state_access": "read",
+          "state_effects": [],
+          "behavior_hints": [
+            "Read-only search for available two-leg itineraries. Each route returns first_leg and second_leg values for booking or flight updates."
+          ]
+        },
+        "get_user_details": {
+          "state_access": "read",
+          "state_effects": [],
+          "behavior_hints": [
+            "Read-only lookup for an exact user_id; returns profile, membership, saved passengers, payment methods, and reservation ids."
+          ]
+        },
+        "get_reservation_details": {
+          "state_access": "read",
+          "state_effects": [],
+          "behavior_hints": [
+            "Read-only lookup for an exact reservation_id; returns the stored reservation fields needed for later booking, update, cancellation, or compensation reasoning."
+          ]
+        },
+        "list_all_airports": {
+          "state_access": "read",
+          "state_effects": [],
+          "behavior_hints": [
+            "Read-only static city-to-IATA catalog."
+          ]
+        },
+        "get_flight_status": {
+          "state_access": "read",
+          "state_effects": [],
+          "behavior_hints": [
+            "Read-only lookup for operational status of a specific flight_number/date, including statuses not returned by availability search."
+          ]
+        },
+        "calculate": {
+          "state_access": "read",
+          "state_effects": [],
+          "behavior_hints": [
+            "Pure arithmetic helper; does not mutate customer or booking state."
+          ]
+        },
+        "book_reservation": {
+          "state_access": "write",
+          "state_effects": [
+            "Create a reservation record with the provided user, itinerary, passengers, baggage counts, insurance choice, and payment history.",
+            "Append the new reservation id to the user profile.",
+            "Update payment balances when gift cards or certificates are used.",
+            "Reserve seats for the selected flight instances when booking succeeds."
+          ],
+          "state_effects_on_success": [
+            "Create a reservation record with the provided user, itinerary, passengers, baggage counts, insurance choice, and payment history.",
+            "Append the new reservation id to the user profile.",
+            "Update payment balances when gift cards or certificates are used.",
+            "Reserve seats for the selected flight instances when booking succeeds."
+          ],
+          "behavior_hints": [
+            "State-changing booking operation; requires complete flight, passenger, baggage, insurance, and payment arguments. Successful calls create a reservation and deduct stored gift-card/certificate balances."
+          ]
+        },
+        "cancel_reservation": {
+          "state_access": "write",
+          "state_effects": [
+            "Mark the reservation as cancelled and record refund/payment adjustments when cancellation succeeds."
+          ],
+          "state_effects_on_success": [
+            "Mark the reservation as cancelled and record refund/payment adjustments when cancellation succeeds."
+          ],
+          "behavior_hints": [
+            "State-changing cancellation operation; the toolkit marks the reservation cancelled and appends refund payment entries. It does not release seats back to flight inventory or decide whether cancellation is eligible."
+          ]
+        },
+        "send_certificate": {
+          "state_access": "write",
+          "state_effects": [
+            "Issue a travel certificate to the target user profile when successful."
+          ],
+          "state_effects_on_success": [
+            "Issue a travel certificate to the target user profile when successful."
+          ],
+          "behavior_hints": [
+            "State-changing credit operation; issues a new travel certificate to the target user's stored payment methods when a certificate id is available."
+          ]
+        },
+        "transfer_to_human_agents": {
+          "state_access": "write",
+          "state_effects": [
+            "Escalate the current conversation to a human support agent."
+          ],
+          "state_effects_on_success": [
+            "Escalate the current conversation to a human support agent."
+          ],
+          "behavior_hints": [
+            "Escalation action; takes a concise summary and returns a transfer acknowledgement without modifying airline reservations or payments."
+          ]
+        },
+        "update_reservation_baggages": {
+          "state_access": "write",
+          "state_effects": [
+            "Update baggage counts on an existing reservation and record any payment adjustment when successful."
+          ],
+          "state_effects_on_success": [
+            "Update baggage counts on an existing reservation and record any payment adjustment when successful."
+          ],
+          "behavior_hints": [
+            "State-changing baggage update; arguments are final baggage counts, not deltas. The toolkit charges only newly added paid bags and rejects certificates as update payment methods."
+          ]
+        },
+        "update_reservation_flights": {
+          "state_access": "write",
+          "state_effects": [
+            "Replace reservation flight segments and record fare/payment adjustments when successful."
+          ],
+          "state_effects_on_success": [
+            "Replace reservation flight segments and record fare/payment adjustments when successful."
+          ],
+          "behavior_hints": [
+            "State-changing flight update; requires the complete desired flight list and applies one cabin to the whole reservation. The toolkit validates new flight availability, seats, and payment method before writing the fare delta."
+          ]
+        },
+        "update_reservation_passengers": {
+          "state_access": "write",
+          "state_effects": [
+            "Replace passenger details on an existing reservation when successful."
+          ],
+          "state_effects_on_success": [
+            "Replace passenger details on an existing reservation when successful."
+          ],
+          "behavior_hints": [
+            "State-changing passenger update; replaces the full passenger list and fails if the passenger count differs from the current reservation."
+          ]
+        }
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "Local mock server"
+    }
+  ],
+  "paths": {
+    "/book_reservation": {
+      "post": {
+        "operationId": "book_reservation",
+        "summary": "Book reservation",
+        "description": "Create a brand-new reservation for a user by providing every flight segment, passenger, payment, baggage count, and insurance flag. This does not modify, cancel, refund, insure, or otherwise update any existing reservation. The toolkit verifies that each flight/date exists and is available in the requested cabin, seats cover all passengers, and stored payment methods cover exactly the computed total: current per-segment cabin fare from flight inventory times passenger count, plus $50 per nonfree bag and $30 per passenger when insurance=yes. Prices already stored on an old reservation are historical and are not authoritative for a new booking. Gift-card balances are reduced and certificates are removed on success. The toolkit does not infer missing passenger/payment details from user profiles and does not choose flights or payment splits for the caller.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_id": {
+                    "type": "string",
+                    "description": "User identifier."
+                  },
+                  "origin": {
+                    "type": "string",
+                    "description": "Trip origin as an IATA airport code, matching the selected flight segments."
+                  },
+                  "destination": {
+                    "type": "string",
+                    "description": "Trip destination as an IATA airport code, matching the selected flight segments."
+                  },
+                  "flight_type": {
+                    "type": "string",
+                    "enum": [
+                      "one_way",
+                      "round_trip"
+                    ],
+                    "description": "Reservation trip type: one_way or round_trip."
+                  },
+                  "cabin": {
+                    "type": "string",
+                    "enum": [
+                      "basic_economy",
+                      "economy",
+                      "business"
+                    ],
+                    "description": "One cabin class applied to every flight segment and passenger in this new reservation."
+                  },
+                  "flights": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "flight_number": {
+                          "type": "string",
+                          "description": "Flight number returned by a flight search or already present in the reservation."
+                        },
+                        "date": {
+                          "type": "string",
+                          "description": "Date for this flight segment in YYYY-MM-DD format."
+                        }
+                      },
+                      "required": [
+                        "flight_number",
+                        "date"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "description": "Ordered flight segments to book. Use exact flight_number/date values from flight search results or known flight data."
+                  },
+                  "passengers": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "first_name": {
+                          "type": "string",
+                          "description": "Passenger first name."
+                        },
+                        "last_name": {
+                          "type": "string",
+                          "description": "Passenger last name."
+                        },
+                        "dob": {
+                          "type": "string",
+                          "description": "Passenger date of birth in YYYY-MM-DD format."
+                        }
+                      },
+                      "required": [
+                        "first_name",
+                        "last_name",
+                        "dob"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "description": "Complete passenger roster for the new reservation; every entry must include first_name, last_name, and dob."
+                  },
+                  "payment_methods": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "payment_id": {
+                          "type": "string",
+                          "description": "Stored payment method identifier from the user profile."
+                        },
+                        "amount": {
+                          "type": "integer",
+                          "description": "Dollar amount to charge to this payment method."
+                        }
+                      },
+                      "required": [
+                        "payment_id",
+                        "amount"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "description": "Stored payment method ids and dollar amounts to charge. Amounts must sum exactly to the toolkit-computed total; gift cards/certificates require sufficient balance."
+                  },
+                  "total_baggages": {
+                    "type": "integer",
+                    "description": "Final total checked-bag count for the new reservation, including free and paid bags."
+                  },
+                  "nonfree_baggages": {
+                    "type": "integer",
+                    "description": "Subset of total_baggages that incurs the $50 per-bag fee in this booking."
+                  },
+                  "insurance": {
+                    "type": "string",
+                    "enum": [
+                      "yes",
+                      "no"
+                    ],
+                    "description": "Insurance flag for the new reservation. If yes, the toolkit adds $30 per passenger to the total price."
+                  }
+                },
+                "required": [
+                  "user_id",
+                  "origin",
+                  "destination",
+                  "flight_type",
+                  "cabin",
+                  "flights",
+                  "passengers",
+                  "payment_methods",
+                  "total_baggages",
+                  "nonfree_baggages",
+                  "insurance"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reservation created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "reservation": {
+                      "type": "object",
+                      "description": "Reservation record including flights, passengers, payments, and status.",
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calculate": {
+      "post": {
+        "operationId": "calculate",
+        "summary": "Evaluate expression",
+        "description": "Utility math helper for quick arithmetic. Accepts only digits, +, -, *, /, parentheses, and spaces; any other character causes an error. Returns the numeric result as a string rounded to two decimals.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expression": {
+                    "type": "string",
+                    "description": "Math expression with numbers and +,-,*,/."
+                  }
+                },
+                "required": [
+                  "expression"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Expression result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "result": {
+                      "type": "string",
+                      "description": "String form of the computed value."
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cancel_reservation": {
+      "post": {
+        "operationId": "cancel_reservation",
+        "summary": "Cancel reservation",
+        "description": "Cancel an existing reservation by id. This cancels the whole reservation; it is not a passenger-removal, cabin-change, or flight-update operation. The toolkit appends negative payment entries that reverse the reservation's payment history and sets reservation.status='cancelled'. It does not release seats back to flight inventory and does not decide whether cancellation is eligible. The agent must verify policy eligibility before calling this write tool; if the reservation is not eligible for cancellation, do not call it.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reservation_id": {
+                    "type": "string",
+                    "description": "Reservation identifier."
+                  }
+                },
+                "required": [
+                  "reservation_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reservation after cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "reservation": {
+                      "type": "object",
+                      "description": "Reservation record including flights, passengers, payments, and status.",
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_reservation_details": {
+      "post": {
+        "operationId": "get_reservation_details",
+        "summary": "Get reservation details",
+        "description": "Fetch the full stored reservation record, including user id, route, trip type, cabin, flights with prices, passengers, payment history, created_at, baggage counts, insurance flag, and status. The created_at field is booking creation time; it is not by itself proof that this reservation is the user's delayed, cancelled, latest-flown, or otherwise described trip.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reservation_id": {
+                    "type": "string",
+                    "description": "Reservation identifier."
+                  }
+                },
+                "required": [
+                  "reservation_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reservation data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "reservation": {
+                      "type": "object",
+                      "description": "Reservation record including flights, passengers, payments, and status.",
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_user_details": {
+      "post": {
+        "operationId": "get_user_details",
+        "summary": "Get user details",
+        "description": "Fetch an exact user's stored profile: name, contact info, date of birth, membership, saved passengers, stored payment methods with balances/source, and reservation ids. The reservation id list is a set of linked reservations, not a semantic match for descriptions such as delayed flight, cancelled trip, or latest flown trip; fetch candidate reservations and match their route/date/status/passenger facts to the user's request.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_id": {
+                    "type": "string",
+                    "description": "User identifier."
+                  }
+                },
+                "required": [
+                  "user_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "user": {
+                      "type": "object",
+                      "description": "User profile with contact info, saved payments, and reservation list.",
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/list_all_airports": {
+      "post": {
+        "operationId": "list_all_airports",
+        "summary": "List airports",
+        "description": "Return the static catalog of supported airports and cities. Use this catalog to map city names to IATA airport codes before calling flight search tools.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "description": "Empty object; no parameters required.",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Airport listing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "airports": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "iata": {
+                            "type": "string",
+                            "description": "IATA airport code."
+                          },
+                          "city": {
+                            "type": "string",
+                            "description": "City name."
+                          }
+                        },
+                        "required": [
+                          "iata",
+                          "city"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Collection of airports supported by the airline."
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/search_direct_flight": {
+      "post": {
+        "operationId": "search_direct_flight",
+        "summary": "Search direct flights",
+        "description": "Find nonstop flights for a given IATA origin, IATA destination, and date. This searches one leg only; for a round trip or multi-leg itinerary, call it for each needed origin/destination/date leg and compare complete itineraries only after the needed legs are known. Only flight instances whose status is 'available' are returned; each result includes flight_number, times, available seats by cabin, and prices by cabin. Returned order is not a recommendation. When the user asks for the cheapest, earliest/latest, shortest/longest, or time-constrained option, compare all eligible returned flights using the relevant fields; for price comparisons use prices for the requested cabin.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "origin": {
+                    "type": "string",
+                    "description": "Origin IATA airport code."
+                  },
+                  "destination": {
+                    "type": "string",
+                    "description": "Destination IATA airport code."
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "Flight date in YYYY-MM-DD format."
+                  }
+                },
+                "required": [
+                  "origin",
+                  "destination",
+                  "date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Direct flight options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "flights": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "flight_number": {
+                            "type": "string",
+                            "description": "Flight identifier."
+                          },
+                          "origin": {
+                            "type": "string",
+                            "description": "Origin IATA code."
+                          },
+                          "destination": {
+                            "type": "string",
+                            "description": "Destination IATA code."
+                          },
+                          "date": {
+                            "type": "string",
+                            "description": "Date for this leg."
+                          },
+                          "status": {
+                            "type": "string",
+                            "description": "Availability status."
+                          },
+                          "scheduled_departure_time_est": {
+                            "type": "string",
+                            "description": "Scheduled departure time EST."
+                          },
+                          "scheduled_arrival_time_est": {
+                            "type": "string",
+                            "description": "Scheduled arrival time EST."
+                          },
+                          "available_seats": {
+                            "type": "object",
+                            "properties": {
+                              "basic_economy": {
+                                "type": "integer"
+                              },
+                              "economy": {
+                                "type": "integer"
+                              },
+                              "business": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "basic_economy",
+                              "economy",
+                              "business"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Available seats keyed by cabin class."
+                          },
+                          "prices": {
+                            "type": "object",
+                            "properties": {
+                              "basic_economy": {
+                                "type": "integer"
+                              },
+                              "economy": {
+                                "type": "integer"
+                              },
+                              "business": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "basic_economy",
+                              "economy",
+                              "business"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Price per cabin class in dollars."
+                          }
+                        },
+                        "required": [
+                          "flight_number",
+                          "origin",
+                          "destination",
+                          "status",
+                          "scheduled_departure_time_est",
+                          "scheduled_arrival_time_est",
+                          "available_seats",
+                          "prices"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Each entry describes one eligible nonstop flight. Compare all entries when the user asks for an optimized or constrained choice; do not assume the first entry is best."
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/search_onestop_flight": {
+      "post": {
+        "operationId": "search_onestop_flight",
+        "summary": "Search one-stop flights",
+        "description": "Find two-leg itineraries for an IATA origin, IATA destination, and departure date. Only available flight instances are returned. Each top-level result is one complete two-leg candidate itinerary. Returned order is not a recommendation. When the user asks for the cheapest, earliest/latest, fastest/shortest, or time-constrained option, compare all eligible candidate itineraries. For price comparisons sum prices for the requested cabin across both legs. For fastest/shortest trip duration, compare elapsed itinerary time from the first departure to the final arrival, including stopover time; do not rank by summed in-air flight time alone.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "origin": {
+                    "type": "string",
+                    "description": "Origin IATA airport code."
+                  },
+                  "destination": {
+                    "type": "string",
+                    "description": "Destination IATA airport code."
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "First-leg departure date in YYYY-MM-DD format."
+                  }
+                },
+                "required": [
+                  "origin",
+                  "destination",
+                  "date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "One-stop combinations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "routes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "first_leg": {
+                            "type": "object",
+                            "properties": {
+                              "flight_number": {
+                                "type": "string",
+                                "description": "Flight identifier."
+                              },
+                              "origin": {
+                                "type": "string",
+                                "description": "Origin IATA code."
+                              },
+                              "destination": {
+                                "type": "string",
+                                "description": "Destination IATA code."
+                              },
+                              "date": {
+                                "type": "string",
+                                "description": "Date for this leg."
+                              },
+                              "status": {
+                                "type": "string",
+                                "description": "Availability status."
+                              },
+                              "scheduled_departure_time_est": {
+                                "type": "string",
+                                "description": "Scheduled departure time EST."
+                              },
+                              "scheduled_arrival_time_est": {
+                                "type": "string",
+                                "description": "Scheduled arrival time EST."
+                              },
+                              "available_seats": {
+                                "type": "object",
+                                "properties": {
+                                  "basic_economy": {
+                                    "type": "integer"
+                                  },
+                                  "economy": {
+                                    "type": "integer"
+                                  },
+                                  "business": {
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "basic_economy",
+                                  "economy",
+                                  "business"
+                                ],
+                                "additionalProperties": false,
+                                "description": "Available seats keyed by cabin class."
+                              },
+                              "prices": {
+                                "type": "object",
+                                "properties": {
+                                  "basic_economy": {
+                                    "type": "integer"
+                                  },
+                                  "economy": {
+                                    "type": "integer"
+                                  },
+                                  "business": {
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "basic_economy",
+                                  "economy",
+                                  "business"
+                                ],
+                                "additionalProperties": false,
+                                "description": "Price per cabin class in dollars."
+                              }
+                            },
+                            "required": [
+                              "flight_number",
+                              "origin",
+                              "destination",
+                              "status",
+                              "scheduled_departure_time_est",
+                              "scheduled_arrival_time_est",
+                              "available_seats",
+                              "prices"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "second_leg": {
+                            "type": "object",
+                            "properties": {
+                              "flight_number": {
+                                "type": "string",
+                                "description": "Flight identifier."
+                              },
+                              "origin": {
+                                "type": "string",
+                                "description": "Origin IATA code."
+                              },
+                              "destination": {
+                                "type": "string",
+                                "description": "Destination IATA code."
+                              },
+                              "date": {
+                                "type": "string",
+                                "description": "Date for this leg."
+                              },
+                              "status": {
+                                "type": "string",
+                                "description": "Availability status."
+                              },
+                              "scheduled_departure_time_est": {
+                                "type": "string",
+                                "description": "Scheduled departure time EST."
+                              },
+                              "scheduled_arrival_time_est": {
+                                "type": "string",
+                                "description": "Scheduled arrival time EST."
+                              },
+                              "available_seats": {
+                                "type": "object",
+                                "properties": {
+                                  "basic_economy": {
+                                    "type": "integer"
+                                  },
+                                  "economy": {
+                                    "type": "integer"
+                                  },
+                                  "business": {
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "basic_economy",
+                                  "economy",
+                                  "business"
+                                ],
+                                "additionalProperties": false,
+                                "description": "Available seats keyed by cabin class."
+                              },
+                              "prices": {
+                                "type": "object",
+                                "properties": {
+                                  "basic_economy": {
+                                    "type": "integer"
+                                  },
+                                  "economy": {
+                                    "type": "integer"
+                                  },
+                                  "business": {
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "basic_economy",
+                                  "economy",
+                                  "business"
+                                ],
+                                "additionalProperties": false,
+                                "description": "Price per cabin class in dollars."
+                              }
+                            },
+                            "required": [
+                              "flight_number",
+                              "origin",
+                              "destination",
+                              "status",
+                              "scheduled_departure_time_est",
+                              "scheduled_arrival_time_est",
+                              "available_seats",
+                              "prices"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "first_leg",
+                          "second_leg"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Each entry contains one complete two-leg candidate itinerary with first_leg and second_leg flight metadata. Compare all entries when the user asks for an optimized or constrained choice; do not assume the first entry is best. For fastest/shortest trip duration, use elapsed time from first departure to final arrival, including stopover time."
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/send_certificate": {
+      "post": {
+        "operationId": "send_certificate",
+        "summary": "Send travel certificate",
+        "description": "Issue a travel certificate credit to a user's wallet. The toolkit uses a small fixed pool of new certificate ids; after three issued certificates in a task, the call fails. The certificate is stored immediately in the user's payment_methods with the given amount. The toolkit does not validate compensation eligibility; the agent must verify policy eligibility before calling this write tool.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_id": {
+                    "type": "string",
+                    "description": "Target user id."
+                  },
+                  "amount": {
+                    "type": "integer",
+                    "description": "Certificate amount in dollars."
+                  }
+                },
+                "required": [
+                  "user_id",
+                  "amount"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Certificate issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Text acknowledgement describing the new certificate."
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/transfer_to_human_agents": {
+      "post": {
+        "operationId": "transfer_to_human_agents",
+        "summary": "Transfer to human agent",
+        "description": "Escalate the conversation to a human agent by sending a concise summary. Use only when the user explicitly asks to speak with or be transferred to a human agent, or when the current request cannot be completed, refused, or advanced with the available airline tools and no in-scope fallback remains. Do not use this tool merely because one requested option is unavailable or policy-blocked if the user has given another acceptable in-scope action to handle. Do not use this tool merely because the user asks for an exception, escalation, internal review, or double-check of a policy-blocked action; give a direct policy refusal instead. The tool returns a transfer acknowledgement and does not modify airline reservations, flights, users, or payments. After this tool call succeeds, send exactly: YOU ARE BEING TRANSFERRED TO A HUMAN AGENT. PLEASE HOLD ON.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "summary": {
+                    "type": "string",
+                    "description": "Concise summary of the current issue for the human agent."
+                  }
+                },
+                "required": [
+                  "summary"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transfer acknowledgement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Confirmation that a human agent will follow up."
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/update_reservation_baggages": {
+      "post": {
+        "operationId": "update_reservation_baggages",
+        "summary": "Update baggage counts",
+        "description": "Set the final baggage counts on an existing reservation. The toolkit charges $50 for each newly added paid bag relative to the reservation's current nonfree_baggages count; decreases do not produce refunds. The payment id must belong to the reservation's user, certificates are rejected for updates, and gift cards must have enough balance when a positive charge is needed.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reservation_id": {
+                    "type": "string",
+                    "description": "Reservation identifier."
+                  },
+                  "total_baggages": {
+                    "type": "integer",
+                    "description": "Final total checked-bag count to store on the reservation, not a delta."
+                  },
+                  "nonfree_baggages": {
+                    "type": "integer",
+                    "description": "Final paid-bag count to store on the reservation, not a delta. Positive increases over the current paid-bag count are charged at $50 each."
+                  },
+                  "payment_id": {
+                    "type": "string",
+                    "description": "Stored credit-card or gift-card id for any added paid-bag charge. Certificates are rejected for reservation updates."
+                  }
+                },
+                "required": [
+                  "reservation_id",
+                  "total_baggages",
+                  "nonfree_baggages",
+                  "payment_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reservation after baggage update",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "reservation": {
+                      "type": "object",
+                      "description": "Reservation record including flights, passengers, payments, and status.",
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/update_reservation_flights": {
+      "post": {
+        "operationId": "update_reservation_flights",
+        "summary": "Update reservation flights",
+        "description": "Replace some or all flights in a reservation and recalculate fare. This is also the cabin-change tool: to change only cabin, pass the same complete flight list with the new cabin. The request must include the complete desired flight list after the update, including unchanged legs that should remain. The single cabin argument is written to the whole reservation. Existing unchanged legs keep their prior prices when the cabin is unchanged; new legs and cabin changes are validated for availability/seats and priced from flight data. Payment history is appended with the fare delta, which can be positive for a charge or negative for a refund. Sequential updates are allowed; each call computes its delta against the reservation state at that moment.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reservation_id": {
+                    "type": "string",
+                    "description": "Reservation identifier."
+                  },
+                  "cabin": {
+                    "type": "string",
+                    "enum": [
+                      "basic_economy",
+                      "economy",
+                      "business"
+                    ],
+                    "description": "One cabin class to write to the entire reservation after the update."
+                  },
+                  "flights": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "flight_number": {
+                          "type": "string",
+                          "description": "Flight number returned by a flight search or already present in the reservation."
+                        },
+                        "date": {
+                          "type": "string",
+                          "description": "Date for this flight segment in YYYY-MM-DD format."
+                        }
+                      },
+                      "required": [
+                        "flight_number",
+                        "date"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "description": "Complete desired flight list after the update, including unchanged legs that should remain. Do not pass only the changed legs."
+                  },
+                  "payment_id": {
+                    "type": "string",
+                    "description": "Stored credit-card or gift-card id used for the fare delta. Certificates are rejected for reservation updates."
+                  }
+                },
+                "required": [
+                  "reservation_id",
+                  "cabin",
+                  "flights",
+                  "payment_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reservation after flight update",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "reservation": {
+                      "type": "object",
+                      "description": "Reservation record including flights, passengers, payments, and status.",
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/update_reservation_passengers": {
+      "post": {
+        "operationId": "update_reservation_passengers",
+        "summary": "Update reservation passengers",
+        "description": "Replace passenger details on an existing reservation while preserving the same passenger count. This is not a flight, cabin, cancellation, refund, or booking operation; the toolkit only checks that the replacement list length equals the current passenger count and then writes the provided passenger details.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reservation_id": {
+                    "type": "string",
+                    "description": "Reservation identifier."
+                  },
+                  "passengers": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "first_name": {
+                          "type": "string",
+                          "description": "Passenger first name."
+                        },
+                        "last_name": {
+                          "type": "string",
+                          "description": "Passenger last name."
+                        },
+                        "dob": {
+                          "type": "string",
+                          "description": "Passenger date of birth in YYYY-MM-DD format."
+                        }
+                      },
+                      "required": [
+                        "first_name",
+                        "last_name",
+                        "dob"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "description": "Complete replacement passenger list. Its length must match the reservation's current passenger count."
+                  }
+                },
+                "required": [
+                  "reservation_id",
+                  "passengers"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reservation after passenger update",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "reservation": {
+                      "type": "object",
+                      "description": "Reservation record including flights, passengers, payments, and status.",
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_flight_status": {
+      "post": {
+        "operationId": "get_flight_status",
+        "summary": "Get flight status",
+        "description": "Return the operational status string for a specific flight number on a specific date, including available, on time, delayed, flying, landed, or cancelled.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "flight_number": {
+                    "type": "string",
+                    "description": "Flight number such as HAT001."
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "Flight date in YYYY-MM-DD format."
+                  }
+                },
+                "required": [
+                  "flight_number",
+                  "date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Flight status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Status such as available, on time, delayed, etc."
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

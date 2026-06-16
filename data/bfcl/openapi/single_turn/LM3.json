@@ -1,0 +1,246 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM3",
+    "version": "1.0.0",
+    "description": "LM3 is a compact API collection that combines ride selection and weather data to power travel-aware applications. Use the uber_ride tool to request suitable Uber options by supplying start location, desired ride type, and maximum acceptable wait time, and query api_weather for current conditions at the same location. The design favors simple, synchronous requests and small JSON payloads so frontends can present recommended rides with weather-aware context quickly."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM3"
+    }
+  ],
+  "paths": {
+    "/uber_ride": {
+      "post": {
+        "operationId": "uber_ride",
+        "summary": "Simulate selecting a matching Uber ride",
+        "description": "Simulates choosing a suitable Uber ride given the starting location (loc), requested ride type (type), and the maximum wait time in minutes (time). The simulation returns a single chosen ride with ETA, vehicle/driver info, and fare estimate.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "loc": {
+                    "type": "string",
+                    "description": "The starting location for the Uber ride, in the format of 'Street Address, City, State', such as '123 Main St, Springfield, IL'."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "The type of Uber ride the user is ordering.",
+                    "enum": [
+                      "plus",
+                      "comfort",
+                      "black"
+                    ]
+                  },
+                  "time": {
+                    "type": "integer",
+                    "description": "The maximum amount of time the customer is willing to wait for the ride, in minutes."
+                  }
+                },
+                "required": [
+                  "loc",
+                  "type",
+                  "time"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful ride selection payload",
+                  "properties": {
+                    "ride_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the selected ride."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Selected Uber ride type (matches the requested type if available)."
+                    },
+                    "driver": {
+                      "type": "object",
+                      "description": "Driver information for the selected ride.",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "Driver's display name."
+                        },
+                        "rating": {
+                          "type": "number",
+                          "description": "Driver's average rating (0-5).",
+                          "minimum": 0,
+                          "maximum": 5
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "vehicle": {
+                      "type": "object",
+                      "description": "Vehicle details for the selected ride.",
+                      "properties": {
+                        "make": {
+                          "type": "string",
+                          "description": "Vehicle manufacturer (e.g., Toyota)."
+                        },
+                        "model": {
+                          "type": "string",
+                          "description": "Vehicle model (e.g., Camry)."
+                        },
+                        "license_plate": {
+                          "type": "string",
+                          "description": "Vehicle license plate identifier."
+                        }
+                      },
+                      "required": [
+                        "make",
+                        "model"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "eta_minutes": {
+                      "type": "integer",
+                      "description": "Estimated time of arrival in whole minutes."
+                    },
+                    "eta_seconds": {
+                      "type": "integer",
+                      "description": "Estimated time of arrival in seconds (more precise)."
+                    },
+                    "estimated_distance_km": {
+                      "type": "number",
+                      "description": "Estimated distance from driver to pickup location in kilometers. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "fare": {
+                      "type": "number",
+                      "description": "Estimated fare for the trip in the local currency. Provide as a float (e.g., 12.50, not 12).",
+                      "format": "double"
+                    },
+                    "surge_multiplier": {
+                      "type": "number",
+                      "description": "Current surge multiplier applied to fare calculations. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "estimated_arrival_time": {
+                      "type": "string",
+                      "description": "Estimated arrival time as a timestamp or human-readable string (no format enforced)."
+                    }
+                  },
+                  "required": [
+                    "ride_id",
+                    "type",
+                    "driver",
+                    "vehicle",
+                    "eta_minutes",
+                    "fare"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api_weather": {
+      "post": {
+        "operationId": "api_weather",
+        "summary": "Retrieve current weather for a location",
+        "description": "Simulate retrieving current weather for the provided 'loc' (e.g., 'City, Country'). Return plausible, self-contained current conditions and units.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "loc": {
+                    "type": "string",
+                    "description": "The location for which weather information is to be retrieved, in the format of 'City, Country' (e.g., 'Paris, France')."
+                  }
+                },
+                "required": [
+                  "loc"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Current weather payload for the requested location.",
+                  "properties": {
+                    "temperature": {
+                      "type": "number",
+                      "description": "Air temperature. Use float format (e.g., 1.0 not 1). Unit is specified by temperature_unit.",
+                      "format": "double"
+                    },
+                    "temperature_unit": {
+                      "type": "string",
+                      "description": "Unit for temperature (for example, 'C' for Celsius or 'F' for Fahrenheit)."
+                    },
+                    "condition": {
+                      "type": "string",
+                      "description": "Short textual description of the weather conditions (e.g., 'Clear', 'Light rain', 'Partly cloudy')."
+                    },
+                    "humidity": {
+                      "type": "integer",
+                      "description": "Relative humidity as a percentage (0-100).",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "wind_speed": {
+                      "type": "number",
+                      "description": "Wind speed. Use float format (e.g., 1.0 not 1). Unit is specified by wind_unit.",
+                      "format": "double"
+                    },
+                    "wind_unit": {
+                      "type": "string",
+                      "description": "Unit for wind speed (for example, 'm/s' or 'km/h')."
+                    },
+                    "wind_direction": {
+                      "type": "string",
+                      "description": "Wind direction as a cardinal direction or degrees (e.g., 'NW' or '270°')."
+                    },
+                    "observation_time": {
+                      "type": "string",
+                      "description": "Timestamp of the observation. ISO 8601 is recommended (e.g., 2026-03-12T15:04:05Z)."
+                    }
+                  },
+                  "required": [
+                    "temperature",
+                    "temperature_unit",
+                    "condition",
+                    "humidity"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

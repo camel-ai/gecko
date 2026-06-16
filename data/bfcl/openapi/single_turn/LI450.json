@@ -1,0 +1,181 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI450",
+    "version": "1.0.0",
+    "description": "LI450 is a transactional processing API collection that handles batch financial records, applying currency conversion rates and optionally filtering by status codes; it is designed for efficient, idempotent batch submissions, predictable error reporting, and configurable conversion sources. Clients send transaction batches, receive normalized outputs and per-item results, and can enable selective filtering to reduce downstream processing and reconcile multi-currency ledgers."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI450"
+    }
+  ],
+  "paths": {
+    "/process_transactions": {
+      "post": {
+        "operationId": "process_transactions",
+        "summary": "Simulate processing a batch of transactions with currency conversion and optional status filtering",
+        "description": "Process each transaction by applying the provided conversion rates into the target currency and optionally filter by status. Return the list of processed transactions with converted amounts and summary totals.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "transactions": {
+                    "type": "array",
+                    "description": "A list of transactions, each transaction is represented as a dictionary containing details such as the transaction ID, amount, and currency.",
+                    "items": {
+                      "type": "object",
+                      "description": "Array item",
+                      "properties": {}
+                    }
+                  },
+                  "conversion_rates": {
+                    "type": "object",
+                    "description": "A dictionary mapping currency codes to their respective conversion rates into the target currency.",
+                    "properties": {
+                      "USD": {
+                        "type": "number",
+                        "format": "double",
+                        "description": "Conversion rate from USD to the target currency.. Use float format (e.g., 1.0 not 1)."
+                      },
+                      "EUR": {
+                        "type": "number",
+                        "format": "double",
+                        "description": "Conversion rate from EUR to the target currency.. Use float format (e.g., 1.0 not 1)."
+                      },
+                      "GBP": {
+                        "type": "number",
+                        "format": "double",
+                        "description": "Conversion rate from GBP to the target currency.. Use float format (e.g., 1.0 not 1)."
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "target_currency": {
+                    "type": "string",
+                    "description": "The currency to which all transaction amounts should be converted. Must be a valid ISO currency code.",
+                    "enum": [
+                      "USD",
+                      "EUR",
+                      "GBP"
+                    ],
+                    "default": "USD"
+                  },
+                  "filter_status": {
+                    "type": "string",
+                    "description": "Optional filter to include only transactions with a specified status code. Valid statuses are 'pending', 'completed', and 'cancelled'.",
+                    "enum": [
+                      "pending",
+                      "completed",
+                      "cancelled"
+                    ],
+                    "default": null
+                  }
+                },
+                "required": [
+                  "transactions",
+                  "conversion_rates"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Result of processing the transactions",
+                  "properties": {
+                    "processed_transactions": {
+                      "type": "array",
+                      "description": "List of transactions after conversion and optional filtering",
+                      "items": {
+                        "type": "object",
+                        "description": "A processed transaction",
+                        "properties": {
+                          "transaction_id": {
+                            "type": "string",
+                            "description": "The original transaction identifier"
+                          },
+                          "original_amount": {
+                            "type": "number",
+                            "description": "Original transaction amount. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "original_currency": {
+                            "type": "string",
+                            "description": "Currency code of the original amount (e.g., USD)"
+                          },
+                          "conversion_rate_used": {
+                            "type": "number",
+                            "description": "Conversion rate applied to convert the original amount into the target currency. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "converted_amount": {
+                            "type": "number",
+                            "description": "Amount after conversion into the target currency. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "target_currency": {
+                            "type": "string",
+                            "description": "The currency to which the amount was converted"
+                          },
+                          "status": {
+                            "type": "string",
+                            "description": "Transaction status as provided in the input (if present)"
+                          }
+                        },
+                        "required": [
+                          "transaction_id",
+                          "original_amount",
+                          "original_currency",
+                          "conversion_rate_used",
+                          "converted_amount",
+                          "target_currency"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "summary": {
+                      "type": "object",
+                      "description": "Aggregate information about the processed batch",
+                      "properties": {
+                        "processed_count": {
+                          "type": "integer",
+                          "description": "Number of transactions included in processed_transactions"
+                        },
+                        "total_converted_amount": {
+                          "type": "number",
+                          "description": "Sum of converted amounts in the target currency. Use float format (e.g., 1.0 not 1).",
+                          "format": "double"
+                        }
+                      },
+                      "required": [
+                        "processed_count",
+                        "total_converted_amount"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "processed_transactions",
+                    "summary"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

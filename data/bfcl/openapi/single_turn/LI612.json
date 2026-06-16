@@ -1,0 +1,685 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI612",
+    "version": "1.0.0",
+    "description": "LI612 provides unified endpoints for discovering and booking travel and cultural activities: search and purchase event tickets, find and reserve train journeys, and share a user's location with contacts. Designed for straightforward request/response flows, it supports querying by city, date, route and passenger details, selecting classes and seat preferences, and completing purchases. Use short, atomic calls to chain searches, selections, and transactions securely within client applications."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI612"
+    }
+  ],
+  "paths": {
+    "/Events_3_FindEvents": {
+      "post": {
+        "operationId": "Events_3_FindEvents",
+        "summary": "Find cultural events in a city on a given date",
+        "description": "Simulate searching for cultural events (e.g., concerts, theater) occurring in the specified city and optionally on the specified date. If date is omitted, return upcoming events.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "event_type": {
+                    "type": "string",
+                    "description": "The type of cultural event to search for.",
+                    "enum": [
+                      "Music",
+                      "Theater"
+                    ]
+                  },
+                  "city": {
+                    "type": "string",
+                    "description": "The city in which to search for events, formatted as 'City, State' (e.g., 'New York, NY')."
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "The date of the event, formatted as 'MM/DD/YYYY'. If not specified, the function will search for all upcoming events.",
+                    "default": "current date"
+                  }
+                },
+                "required": [
+                  "event_type",
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "A list of matching cultural events.",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "description": "Matching events ordered by relevance or date.",
+                      "minItems": 0,
+                      "items": {
+                        "type": "object",
+                        "description": "An individual event.",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the event."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Event title or name."
+                          },
+                          "event_type": {
+                            "type": "string",
+                            "description": "Type of event (e.g., Music, Theater)."
+                          },
+                          "date": {
+                            "type": "string",
+                            "description": "Date of the event in 'MM/DD/YYYY' format."
+                          },
+                          "time": {
+                            "type": "string",
+                            "description": "Start time for the event if available (free-text, e.g., '19:30' or '7:30 PM')."
+                          },
+                          "venue": {
+                            "type": "object",
+                            "description": "Venue information for the event.",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "description": "Venue name."
+                              },
+                              "address": {
+                                "type": "string",
+                                "description": "Street address of the venue, if available."
+                              }
+                            },
+                            "required": [
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "city": {
+                            "type": "string",
+                            "description": "City where the event takes place (e.g., 'New York, NY')."
+                          },
+                          "price": {
+                            "type": "number",
+                            "description": "Suggested ticket price. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "currency": {
+                            "type": "string",
+                            "description": "Currency code for the price, if provided (e.g., 'USD')."
+                          },
+                          "tickets_available": {
+                            "type": "integer",
+                            "description": "Number of tickets currently available, if known."
+                          },
+                          "url": {
+                            "type": "string",
+                            "description": "URL with more information or ticket purchase link, if available."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "event_type",
+                          "date",
+                          "venue"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "events"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Events_3_BuyEventTickets": {
+      "post": {
+        "operationId": "Events_3_BuyEventTickets",
+        "summary": "Purchase tickets for a cultural event",
+        "description": "Simulate purchasing tickets. Validate date and city formats and enforce a minimum ticket quantity.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "event_name": {
+                    "type": "string",
+                    "description": "The name of the artist or play for which tickets are being purchased."
+                  },
+                  "number_of_tickets": {
+                    "type": "integer",
+                    "description": "The quantity of tickets to reserve for the event.",
+                    "minimum": 1
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "The scheduled date of the event, in the format 'MM/DD/YYYY'.",
+                    "pattern": "^(0[1-9]|1[0-2])/(0[1-9]|[12]\\d|3[01])/\\d{4}$"
+                  },
+                  "city": {
+                    "type": "string",
+                    "description": "The city where the event is being held, in the format 'City, State' (e.g., 'New York, NY').",
+                    "pattern": "^[A-Za-z .'\\-]+,\\s?[A-Za-z]{2}$"
+                  }
+                },
+                "required": [
+                  "event_name",
+                  "number_of_tickets",
+                  "date",
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful ticket purchase confirmation payload",
+                  "properties": {
+                    "confirmation_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the confirmed purchase"
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Outcome of the purchase",
+                      "enum": [
+                        "confirmed",
+                        "pending"
+                      ]
+                    },
+                    "issued_at": {
+                      "type": "string",
+                      "description": "Timestamp (ISO 8601) when the purchase was confirmed",
+                      "format": "date-time"
+                    },
+                    "total_amount": {
+                      "type": "number",
+                      "description": "Total amount charged. Provide as a float (e.g., 1.0, not 1)",
+                      "format": "double"
+                    },
+                    "tickets": {
+                      "type": "array",
+                      "description": "List of issued tickets, if applicable",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "ticket_id": {
+                            "type": "string",
+                            "description": "Identifier for an individual ticket"
+                          },
+                          "seat_info": {
+                            "type": "string",
+                            "description": "Optional seat/location information for the ticket"
+                          }
+                        },
+                        "required": [
+                          "ticket_id"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "confirmation_id",
+                    "status",
+                    "issued_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Messaging_1_ShareLocation": {
+      "post": {
+        "operationId": "Messaging_1_ShareLocation",
+        "summary": "Simulate sending a user's geographic coordinates to a contact",
+        "description": "Simulate sharing the caller's current geographic location (latitude, longitude) with a specified contact from the address book. This does not echo inputs in the response.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "The current geographical location of the user to share, in the format of 'Latitude, Longitude' (e.g., '37.7749, -122.4194')."
+                  },
+                  "contact_name": {
+                    "type": "string",
+                    "description": "The full name of the contact to whom the location will be sent."
+                  }
+                },
+                "required": [
+                  "location",
+                  "contact_name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful send result for the shared location message.",
+                  "properties": {
+                    "message_id": {
+                      "type": "string",
+                      "description": "Unique identifier assigned to the sent location message by the system."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Delivery status of the location message (examples: 'sent', 'delivered', 'failed')."
+                    },
+                    "sent_at": {
+                      "type": "string",
+                      "description": "Timestamp when the message was sent, expressed in an RFC3339/ISO8601 date-time string.",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "message_id",
+                    "status",
+                    "sent_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Trains_1_GetTrainTickets": {
+      "post": {
+        "operationId": "Trains_1_GetTrainTickets",
+        "summary": "Simulate reserving train tickets",
+        "description": "Simulate reserving tickets for a train journey given origin, destination, date/time, passenger count, and class preferences.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "_from": {
+                    "type": "string",
+                    "description": "The departure city for the train journey, in the format of 'City, State', such as 'Los Angeles, CA'."
+                  },
+                  "to": {
+                    "type": "string",
+                    "description": "The arrival city for the train journey, in the format of 'City, State', such as 'New York, NY'."
+                  },
+                  "date_of_journey": {
+                    "type": "string",
+                    "description": "The date of the train journey in the format 'YYYY-MM-DD', such as '2023-04-15'."
+                  },
+                  "journey_start_time": {
+                    "type": "string",
+                    "description": "The start time of the train journey in 24-hour format 'HH:MM', such as '14:30'."
+                  },
+                  "number_of_adults": {
+                    "type": "integer",
+                    "description": "The number of adults to reserve train tickets for. Must be between 1 to 5 adults."
+                  },
+                  "trip_protection": {
+                    "type": "boolean",
+                    "description": "Indicates whether to add trip protection to the reservation for an additional fee. Trip protection provides refund options and assistance in case of trip disruptions."
+                  },
+                  "_class": {
+                    "type": "string",
+                    "description": "The fare class for the train reservation. Options include 'Value', 'Flexible', and 'Business'.",
+                    "enum": [
+                      "Value",
+                      "Flexible",
+                      "Business"
+                    ],
+                    "default": "Value"
+                  }
+                },
+                "required": [
+                  "_from",
+                  "to",
+                  "date_of_journey",
+                  "journey_start_time",
+                  "number_of_adults",
+                  "trip_protection"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful reservation payload",
+                  "properties": {
+                    "reservation_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the created reservation."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Reservation status.",
+                      "enum": [
+                        "confirmed",
+                        "pending",
+                        "failed"
+                      ]
+                    },
+                    "total_price": {
+                      "type": "number",
+                      "description": "Total price for the reservation. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Optional ISO currency code for prices (e.g., \"USD\")."
+                    },
+                    "itinerary": {
+                      "type": "array",
+                      "description": "One or more booked journey segments for the reservation.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "train_number": {
+                            "type": "string",
+                            "description": "Identifier for the train operating the segment."
+                          },
+                          "departure": {
+                            "type": "string",
+                            "description": "Departure city (as used for booking)."
+                          },
+                          "arrival": {
+                            "type": "string",
+                            "description": "Arrival city (as used for booking)."
+                          },
+                          "date_of_journey": {
+                            "type": "string",
+                            "description": "Date of the journey in 'YYYY-MM-DD' format."
+                          },
+                          "journey_start_time": {
+                            "type": "string",
+                            "description": "Start time in 24-hour 'HH:MM' format for this segment."
+                          },
+                          "fare_class": {
+                            "type": "string",
+                            "description": "Fare class applied to this segment (e.g., Value, Flexible, Business)."
+                          },
+                          "coach": {
+                            "type": "string",
+                            "description": "Coach or carriage identifier, if assigned."
+                          },
+                          "seats": {
+                            "type": "array",
+                            "description": "Assigned seat identifiers for this segment (if assigned).",
+                            "items": {
+                              "type": "string",
+                              "description": "Array item"
+                            }
+                          },
+                          "price_per_ticket": {
+                            "type": "number",
+                            "description": "Price per ticket for this segment. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          }
+                        },
+                        "required": [
+                          "train_number",
+                          "departure",
+                          "arrival",
+                          "date_of_journey",
+                          "journey_start_time",
+                          "fare_class",
+                          "price_per_ticket"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "booking_time": {
+                      "type": "string",
+                      "description": "Timestamp when the reservation was created (ISO 8601), if provided."
+                    }
+                  },
+                  "required": [
+                    "reservation_id",
+                    "status",
+                    "total_price",
+                    "itinerary"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Trains_1_FindTrains": {
+      "post": {
+        "operationId": "Trains_1_FindTrains",
+        "summary": "Find available trains for a route and date",
+        "description": "Simulate searching available train options for the given origin, destination, and date_of_journey, allowing selection of a preferred fare class.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "_from": {
+                    "type": "string",
+                    "description": "The city where the train journey will start."
+                  },
+                  "to": {
+                    "type": "string",
+                    "description": "The destination city for the train journey."
+                  },
+                  "date_of_journey": {
+                    "type": "string",
+                    "description": "The date of the train journey, in the format of 'YYYY-MM-DD'."
+                  },
+                  "_class": {
+                    "type": "string",
+                    "description": "The fare class for the train reservation.",
+                    "enum": [
+                      "Value",
+                      "Flexible",
+                      "Business"
+                    ],
+                    "default": "Value"
+                  },
+                  "number_of_adults": {
+                    "type": "integer",
+                    "description": "The number of adults to reserve train tickets for.",
+                    "default": 1
+                  }
+                },
+                "required": [
+                  "_from",
+                  "to",
+                  "date_of_journey"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload containing matching train options.",
+                  "properties": {
+                    "trains": {
+                      "type": "array",
+                      "description": "List of matching train options (may be empty if no options found).",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "train_id": {
+                            "type": "string",
+                            "description": "Unique identifier for this train option."
+                          },
+                          "operator": {
+                            "type": "string",
+                            "description": "Name of the train operator."
+                          },
+                          "departure_time": {
+                            "type": "string",
+                            "description": "Scheduled departure time (local time)."
+                          },
+                          "arrival_time": {
+                            "type": "string",
+                            "description": "Scheduled arrival time (local time)."
+                          },
+                          "duration_minutes": {
+                            "type": "integer",
+                            "description": "Total trip duration expressed in minutes."
+                          },
+                          "available_classes": {
+                            "type": "array",
+                            "description": "Fare classes available on this train option with pricing and availability.",
+                            "items": {
+                              "type": "object",
+                              "description": "Array item",
+                              "properties": {
+                                "class": {
+                                  "type": "string",
+                                  "description": "Fare class name (for example: Value, Flexible, Business)."
+                                },
+                                "price": {
+                                  "type": "object",
+                                  "description": "Price for this fare class.",
+                                  "properties": {
+                                    "currency": {
+                                      "type": "string",
+                                      "description": "ISO currency code for the price (e.g., USD)."
+                                    },
+                                    "amount": {
+                                      "type": "number",
+                                      "description": "Monetary amount for the fare."
+                                    }
+                                  },
+                                  "required": [
+                                    "currency",
+                                    "amount"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "seats_available": {
+                                  "type": "integer",
+                                  "description": "Estimated number of seats currently available for this class."
+                                }
+                              },
+                              "required": [
+                                "class",
+                                "price"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "direct": {
+                            "type": "boolean",
+                            "description": "Whether this option is a direct service (true) or requires changes (false)."
+                          }
+                        },
+                        "required": [
+                          "train_id",
+                          "operator",
+                          "departure_time",
+                          "arrival_time",
+                          "available_classes"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "route_summary": {
+                      "type": "object",
+                      "description": "Summary of the requested route and date.",
+                      "properties": {
+                        "origin": {
+                          "type": "string",
+                          "description": "Origin city or station."
+                        },
+                        "destination": {
+                          "type": "string",
+                          "description": "Destination city or station."
+                        },
+                        "date_of_journey": {
+                          "type": "string",
+                          "description": "Date of journey as provided in the request."
+                        }
+                      },
+                      "required": [
+                        "origin",
+                        "destination",
+                        "date_of_journey"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "trains",
+                    "route_summary"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

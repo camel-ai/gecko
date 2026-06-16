@@ -1,0 +1,334 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM23",
+    "version": "1.0.0",
+    "description": "LM23 is an API collection for product discovery and detail retrieval, offering endpoints to search products by color, size, category, price, and brand to locate SKUs or SPUs, and to fetch comprehensive product details including size/color options, materials, and care instructions. Designed for fast integration into shopping, inventory, and catalog systems, it supports precise filtering for front-end displays, recommendation engines, and backend inventory workflows."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM23"
+    }
+  ],
+  "paths": {
+    "/search_products": {
+      "post": {
+        "operationId": "search_products",
+        "summary": "Search products (SPU/SKU) by category, color, size, price range, and brand",
+        "description": "Simulate a product search returning matching SPUs or SKUs. Use provided filters to narrow results; category is required. price_min defaults to 0.0 when omitted; price_max is optional.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "color": {
+                    "type": "string",
+                    "description": "The color of the product. This is an optional parameter that can be used to refine SKU searches.",
+                    "default": null
+                  },
+                  "size": {
+                    "type": "string",
+                    "description": "The size of the product. This is an optional parameter that can be used to refine SKU searches.",
+                    "default": null
+                  },
+                  "category": {
+                    "type": "string",
+                    "description": "The category of the product, such as 'electronics', 'clothing', 'shoes' or 'furniture'. This parameter is required for both SPU and SKU level searches."
+                  },
+                  "price_min": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The minimum price of the product search. Enter a float value representing the lowest price in dollars.. Use float format (e.g., 1.0 not 1).",
+                    "default": 0.0
+                  },
+                  "price_max": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The maximum price of the product search. Enter a float value representing the highest price in dollars.. Use float format (e.g., 1.0 not 1).",
+                    "default": null
+                  },
+                  "brand": {
+                    "type": "string",
+                    "description": "The brand of the product. This is an optional parameter for searching within a specific brand.",
+                    "default": null
+                  }
+                },
+                "required": [
+                  "category"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search response containing pagination and matched product entries.",
+                  "properties": {
+                    "total_count": {
+                      "type": "integer",
+                      "description": "Total number of matched items across all pages."
+                    },
+                    "page": {
+                      "type": "integer",
+                      "description": "Current page number (1-based)."
+                    },
+                    "per_page": {
+                      "type": "integer",
+                      "description": "Number of items returned on this page."
+                    },
+                    "results": {
+                      "type": "array",
+                      "description": "Array of matched product entries (each entry may represent an SPU or a SKU).",
+                      "items": {
+                        "type": "object",
+                        "description": "A single matched product (SPU or SKU). Fields that are not applicable for the returned level (SPU vs SKU) may be omitted or null.",
+                        "properties": {
+                          "product_id": {
+                            "type": "string",
+                            "description": "Internal unique identifier for this product entry (SPU or SKU)."
+                          },
+                          "sku": {
+                            "type": "string",
+                            "description": "SKU identifier when the result is at SKU level; may be null for SPU-level results.",
+                            "nullable": true
+                          },
+                          "spu": {
+                            "type": "string",
+                            "description": "SPU identifier when available; may be null for pure SKU entries.",
+                            "nullable": true
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Human-readable product name or title."
+                          },
+                          "brand": {
+                            "type": "string",
+                            "description": "Brand name associated with the product, if known.",
+                            "nullable": true
+                          },
+                          "category": {
+                            "type": "string",
+                            "description": "Product category (matches the requested category)."
+                          },
+                          "color": {
+                            "type": "string",
+                            "description": "Color of the product variant, if applicable.",
+                            "nullable": true
+                          },
+                          "size": {
+                            "type": "string",
+                            "description": "Size of the product variant, if applicable.",
+                            "nullable": true
+                          },
+                          "price": {
+                            "type": "number",
+                            "description": "Price of the returned product in decimal dollars. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "in_stock": {
+                            "type": "boolean",
+                            "description": "Whether this product/variant is currently in stock."
+                          }
+                        },
+                        "required": [
+                          "product_id",
+                          "name",
+                          "category",
+                          "price",
+                          "in_stock"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "total_count",
+                    "page",
+                    "per_page",
+                    "results"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_product_details": {
+      "post": {
+        "operationId": "get_product_details",
+        "summary": "Retrieve detailed product information (size, color, material, care)",
+        "description": "Simulate returning a product's detailed information, including available sizes, colors, material, SKU-level details when requested, and optional care instructions.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "item_id": {
+                    "type": "string",
+                    "description": "The unique identifier of the product, required to fetch specific product details."
+                  },
+                  "color": {
+                    "type": "string",
+                    "description": "The color of the product. Specify this parameter to filter product details by color.",
+                    "default": "any"
+                  },
+                  "size": {
+                    "type": "string",
+                    "description": "The size of the product. Specify this parameter to filter product details by size.",
+                    "default": "any"
+                  },
+                  "detailLevel": {
+                    "type": "string",
+                    "description": "The level of detail required for the product information. Use 'SKU' for size and color details.",
+                    "enum": [
+                      "SKU",
+                      "Basic"
+                    ],
+                    "default": "Basic"
+                  },
+                  "material": {
+                    "type": "string",
+                    "description": "The material of the product. This parameter is optional and can be used to filter product details.",
+                    "default": "all"
+                  },
+                  "care_instructions": {
+                    "type": "boolean",
+                    "description": "Whether to include care instructions in the product details. If true, care instructions will be included.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "item_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful product details payload",
+                  "properties": {
+                    "productId": {
+                      "type": "string",
+                      "description": "The canonical unique identifier for the product."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Display name of the product."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "Full product description; may include marketing copy and feature list."
+                    },
+                    "detailLevel": {
+                      "type": "string",
+                      "description": "Level of detail included in this response. Matches request.detailLevel when possible.",
+                      "enum": [
+                        "SKU",
+                        "Basic"
+                      ]
+                    },
+                    "price": {
+                      "type": "number",
+                      "description": "Base product price. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "ISO-4217 currency code for the price (e.g., USD)."
+                    },
+                    "availableColors": {
+                      "type": "array",
+                      "description": "List of available color options for the product.",
+                      "items": {
+                        "type": "string",
+                        "description": "Array item"
+                      }
+                    },
+                    "availableSizes": {
+                      "type": "array",
+                      "description": "List of available size options for the product.",
+                      "items": {
+                        "type": "string",
+                        "description": "Array item"
+                      }
+                    },
+                    "material": {
+                      "type": "string",
+                      "description": "Primary material of the product, if known."
+                    },
+                    "care_instructions": {
+                      "type": "string",
+                      "description": "Textual care instructions. Present only when the request asked for care instructions (request.care_instructions = true). This is free-text guidance."
+                    },
+                    "skus": {
+                      "type": "array",
+                      "description": "SKU-level entries. Included when detailLevel is 'SKU'. Each SKU represents a specific combination of size/color and associated inventory/price.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "skuId": {
+                            "type": "string",
+                            "description": "Identifier for this SKU."
+                          },
+                          "color": {
+                            "type": "string",
+                            "description": "Color for this SKU."
+                          },
+                          "size": {
+                            "type": "string",
+                            "description": "Size for this SKU."
+                          },
+                          "inStock": {
+                            "type": "boolean",
+                            "description": "Whether this SKU is currently in stock."
+                          },
+                          "price": {
+                            "type": "number",
+                            "description": "SKU-specific price. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          }
+                        },
+                        "required": [
+                          "skuId"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "productId",
+                    "name",
+                    "price"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

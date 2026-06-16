@@ -1,0 +1,815 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM176",
+    "version": "1.0.0",
+    "description": "LM176 is an API collection providing messaging, heartbeat control, memory management, search, and HTTP request tooling for interactive agents. Use send_message and message_chatgpt for human and AI exchanges; pause_heartbeats to suspend automatic timing; core_memory_append/core_memory_replace for immediate memory updates; recall_memory_search and archival_memory_search/insert for conversational and long-term retrieval; http_request for external integrations. The style is synchronous, action-oriented, and designed for precise, scriptable orchestration of agent behaviors."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM176"
+    }
+  ],
+  "paths": {
+    "/send_message": {
+      "post": {
+        "operationId": "send_message",
+        "summary": "Simulate sending a Unicode message (including emojis).",
+        "description": "Simulate delivering a message string to a recipient identifier, preserving full Unicode (including emojis) and honoring the urgent flag.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "message": {
+                    "type": "string",
+                    "description": "The content of the message to be sent. Supports Unicode characters such as text and emojis."
+                  },
+                  "recipient": {
+                    "type": "string",
+                    "description": "The identifier of the recipient. This could be a username, phone number, or an email address, depending on the implementation.",
+                    "default": "default@example.com"
+                  },
+                  "urgent": {
+                    "type": "boolean",
+                    "description": "Flag to indicate if the message should be sent with high priority.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "message"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Acknowledgement returned when a message is successfully accepted for delivery.",
+                  "properties": {
+                    "messageId": {
+                      "type": "string",
+                      "description": "Unique identifier assigned to the accepted message."
+                    },
+                    "recipient": {
+                      "type": "string",
+                      "description": "The recipient identifier to which the message will be delivered."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Delivery status of the accepted message (e.g., queued, sent)."
+                    },
+                    "acceptedAt": {
+                      "type": "string",
+                      "description": "Timestamp (RFC 3339) when the message was accepted for delivery.",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "messageId",
+                    "recipient",
+                    "status",
+                    "acceptedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pause_heartbeats": {
+      "post": {
+        "operationId": "pause_heartbeats",
+        "summary": "Pause timed heartbeats for a duration",
+        "description": "Simulate temporarily ignoring timed heartbeats for a specified duration. During the pause, manual heartbeats and other events may still generate messages.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "minutes": {
+                    "type": "integer",
+                    "description": "The duration in minutes for which heartbeats should be ignored. Must be between 1 and 3600 minutes (up to 60 hours).",
+                    "minimum": 1,
+                    "maximum": 3600
+                  }
+                },
+                "required": [
+                  "minutes"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Response returned when heartbeats are successfully paused.",
+                  "properties": {
+                    "paused": {
+                      "type": "boolean",
+                      "description": "True if timed heartbeats are currently paused."
+                    },
+                    "minutes": {
+                      "type": "integer",
+                      "description": "The duration in minutes for which heartbeats were paused."
+                    },
+                    "paused_until": {
+                      "type": "string",
+                      "description": "Timestamp when the pause will end. ISO 8601 timestamp recommended (example: 2026-03-12T15:04:05Z), but formats are not enforced."
+                    }
+                  },
+                  "required": [
+                    "paused",
+                    "minutes",
+                    "paused_until"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/message_chatgpt": {
+      "post": {
+        "operationId": "message_chatgpt",
+        "summary": "Send a stateless message to ChatGPT",
+        "description": "Simulate sending a single, stateless English message to ChatGPT and receive the model's text response.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "message": {
+                    "type": "string",
+                    "description": "The message to send to ChatGPT, formatted as a complete English sentence."
+                  },
+                  "request_heartbeat": {
+                    "type": "boolean",
+                    "description": "Determines whether to request an immediate heartbeat post-execution, useful for managing follow-up actions.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "message"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload from ChatGPT.",
+                  "properties": {
+                    "reply": {
+                      "type": "string",
+                      "description": "The model's full text response in English."
+                    },
+                    "model": {
+                      "type": "string",
+                      "description": "Identifier of the model that produced the response (informational)."
+                    },
+                    "duration_ms": {
+                      "type": "integer",
+                      "description": "Approximate time taken to generate the response in milliseconds."
+                    }
+                  },
+                  "required": [
+                    "reply"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/core_memory_append": {
+      "post": {
+        "operationId": "core_memory_append",
+        "summary": "Append content to a named core memory section",
+        "description": "Simulate appending the provided content to a specified core memory section (supports full Unicode, including emojis). Optionally trigger an immediate heartbeat after append.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "The name of the memory section to be edited, such as 'persona' or 'human'.",
+                    "enum": [
+                      "persona",
+                      "human"
+                    ]
+                  },
+                  "content": {
+                    "type": "string",
+                    "description": "The content to be appended to the memory. Supports all unicode characters, including emojis."
+                  },
+                  "request_heartbeat": {
+                    "type": "boolean",
+                    "description": "If set to 'true', requests an immediate heartbeat after function execution. Useful for sending a follow-up message or triggering another function.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "name",
+                  "content"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Result returned when content is successfully appended to the requested core memory section.",
+                  "properties": {
+                    "appended": {
+                      "type": "boolean",
+                      "description": "True if the content was appended successfully."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The memory section that was updated. Matches request.name.",
+                      "enum": [
+                        "persona",
+                        "human"
+                      ]
+                    },
+                    "content_length": {
+                      "type": "integer",
+                      "description": "Number of Unicode code points appended."
+                    },
+                    "heartbeat_sent": {
+                      "type": "boolean",
+                      "description": "True if an immediate heartbeat was requested and dispatched after the append."
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "description": "Timestamp (UTC) when the append completed, represented as an ISO 8601 string (e.g., 2023-01-01T12:00:00Z)."
+                    }
+                  },
+                  "required": [
+                    "appended",
+                    "name",
+                    "content_length",
+                    "heartbeat_sent"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/core_memory_replace": {
+      "post": {
+        "operationId": "core_memory_replace",
+        "summary": "Replace or delete core memory content",
+        "description": "Simulate replacing the contents of a core memory section. Provide an empty string for new_content to delete matching memories.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "The section of the memory to be edited. Possible values are 'persona' for personality traits and 'human' for human-related memories."
+                  },
+                  "old_content": {
+                    "type": "string",
+                    "description": "The string to be replaced. Must be an exact match of the existing content."
+                  },
+                  "new_content": {
+                    "type": "string",
+                    "description": "The new content to write into the memory. Supports all Unicode characters, including emojis."
+                  },
+                  "request_heartbeat": {
+                    "type": "boolean",
+                    "description": "Whether to request an immediate heartbeat after function execution. Set to true to ensure the system is immediately updated with the changes."
+                  }
+                },
+                "required": [
+                  "name",
+                  "old_content",
+                  "new_content",
+                  "request_heartbeat"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Result payload for a successful core memory replacement or deletion.",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "True when the replacement or deletion operation completed successfully."
+                    },
+                    "modified_count": {
+                      "type": "integer",
+                      "description": "Number of memory entries that were modified or deleted."
+                    },
+                    "deleted": {
+                      "type": "boolean",
+                      "description": "True if the operation deleted entries (new_content was an empty string)."
+                    },
+                    "old_content_match": {
+                      "type": "boolean",
+                      "description": "Whether an exact match for old_content was found."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "modified_count",
+                    "deleted",
+                    "old_content_match"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/recall_memory_search": {
+      "post": {
+        "operationId": "recall_memory_search",
+        "summary": "Simulate searching conversation history for a query and return paginated matches",
+        "description": "Simulates locating occurrences of the provided query string in prior conversation history and returning paginated results.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "description": "The search string to locate within the conversation history."
+                  },
+                  "page": {
+                    "type": "integer",
+                    "description": "Specifies the page number of results to retrieve, where 0 represents the first page.",
+                    "default": 0
+                  },
+                  "request_heartbeat": {
+                    "type": "boolean",
+                    "description": "When set to true, triggers an immediate heartbeat post function execution to facilitate follow-up actions.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "query"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Paginated search results for the provided query.",
+                  "properties": {
+                    "page": {
+                      "type": "integer",
+                      "description": "Zero-based page index of these results."
+                    },
+                    "page_size": {
+                      "type": "integer",
+                      "description": "Number of result items included on this page."
+                    },
+                    "total_matches": {
+                      "type": "integer",
+                      "description": "Total number of occurrences of the query found across the conversation history."
+                    },
+                    "results": {
+                      "type": "array",
+                      "description": "List of matched occurrences found on this page.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "message_id": {
+                            "type": "string",
+                            "description": "Unique identifier for the message containing the match."
+                          },
+                          "snippet": {
+                            "type": "string",
+                            "description": "A short excerpt from the message that includes the matched query."
+                          },
+                          "context": {
+                            "type": "string",
+                            "description": "Surrounding text or context for the snippet, if available."
+                          },
+                          "occurrence_index": {
+                            "type": "integer",
+                            "description": "Index of this occurrence within the message (0-based) when multiple matches appear in the same message."
+                          },
+                          "timestamp": {
+                            "type": "string",
+                            "description": "Timestamp associated with the message (as stored)."
+                          }
+                        },
+                        "required": [
+                          "message_id",
+                          "snippet"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "next_page_token": {
+                      "type": "string",
+                      "description": "Opaque token to request the next page of results, if any. Absent or empty when there are no further pages."
+                    }
+                  },
+                  "required": [
+                    "results",
+                    "total_matches",
+                    "page",
+                    "page_size"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/archival_memory_insert": {
+      "post": {
+        "operationId": "archival_memory_insert",
+        "summary": "Insert archival memory entry",
+        "description": "Simulate adding an entry to the archival memory system. Ensure content is stored for future retrieval and, if requested, an immediate heartbeat is performed and its result returned.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "content": {
+                    "type": "string",
+                    "description": "Content to be archived. Supports all Unicode characters, including emojis."
+                  },
+                  "request_heartbeat": {
+                    "type": "boolean",
+                    "description": "If set to true, triggers an immediate heartbeat to confirm memory insertion and allows for follow-up actions."
+                  }
+                },
+                "required": [
+                  "content",
+                  "request_heartbeat"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful archival insertion result",
+                  "properties": {
+                    "entry_id": {
+                      "type": "string",
+                      "description": "Opaque unique identifier assigned to the archived entry."
+                    },
+                    "stored_at": {
+                      "type": "string",
+                      "description": "Timestamp when the entry was stored (ISO 8601 recommended, e.g., 2026-03-12T07:20:50Z)."
+                    },
+                    "heartbeat_sent": {
+                      "type": "boolean",
+                      "description": "True if an immediate heartbeat was sent in response to request_heartbeat being true."
+                    },
+                    "heartbeat_result": {
+                      "type": "object",
+                      "description": "Present only if heartbeat_sent is true. Contains the result of the heartbeat action.",
+                      "nullable": true,
+                      "properties": {
+                        "acknowledged": {
+                          "type": "boolean",
+                          "description": "Whether the heartbeat was acknowledged by the downstream system."
+                        },
+                        "note": {
+                          "type": "string",
+                          "description": "Optional textual note about the heartbeat outcome."
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "entry_id",
+                    "stored_at",
+                    "heartbeat_sent"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/archival_memory_search": {
+      "post": {
+        "operationId": "archival_memory_search",
+        "summary": "Semantic archival-memory search (embedding-based)",
+        "description": "Simulate performing an embedding-based semantic search over archival memory and return ranked matches with relevance scores and short excerpts.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "description": "The search term used to query the archival memory. This should be a clear and concise representation of the search intent."
+                  },
+                  "page": {
+                    "type": "integer",
+                    "description": "Specifies the page number of search results to retrieve, allowing for pagination through sets of results. The first page is 0.",
+                    "default": 0
+                  },
+                  "request_heartbeat": {
+                    "type": "boolean",
+                    "description": "Determines whether to request an immediate heartbeat post function execution, which is useful for initiating follow-up actions. Set to 'true' to enable this feature."
+                  }
+                },
+                "required": [
+                  "query",
+                  "request_heartbeat"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search response containing ranked archival items relevant to the query.",
+                  "properties": {
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of matching items across the archive."
+                    },
+                    "results": {
+                      "type": "array",
+                      "description": "Ordered list of retrieved items, most relevant first.",
+                      "minItems": 0,
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the archival item."
+                          },
+                          "score": {
+                            "type": "number",
+                            "description": "Relevance score (higher = more relevant). Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "snippet": {
+                            "type": "string",
+                            "description": "Short excerpt from the item showing why it matched the query."
+                          },
+                          "source": {
+                            "type": "string",
+                            "description": "Origin or collection name for the item, if available."
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "description": "Additional key-value metadata associated with the item.",
+                            "properties": {},
+                            "additionalProperties": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "score",
+                          "snippet"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "next_page_token": {
+                      "type": "string",
+                      "description": "Opaque token to request the next page of results, if available."
+                    }
+                  },
+                  "required": [
+                    "total_results",
+                    "results"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/http_request": {
+      "post": {
+        "operationId": "http_request",
+        "summary": "Generate and execute an HTTP request and return the server response",
+        "description": "Simulate constructing and sending an HTTP request using the provided method, url, and payload_json, then return the server's response (status, headers, and body). Validate inputs (JSON payload and fully qualified URL) before executing.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "method": {
+                    "type": "string",
+                    "description": "The HTTP method to be used for the request, such as 'GET', 'POST', 'PUT', 'DELETE', etc.",
+                    "enum": [
+                      "GET",
+                      "POST",
+                      "PUT",
+                      "DELETE",
+                      "PATCH",
+                      "OPTIONS",
+                      "HEAD"
+                    ]
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "The fully qualified URL to which the request will be sent."
+                  },
+                  "payload_json": {
+                    "type": "string",
+                    "description": "A JSON-formatted string that contains the payload data to be sent with the request. Must be a valid JSON string.",
+                    "default": "{}"
+                  },
+                  "request_heartbeat": {
+                    "type": "boolean",
+                    "description": "When set to true, the function will request an immediate heartbeat after execution, which is useful for sending a follow-up message or initiating another function."
+                  }
+                },
+                "required": [
+                  "method",
+                  "url",
+                  "request_heartbeat"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "The successful HTTP response returned by the target server.",
+                  "properties": {
+                    "status_code": {
+                      "type": "integer",
+                      "description": "HTTP response status code returned by the server."
+                    },
+                    "headers": {
+                      "type": "object",
+                      "description": "Response headers as a mapping from header name to one or more values.",
+                      "properties": {},
+                      "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "body": {
+                      "type": "string",
+                      "description": "Raw response body as a string."
+                    },
+                    "body_json": {
+                      "type": "object",
+                      "description": "When the response Content-Type indicates JSON and the body parses as JSON, this contains the parsed JSON value.",
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "description": "Parameter body_json option 1",
+                          "properties": {}
+                        },
+                        {
+                          "type": "array",
+                          "description": "Parameter body_json option 2",
+                          "items": {
+                            "type": "string",
+                            "description": "Array item"
+                          }
+                        },
+                        {
+                          "type": "string",
+                          "description": "Parameter body_json option 3"
+                        },
+                        {
+                          "type": "number",
+                          "description": "Parameter body_json option 4"
+                        },
+                        {
+                          "type": "boolean",
+                          "description": "Parameter body_json option 5"
+                        },
+                        {
+                          "type": "null",
+                          "description": "Parameter body_json option 6"
+                        }
+                      ],
+                      "properties": {}
+                    }
+                  },
+                  "required": [
+                    "status_code",
+                    "headers",
+                    "body"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

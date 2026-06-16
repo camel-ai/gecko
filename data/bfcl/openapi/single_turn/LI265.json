@@ -1,0 +1,309 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI265",
+    "version": "1.0.0",
+    "description": "LI265 provides tools to assess vehicle safety by calculating spatial and temporal distances to leading objects using curvilinear coordinates. It includes functions to determine headway distance, time headway, and time to collision based on ego vehicle data, detected lanes, and 3D perception inputs, enabling real-time risk assessment and decision-making in autonomous driving scenarios."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI265"
+    }
+  ],
+  "paths": {
+    "/get_headway": {
+      "post": {
+        "operationId": "get_headway",
+        "summary": "Simulates headway calculation from ego vehicle to closest leading object using curvilinear coordinates.",
+        "description": "This simulation calculates the headway distance from the front of the ego vehicle to the nearest detected object ahead, based on the ego vehicle's position and orientation, the detected lane information, and 3D bounding boxes representing surrounding objects.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "ego_info": {
+                    "type": "object",
+                    "description": "Information about the ego vehicle, including its position and orientation.",
+                    "properties": {
+                      "position": {
+                        "type": "object",
+                        "description": "Curvilinear coordinates of the ego vehicle, consisting of lateral and longitudinal positions.",
+                        "properties": {
+                          "lateral": {
+                            "type": "number",
+                            "description": "Lateral position of the ego vehicle in meters."
+                          },
+                          "longitudinal": {
+                            "type": "number",
+                            "description": "Longitudinal position of the ego vehicle in meters."
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "orientation": {
+                        "type": "number",
+                        "description": "Orientation of the ego vehicle in degrees."
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "lane_info": {
+                    "type": "object",
+                    "description": "Information about the detected lane.",
+                    "properties": {
+                      "lane_id": {
+                        "type": "string",
+                        "description": "Unique identifier for the detected lane."
+                      },
+                      "lane_type": {
+                        "type": "string",
+                        "description": "Type of the lane.",
+                        "enum": [
+                          "regular",
+                          "merge",
+                          "exit",
+                          "turn"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "bounding_boxes": {
+                    "type": "array",
+                    "description": "List of 3D bounding boxes representing detected objects. Each bounding box should include dimensions and the object's position relative to the ego vehicle.",
+                    "items": {
+                      "type": "object",
+                      "description": "Array item",
+                      "properties": {},
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "ego_info",
+                  "lane_info",
+                  "bounding_boxes"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Headway calculation result.",
+                  "properties": {
+                    "headway_distance": {
+                      "type": "number",
+                      "description": "Distance from the front of the ego vehicle to the closest leading object in meters."
+                    }
+                  },
+                  "required": [
+                    "headway_distance"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_time_headway": {
+      "post": {
+        "operationId": "get_time_headway",
+        "summary": "Simulates calculation of time headway to closest leading object.",
+        "description": "Simulates the time it takes for the ego vehicle to reach the nearest leading object using ego vehicle state, lane curvature, and perceived object data.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "ego_info": {
+                    "type": "object",
+                    "description": "Contains the ego vehicle's current position and velocity.",
+                    "properties": {
+                      "position": {
+                        "type": "array",
+                        "description": "The vehicle's current position as a tuple of x, y, and z coordinates (meters).",
+                        "items": {
+                          "type": "number",
+                          "description": "Array item"
+                        },
+                        "minItems": 3,
+                        "maxItems": 3
+                      },
+                      "velocity": {
+                        "type": "number",
+                        "description": "The vehicle's current velocity in meters per second (m/s)."
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "lane_info": {
+                    "type": "object",
+                    "description": "Information about the detected lane, including its curvature and width.",
+                    "properties": {
+                      "curvature": {
+                        "type": "number",
+                        "description": "The curvature of the lane at the ego vehicle's position (1/meters)."
+                      },
+                      "width": {
+                        "type": "number",
+                        "description": "The width of the lane in meters (m)."
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "bboxes": {
+                    "type": "array",
+                    "description": "List of 3D bounding boxes representing perceived objects. Each bounding box is described by its position and size.",
+                    "items": {
+                      "type": "object",
+                      "description": "Array item",
+                      "properties": {},
+                      "additionalProperties": false
+                    }
+                  },
+                  "velocities": {
+                    "type": "array",
+                    "description": "List of velocities of the detected objects in meters per second (m/s).",
+                    "items": {
+                      "type": "number",
+                      "description": "Array item"
+                    }
+                  },
+                  "accelerations": {
+                    "type": "array",
+                    "description": "List of accelerations of the detected objects in meters per second squared (m/s^2).",
+                    "items": {
+                      "type": "number",
+                      "description": "Array item"
+                    }
+                  }
+                },
+                "required": [
+                  "ego_info",
+                  "lane_info",
+                  "bboxes",
+                  "velocities",
+                  "accelerations"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Time headway calculation result",
+                  "properties": {
+                    "time_headway": {
+                      "type": "number",
+                      "description": "Time headway (seconds) to the closest leading object"
+                    }
+                  },
+                  "required": [
+                    "time_headway"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_time_to_collision": {
+      "post": {
+        "operationId": "get_time_to_collision",
+        "summary": "Simulates time to collision with leading object based on velocities and accelerations.",
+        "description": "Calculates the time it will take for the ego vehicle to collide with the closest leading object in curvilinear coordinates, considering both vehicles' velocities and the leading object's acceleration.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "ego_velocity": {
+                    "type": "number",
+                    "description": "The current velocity of the ego vehicle in meters per second.",
+                    "minimum": 0
+                  },
+                  "ego_acceleration": {
+                    "type": "number",
+                    "description": "The current acceleration of the ego vehicle in meters per second squared."
+                  },
+                  "leading_object_velocity": {
+                    "type": "number",
+                    "description": "The current velocity of the leading object in meters per second.",
+                    "minimum": 0
+                  },
+                  "leading_object_acceleration": {
+                    "type": "number",
+                    "description": "The current acceleration of the leading object in meters per second squared."
+                  },
+                  "initial_distance": {
+                    "type": "number",
+                    "description": "The initial distance between the ego vehicle and the leading object in meters.",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "ego_velocity",
+                  "ego_acceleration",
+                  "leading_object_velocity",
+                  "leading_object_acceleration",
+                  "initial_distance"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "time_to_collision": {
+                      "type": "number",
+                      "description": "Time in seconds until the ego vehicle collides with the leading object. Returns null if no collision is predicted.",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "time_to_collision"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

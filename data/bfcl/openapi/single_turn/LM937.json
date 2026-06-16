@@ -1,0 +1,260 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM937",
+    "version": "1.0.0",
+    "description": "LM937 exposes programmatic endpoints to manage project discovery and security scanning: team-scoped project retrieval (with filters for inactive or non-root projects), property enumeration by project UUID, and initiation of vulnerability analysis by project UUID. Use UUID identifiers and simple query flags to select targets, then call the analysis endpoint to start vulnerability scans and monitor results through standard async or polling workflows."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM937"
+    }
+  ],
+  "paths": {
+    "/AclApi_retrieve_projects": {
+      "post": {
+        "operationId": "AclApi_retrieve_projects",
+        "summary": "Retrieve projects assigned to a team",
+        "description": "Simulate retrieval of projects assigned to the provided team UUID. Supports flags to exclude inactive projects and to return only root projects.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "uuid": {
+                    "type": "string",
+                    "description": "The unique identifier (UUID) of the team for which to retrieve assigned projects."
+                  },
+                  "excludeInactive": {
+                    "type": "boolean",
+                    "description": "When set to true, inactive projects are excluded from the results.",
+                    "default": false
+                  },
+                  "onlyRoot": {
+                    "type": "boolean",
+                    "description": "When set to true, only root projects are included in the results, excluding any child projects.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "uuid"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "description": "Array of project objects assigned to the specified team.",
+                  "items": {
+                    "type": "object",
+                    "description": "Array item",
+                    "properties": {
+                      "projectId": {
+                        "type": "string",
+                        "description": "Project unique identifier (UUID)."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Human-readable project name."
+                      },
+                      "active": {
+                        "type": "boolean",
+                        "description": "Whether the project is currently active."
+                      },
+                      "isRoot": {
+                        "type": "boolean",
+                        "description": "Whether this project is a root project (has no parent)."
+                      },
+                      "parentProjectId": {
+                        "type": "string",
+                        "description": "Parent project UUID if this is a child project, otherwise null."
+                      }
+                    },
+                    "required": [
+                      "projectId",
+                      "name",
+                      "active",
+                      "isRoot"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ProjectPropertyApi_get_properties": {
+      "post": {
+        "operationId": "ProjectPropertyApi_get_properties",
+        "summary": "Retrieve project properties by project UUID",
+        "description": "Simulate retrieval of all project properties for the given project UUID. Returns an array of property objects (may be empty) on success.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "uuid": {
+                    "type": "string",
+                    "description": "The unique identifier of the project for which properties are to be retrieved. It must be a valid UUID format, such as '123e4567-e89b-12d3-a456-426614174000'.",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "uuid"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing the list of properties associated with the specified project.",
+                  "properties": {
+                    "properties": {
+                      "type": "array",
+                      "description": "Array of project property objects. May be empty if the project has no properties.",
+                      "minItems": 0,
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier of the property. Provide as a UUID.",
+                            "format": "uuid"
+                          },
+                          "key": {
+                            "type": "string",
+                            "description": "The property's key or name."
+                          },
+                          "value": {
+                            "type": "string",
+                            "description": "The property's value."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Optional human-readable description of the property.",
+                            "nullable": true
+                          },
+                          "type": {
+                            "type": "string",
+                            "description": "Type of the property's value (for example: string, number, boolean)."
+                          },
+                          "required": {
+                            "type": "boolean",
+                            "description": "Whether this property is required for the project."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "key",
+                          "value",
+                          "type",
+                          "required"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "properties"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/FindingApi_analyze_project": {
+      "post": {
+        "operationId": "FindingApi_analyze_project",
+        "summary": "Initiate project vulnerability analysis",
+        "description": "Simulate initiating a vulnerability analysis for the project identified by the provided UUID. Returns metadata about the created analysis job so callers can track progress.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "uuid": {
+                    "type": "string",
+                    "description": "The unique identifier (UUID) of the project for which the vulnerability analysis is to be performed."
+                  }
+                },
+                "required": [
+                  "uuid"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Metadata for the initiated vulnerability analysis job.",
+                  "properties": {
+                    "analysis_id": {
+                      "type": "string",
+                      "description": "A unique identifier for the analysis run."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Current lifecycle state of the analysis (for example: queued, running, completed). Example values are illustrative and not exhaustive."
+                    },
+                    "queued_at": {
+                      "type": "string",
+                      "description": "Timestamp when the analysis was queued. ISO 8601 is recommended for interoperability, but format is not enforced here."
+                    },
+                    "estimated_completion_seconds": {
+                      "type": "integer",
+                      "description": "Estimated remaining time to completion in seconds."
+                    },
+                    "findings_count": {
+                      "type": "integer",
+                      "description": "Number of findings discovered so far by the analysis."
+                    }
+                  },
+                  "required": [
+                    "analysis_id",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,257 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LS71",
+    "version": "1.0.0",
+    "description": "LS71 is an API collection for converting natural-language analytical requests into structured query parameters. Its core tool, extract_parameters_v1, parses user prompts to identify demographics, target entities, metrics, country, and date ranges, producing validated filters for database queries. Designed for programmatic integration or conversational agents, LS71 streamlines generation of accurate analytics queries, supports iterative clarification, and fits into ETL or BI pipelines to automate parameter extraction and query construction."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LS71"
+    }
+  ],
+  "paths": {
+    "/extract_parameters_v1": {
+      "post": {
+        "operationId": "extract_parameters_v1",
+        "summary": "Simulate extraction of query parameters (demographics, targets, metrics, country, date range, interval).",
+        "description": "Run a deterministic extraction that identifies demographics, target entities and types, metrics, country, and min/max dates from a user's question. Return empty arrays or nulls when no value is inferred.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload. Guidance: return empty arrays for demographics when nothing is inferred; use null for unspecified country, min_date, max_date, and interval. Do not modify the original names, types, or required fields.",
+                "properties": {
+                  "demographics": {
+                    "type": "array",
+                    "description": "Array of strings indicating demographics, geographic, or psychographic characteristics, e.g., 'wealthy', 'women'. If no demographics inferred, return empty array.",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  },
+                  "targets": {
+                    "type": "array",
+                    "description": "Array of target entities and types. Each entry is a string combining 'target' and 'target_type', such as 'brand:Nike' or 'country:USA'.",
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  },
+                  "metrics": {
+                    "type": "array",
+                    "description": "Array of strings for attitudinal metrics about target entities, e.g., 'trust', 'usage frequency'.",
+                    "items": {
+                      "type": "string",
+                      "description": "Array item",
+                      "enum": [
+                        "favorability",
+                        "admired employer",
+                        "buzz",
+                        "community impact",
+                        "purchasing consideration",
+                        "trust",
+                        "usage frequency",
+                        "value",
+                        "promoter",
+                        "view"
+                      ]
+                    }
+                  },
+                  "country": {
+                    "type": "string",
+                    "description": "Country related to the demographics of interest. If unspecified, default is null.",
+                    "default": null
+                  },
+                  "min_date": {
+                    "type": "string",
+                    "description": "Start date of the date range in YYYY-MM-DD format. Default is null, representing no specific start date.",
+                    "default": null
+                  },
+                  "max_date": {
+                    "type": "string",
+                    "description": "End date of the date range in YYYY-MM-DD format. Default is null, representing no specific end date.",
+                    "default": null
+                  },
+                  "interval": {
+                    "type": "string",
+                    "description": "Aggregation interval for data reporting, e.g., 'daily', 'monthly'. If unspecified, default is null.",
+                    "enum": [
+                      "day",
+                      "week",
+                      "month",
+                      "quarter",
+                      "year"
+                    ],
+                    "default": null
+                  }
+                },
+                "required": [
+                  "targets",
+                  "metrics"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Extracted parameters for building a database query.",
+                  "properties": {
+                    "demographics": {
+                      "type": "array",
+                      "description": "Array of strings indicating inferred demographics, geographic, or psychographic characteristics. If none inferred, return an empty array.",
+                      "default": [],
+                      "items": {
+                        "type": "string",
+                        "description": "Demographic descriptor (e.g., \"women\", \"wealthy\")."
+                      }
+                    },
+                    "targets": {
+                      "type": "array",
+                      "description": "Original target strings as found/normalized from the user's question, each typically in the form 'type:value' (e.g., 'brand:Nike' or 'country:USA').",
+                      "items": {
+                        "type": "string",
+                        "description": "Target string."
+                      }
+                    },
+                    "parsed_targets": {
+                      "type": "array",
+                      "description": "Parsed representation of each target string split into type and value. Preserve order corresponding to 'targets'.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "target_type": {
+                            "type": "string",
+                            "description": "Type portion of the target string (e.g., 'brand', 'country')."
+                          },
+                          "target": {
+                            "type": "string",
+                            "description": "Value portion of the target string (e.g., 'Nike', 'USA')."
+                          }
+                        },
+                        "required": [
+                          "target_type",
+                          "target"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "metrics": {
+                      "type": "array",
+                      "description": "Attitudinal metrics identified for the query.",
+                      "items": {
+                        "type": "string",
+                        "description": "Metric name (e.g., 'trust', 'usage frequency').",
+                        "enum": [
+                          "favorability",
+                          "admired employer",
+                          "buzz",
+                          "community impact",
+                          "purchasing consideration",
+                          "trust",
+                          "usage frequency",
+                          "value",
+                          "promoter",
+                          "view"
+                        ]
+                      }
+                    },
+                    "country": {
+                      "type": "object",
+                      "description": "Country related to the demographics of interest. Null if unspecified.",
+                      "oneOf": [
+                        {
+                          "type": "string",
+                          "description": "Parameter country option 1"
+                        },
+                        {
+                          "type": "null",
+                          "description": "Parameter country option 2"
+                        }
+                      ],
+                      "properties": {}
+                    },
+                    "min_date": {
+                      "type": "object",
+                      "description": "Start date of the date range in YYYY-MM-DD format as inferred. Use null to indicate no specific start date.",
+                      "oneOf": [
+                        {
+                          "type": "string",
+                          "description": "Parameter min_date option 1"
+                        },
+                        {
+                          "type": "null",
+                          "description": "Parameter min_date option 2"
+                        }
+                      ],
+                      "properties": {}
+                    },
+                    "max_date": {
+                      "type": "object",
+                      "description": "End date of the date range in YYYY-MM-DD format as inferred. Use null to indicate no specific end date.",
+                      "oneOf": [
+                        {
+                          "type": "string",
+                          "description": "Parameter max_date option 1"
+                        },
+                        {
+                          "type": "null",
+                          "description": "Parameter max_date option 2"
+                        }
+                      ],
+                      "properties": {}
+                    },
+                    "interval": {
+                      "type": "object",
+                      "description": "Aggregation interval for reporting. Null if unspecified.",
+                      "oneOf": [
+                        {
+                          "type": "string",
+                          "description": "Parameter interval option 1",
+                          "enum": [
+                            "day",
+                            "week",
+                            "month",
+                            "quarter",
+                            "year"
+                          ]
+                        },
+                        {
+                          "type": "null",
+                          "description": "Parameter interval option 2"
+                        }
+                      ],
+                      "properties": {}
+                    }
+                  },
+                  "required": [
+                    "targets",
+                    "parsed_targets",
+                    "metrics",
+                    "demographics",
+                    "country",
+                    "min_date",
+                    "max_date",
+                    "interval"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

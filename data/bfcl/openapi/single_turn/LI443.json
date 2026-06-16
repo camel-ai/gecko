@@ -1,0 +1,241 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI443",
+    "version": "1.0.0",
+    "description": "The LI443 API collection provides a single-purpose interface to retrieve weather forecasts for specified locations and date ranges using the weather_forecast_get_prediction tool. Developers can request temperature, precipitation probability and amounts, and wind speed data in JSON for integration into apps, dashboards, or automation pipelines; queries accept standard location identifiers and date ranges, emphasize straightforward synchronous requests, and return structured time-series forecast results for downstream processing."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI443"
+    }
+  ],
+  "paths": {
+    "/weather_forecast_get_prediction": {
+      "post": {
+        "operationId": "weather_forecast_get_prediction",
+        "summary": "Get weather forecast predictions",
+        "description": "Simulate retrieval of weather forecast data (temperature, precipitation, wind) for a given location and date range.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "The location for which to retrieve the weather forecast, in the format of 'City, Country' (e.g., 'London, UK')."
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "description": "The start date for the forecast period in the format of 'YYYY-MM-DD' (e.g., '2023-04-01')."
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "description": "The end date for the forecast period in the format of 'YYYY-MM-DD' (e.g., '2023-04-07')."
+                  },
+                  "units": {
+                    "type": "string",
+                    "description": "The unit system used for the weather forecast. Choose 'metric' for Celsius or 'imperial' for Fahrenheit.",
+                    "enum": [
+                      "metric",
+                      "imperial"
+                    ],
+                    "default": "metric"
+                  },
+                  "include_details": {
+                    "type": "boolean",
+                    "description": "Whether to include detailed hourly forecast data or not. If set to false, only daily summaries will be provided.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "location",
+                  "start_date",
+                  "end_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful weather forecast response payload",
+                  "properties": {
+                    "location": {
+                      "type": "string",
+                      "description": "The location for which the forecast applies, matching the request's location string (e.g., 'City, Country')."
+                    },
+                    "start_date": {
+                      "type": "string",
+                      "description": "Start date of the returned forecast period (YYYY-MM-DD).",
+                      "format": "date"
+                    },
+                    "end_date": {
+                      "type": "string",
+                      "description": "End date of the returned forecast period (YYYY-MM-DD).",
+                      "format": "date"
+                    },
+                    "units": {
+                      "type": "string",
+                      "description": "Unit system used for numeric values in this response. Values should match the request (e.g., 'metric' or 'imperial').",
+                      "enum": [
+                        "metric",
+                        "imperial"
+                      ]
+                    },
+                    "forecasts": {
+                      "type": "array",
+                      "description": "Array of daily forecast objects covering the requested date range. If include_details=true in the request, each day may include an hourly array with finer-grained data.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "date": {
+                            "type": "string",
+                            "description": "Date for this daily forecast entry (YYYY-MM-DD).",
+                            "format": "date"
+                          },
+                          "summary": {
+                            "type": "string",
+                            "description": "Short textual summary of expected weather conditions for the day."
+                          },
+                          "temperature": {
+                            "type": "object",
+                            "description": "Parameter temperature",
+                            "properties": {
+                              "min": {
+                                "type": "number",
+                                "description": "Daily minimum temperature. Use float format (e.g., 1.0 not 1).",
+                                "format": "double"
+                              },
+                              "max": {
+                                "type": "number",
+                                "description": "Daily maximum temperature. Use float format (e.g., 1.0 not 1).",
+                                "format": "double"
+                              },
+                              "average": {
+                                "type": "number",
+                                "description": "Daily average temperature, if available. Use float format (e.g., 1.0 not 1).",
+                                "format": "double"
+                              }
+                            },
+                            "required": [
+                              "min",
+                              "max"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "precipitation": {
+                            "type": "object",
+                            "description": "Parameter precipitation",
+                            "properties": {
+                              "amount": {
+                                "type": "number",
+                                "description": "Estimated precipitation amount for the day. Use float format (e.g., 1.0 not 1).",
+                                "format": "double"
+                              },
+                              "probability": {
+                                "type": "number",
+                                "description": "Probability of precipitation as a decimal between 0 and 1, if available. Provide as a float (e.g., 0.25, not 25).",
+                                "format": "double"
+                              }
+                            },
+                            "required": [
+                              "amount"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "wind": {
+                            "type": "object",
+                            "description": "Parameter wind",
+                            "properties": {
+                              "speed": {
+                                "type": "number",
+                                "description": "Representative wind speed for the day. Use float format (e.g., 1.0 not 1).",
+                                "format": "double"
+                              },
+                              "direction": {
+                                "type": "string",
+                                "description": "Wind direction (e.g., 'NW', 'E')."
+                              }
+                            },
+                            "required": [
+                              "speed"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "hourly": {
+                            "type": "array",
+                            "description": "Optional hourly data array included when include_details=true in the request.",
+                            "items": {
+                              "type": "object",
+                              "description": "Array item",
+                              "properties": {
+                                "time": {
+                                  "type": "string",
+                                  "description": "Local time for this hourly entry (e.g., '14:00')."
+                                },
+                                "temperature": {
+                                  "type": "number",
+                                  "description": "Temperature at the given hour. Use float format (e.g., 1.0 not 1).",
+                                  "format": "double"
+                                },
+                                "precipitation": {
+                                  "type": "number",
+                                  "description": "Precipitation amount at the given hour, if available. Use float format (e.g., 1.0 not 1).",
+                                  "format": "double"
+                                },
+                                "wind_speed": {
+                                  "type": "number",
+                                  "description": "Wind speed at the given hour. Use float format (e.g., 1.0 not 1).",
+                                  "format": "double"
+                                },
+                                "wind_direction": {
+                                  "type": "string",
+                                  "description": "Wind direction at the given hour (e.g., 'NW')."
+                                }
+                              },
+                              "required": [
+                                "time",
+                                "temperature"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "date",
+                          "temperature",
+                          "precipitation",
+                          "wind"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "location",
+                    "start_date",
+                    "end_date",
+                    "units",
+                    "forecasts"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

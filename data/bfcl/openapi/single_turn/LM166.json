@@ -1,0 +1,711 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM166",
+    "version": "1.0.0",
+    "description": "LM166 is a simple, read-focused API collection for retrieving Adriel's professional data. Use its endpoints to fetch project lists and details, experiences, education records, and a full profile; each call returns structured JSON suitable for client-side rendering or integration into dashboards. Designed for quick lookups and filtering, the endpoints support pagination and selective fields to minimize payload and simplify integration into user profiles, reports, or administrative panels."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM166"
+    }
+  ],
+  "paths": {
+    "/get_detail_adriel_project": {
+      "post": {
+        "operationId": "get_detail_adriel_project",
+        "summary": "Retrieve detailed project info assigned to Adriel",
+        "description": "Simulate retrieval of the detailed information for a specific project that Adriel has been assigned to. Supports optionally returning financial details when requested.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "project_name": {
+                    "type": "string",
+                    "description": "The unique name identifier for the project."
+                  },
+                  "include_financials": {
+                    "type": "boolean",
+                    "description": "A flag to determine if financial information related to the project should be included in the details.",
+                    "default": false
+                  },
+                  "requested_by": {
+                    "type": "string",
+                    "description": "The name of the person or system requesting the project details. Format: 'FirstName LastName' (e.g., 'John Doe').",
+                    "default": "System Auto-Request"
+                  }
+                },
+                "required": [
+                  "project_name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Detailed project information returned on successful retrieval.",
+                  "properties": {
+                    "project_id": {
+                      "type": "string",
+                      "description": "Unique internal identifier for the project."
+                    },
+                    "project_name": {
+                      "type": "string",
+                      "description": "The unique name identifier for the project."
+                    },
+                    "title": {
+                      "type": "string",
+                      "description": "Human-friendly project title."
+                    },
+                    "assigned_to": {
+                      "type": "string",
+                      "description": "Person assigned to the project (e.g., 'Adriel')."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Current lifecycle status of the project."
+                    },
+                    "summary": {
+                      "type": "string",
+                      "description": "Brief summary describing the project's goal and scope."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp when the project was created (RFC 3339).",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "description": "Timestamp of the last update to the project (RFC 3339).",
+                      "format": "date-time"
+                    },
+                    "financials": {
+                      "type": "object",
+                      "description": "Financial details for the project. This object is present only when include_financials=true in the request.",
+                      "properties": {
+                        "currency": {
+                          "type": "string",
+                          "description": "Currency code (ISO 4217, e.g., 'USD')."
+                        },
+                        "budget": {
+                          "type": "number",
+                          "description": "Total budget allocated. Use float format (e.g., 1.0 not 1).",
+                          "format": "double"
+                        },
+                        "spent": {
+                          "type": "number",
+                          "description": "Amount spent to date. Use float format (e.g., 1.0 not 1).",
+                          "format": "double"
+                        }
+                      },
+                      "required": [
+                        "currency",
+                        "budget",
+                        "spent"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "metadata": {
+                      "type": "object",
+                      "description": "Additional metadata as key/value pairs.",
+                      "properties": {},
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "project_id",
+                    "project_name",
+                    "assigned_to",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_adriel_list_projects": {
+      "post": {
+        "operationId": "get_adriel_list_projects",
+        "summary": "Retrieve Adriel's projects (names and statuses)",
+        "description": "Simulate retrieving the list of projects that user Adriel is currently working on. Honours include_completed and paginates results.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "user_id": {
+                    "type": "string",
+                    "description": "The unique identifier for the user whose project list is being requested."
+                  },
+                  "include_completed": {
+                    "type": "boolean",
+                    "description": "Determines whether to include completed projects in the list.",
+                    "default": false
+                  },
+                  "page": {
+                    "type": "integer",
+                    "description": "The page number for pagination, starting from 1.",
+                    "default": 1,
+                    "minimum": 1
+                  },
+                  "page_size": {
+                    "type": "integer",
+                    "description": "The number of projects to display per page.",
+                    "default": 10,
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "user_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload containing the matched projects and pagination metadata.",
+                  "properties": {
+                    "projects": {
+                      "type": "array",
+                      "description": "List of projects matching the request filters and pagination.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "description": "Project name."
+                          },
+                          "status": {
+                            "type": "string",
+                            "description": "Current status of the project."
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "status"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "description": "Pagination metadata for the returned list.",
+                      "properties": {
+                        "total_count": {
+                          "type": "integer",
+                          "description": "Total number of projects that match the filters.",
+                          "minimum": 0
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "Current page number.",
+                          "minimum": 1
+                        },
+                        "page_size": {
+                          "type": "integer",
+                          "description": "Number of projects returned per page.",
+                          "minimum": 1
+                        }
+                      },
+                      "required": [
+                        "total_count",
+                        "page",
+                        "page_size"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "projects",
+                    "pagination"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_adriel_experiences": {
+      "post": {
+        "operationId": "get_adriel_experiences",
+        "summary": "Retrieve Adriel's experiences",
+        "description": "Simulate retrieval of Adriel's experiences (jobs, projects, education) according to the request parameters.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "user_id": {
+                    "type": "string",
+                    "description": "The unique identifier of the user whose experiences are being retrieved."
+                  },
+                  "include_education": {
+                    "type": "boolean",
+                    "description": "A flag indicating whether educational experiences should also be included in the results.",
+                    "default": false
+                  },
+                  "date_format": {
+                    "type": "string",
+                    "description": "The expected string format for dates, such as 'YYYY-MM-DD'.",
+                    "default": "YYYY-MM-DD"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "The maximum number of experiences to retrieve.",
+                    "default": 10
+                  },
+                  "sort_order": {
+                    "type": "string",
+                    "description": "The order in which to sort the experiences, either 'ascending' or 'descending'.",
+                    "enum": [
+                      "ascending",
+                      "descending"
+                    ],
+                    "default": "descending"
+                  }
+                },
+                "required": [
+                  "user_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "experiences": {
+                      "type": "array",
+                      "description": "List of experiences matching the request.",
+                      "maxItems": 1000,
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the experience."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Title or name of the experience (job title or project name)."
+                          },
+                          "type": {
+                            "type": "string",
+                            "description": "Type of experience, for example 'job', 'project', or 'education'."
+                          },
+                          "organization": {
+                            "type": "string",
+                            "description": "Organization or company associated with the experience."
+                          },
+                          "role": {
+                            "type": "string",
+                            "description": "Role or responsibilities held during the experience."
+                          },
+                          "start_date": {
+                            "type": "string",
+                            "description": "Start date for the experience. Matches the request's date_format when provided."
+                          },
+                          "end_date": {
+                            "type": "string",
+                            "description": "End date for the experience, or null if ongoing. Matches the request's date_format when provided."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Detailed description of the experience."
+                          },
+                          "is_education": {
+                            "type": "boolean",
+                            "description": "True when this experience is educational in nature."
+                          },
+                          "tags": {
+                            "type": "array",
+                            "description": "Optional tags or keywords associated with the experience.",
+                            "items": {
+                              "type": "string",
+                              "description": "Array item"
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "type",
+                          "start_date"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "experiences"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_adriel_education": {
+      "post": {
+        "operationId": "get_adriel_education",
+        "summary": "Return Adriel's education and optional certifications",
+        "description": "Simulate a list of Adriel's formal educational qualifications (institution, degree, field of study). Optionally include professional certifications when requested.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "user_id": {
+                    "type": "string",
+                    "description": "The unique identifier for the user whose education details are being retrieved."
+                  },
+                  "include_certifications": {
+                    "type": "boolean",
+                    "description": "Determines whether to include professional certifications along with formal education qualifications.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "user_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing Adriel's education and, optionally, certifications.",
+                  "properties": {
+                    "educations": {
+                      "type": "array",
+                      "description": "List of formal education qualifications, ordered most recent first.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "institution": {
+                            "type": "string",
+                            "description": "Name of the educational institution."
+                          },
+                          "degree": {
+                            "type": "string",
+                            "description": "Degree or qualification obtained (for example, Bachelor of Science, Master of Arts)."
+                          },
+                          "field_of_study": {
+                            "type": "string",
+                            "description": "Primary field or major of study."
+                          },
+                          "start_year": {
+                            "type": "integer",
+                            "description": "Start year of the program if known."
+                          },
+                          "end_year": {
+                            "type": "integer",
+                            "description": "Graduation or program end year if known."
+                          },
+                          "honors": {
+                            "type": "string",
+                            "description": "Honors or distinctions, if any."
+                          }
+                        },
+                        "required": [
+                          "institution",
+                          "degree",
+                          "field_of_study"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "certifications": {
+                      "type": "array",
+                      "description": "Professional certifications. Present only when include_certifications is true; may be omitted or empty otherwise.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "description": "Certification name."
+                          },
+                          "issuing_organization": {
+                            "type": "string",
+                            "description": "Organization that issued the certification."
+                          },
+                          "issued_year": {
+                            "type": "integer",
+                            "description": "Year the certification was issued, if known."
+                          }
+                        },
+                        "required": [
+                          "name"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "educations"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_adriel_profile": {
+      "post": {
+        "operationId": "get_adriel_profile",
+        "summary": "Simulate retrieval of Adriel's detailed user profile",
+        "description": "Return a simulated, detailed profile for the user (Adriel). Include personal, professional, education and optional contact details according to the request parameters and requested format.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "user_id": {
+                    "type": "string",
+                    "description": "The unique identifier for the user whose profile is being requested."
+                  },
+                  "include_contacts": {
+                    "type": "boolean",
+                    "description": "A flag to determine if the contact details should be included in the profile information.",
+                    "default": false
+                  },
+                  "format": {
+                    "type": "string",
+                    "description": "The desired format for the profile data.",
+                    "enum": [
+                      "json",
+                      "xml",
+                      "yaml"
+                    ],
+                    "default": "json"
+                  }
+                },
+                "required": [
+                  "user_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful profile payload for the requested user.",
+                  "properties": {
+                    "user_id": {
+                      "type": "string",
+                      "description": "The unique identifier of the user whose profile this is."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Full name of the user."
+                    },
+                    "preferred_name": {
+                      "type": "string",
+                      "description": "Preferred or display name, if different from full name."
+                    },
+                    "title": {
+                      "type": "string",
+                      "description": "Current professional title (e.g., Senior Engineer, Product Manager)."
+                    },
+                    "headline": {
+                      "type": "string",
+                      "description": "Short professional headline or one-line summary."
+                    },
+                    "summary": {
+                      "type": "string",
+                      "description": "Longer biography or professional summary."
+                    },
+                    "skills": {
+                      "type": "array",
+                      "description": "Key skills or areas of expertise.",
+                      "items": {
+                        "type": "string",
+                        "description": "Array item"
+                      }
+                    },
+                    "experience": {
+                      "type": "array",
+                      "description": "List of professional roles and positions.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "company": {
+                            "type": "string",
+                            "description": "Employer or organization name."
+                          },
+                          "role": {
+                            "type": "string",
+                            "description": "Role or job title held."
+                          },
+                          "start_date": {
+                            "type": "string",
+                            "description": "Start date for the role."
+                          },
+                          "end_date": {
+                            "type": "string",
+                            "description": "End date for the role, null if current.",
+                            "nullable": true
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Optional description of responsibilities and achievements."
+                          }
+                        },
+                        "required": [
+                          "company",
+                          "role",
+                          "start_date"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "education": {
+                      "type": "array",
+                      "description": "Educational background entries.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "institution": {
+                            "type": "string",
+                            "description": "Name of the educational institution."
+                          },
+                          "degree": {
+                            "type": "string",
+                            "description": "Degree or certification earned."
+                          },
+                          "field_of_study": {
+                            "type": "string",
+                            "description": "Primary field of study."
+                          },
+                          "start_year": {
+                            "type": "integer",
+                            "description": "Start year for the program."
+                          },
+                          "end_year": {
+                            "type": "integer",
+                            "description": "Graduation year or end year, null if ongoing.",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "institution"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "locations": {
+                      "type": "array",
+                      "description": "Locations associated with the user (cities, regions).",
+                      "items": {
+                        "type": "string",
+                        "description": "Array item"
+                      }
+                    },
+                    "contacts": {
+                      "type": "object",
+                      "description": "Contact details. Present only when include_contacts is true in the request.",
+                      "properties": {
+                        "email": {
+                          "type": "string",
+                          "description": "Primary email address."
+                        },
+                        "phone": {
+                          "type": "string",
+                          "description": "Primary phone number."
+                        },
+                        "linkedin": {
+                          "type": "string",
+                          "description": "LinkedIn profile URL or handle."
+                        },
+                        "twitter": {
+                          "type": "string",
+                          "description": "Twitter handle or URL."
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "last_updated": {
+                      "type": "string",
+                      "description": "Timestamp indicating when this profile was last refreshed."
+                    }
+                  },
+                  "required": [
+                    "user_id",
+                    "name"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

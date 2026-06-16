@@ -1,0 +1,485 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI760",
+    "version": "1.0.0",
+    "description": "LI760 is an API collection for inventory, search, and remediation workflows: retrieve components by cryptographic hash, search components or projects by query, and locate known vulnerable software via query or CPE identifier; it also exposes an irreversible team deletion endpoint for administrative cleanup. Designed for programmatic integration into CI/CD and asset-management pipelines, usage is query-driven and suited to automated discovery, risk assessment, and remediation orchestration."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI760"
+    }
+  ],
+  "paths": {
+    "/ComponentApi_get_component_by_hash": {
+      "post": {
+        "operationId": "ComponentApi_get_component_by_hash",
+        "summary": "Retrieve components by cryptographic hash",
+        "description": "Simulate returning a list of components that exactly match the provided cryptographic hash.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "hash": {
+                    "type": "string",
+                    "description": "A cryptographic hash of the component to retrieve. This can be in the format of MD5, SHA-1, SHA-256, SHA-384, SHA-512, SHA3-256, SHA3-384, SHA3-512, BLAKE2b-256, BLAKE2b-384, BLAKE2b-512, or BLAKE3.",
+                    "enum": [
+                      "MD5",
+                      "SHA-1",
+                      "SHA-256",
+                      "SHA-384",
+                      "SHA-512",
+                      "SHA3-256",
+                      "SHA3-384",
+                      "SHA3-512",
+                      "BLAKE2b-256",
+                      "BLAKE2b-384",
+                      "BLAKE2b-512",
+                      "BLAKE3"
+                    ]
+                  }
+                },
+                "required": [
+                  "hash"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "description": "A list of components that match the provided cryptographic hash. May be empty if no match is found.",
+                  "items": {
+                    "type": "object",
+                    "description": "A single component record.",
+                    "properties": {
+                      "component_id": {
+                        "type": "string",
+                        "description": "Unique identifier for the component."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Human-readable name of the component."
+                      },
+                      "version": {
+                        "type": "string",
+                        "description": "Component version identifier, if available."
+                      },
+                      "hash": {
+                        "type": "object",
+                        "description": "The cryptographic hash associated with this component.",
+                        "properties": {
+                          "algorithm": {
+                            "type": "string",
+                            "description": "Name of the hash algorithm used for this value (examples: MD5, SHA-1, SHA-256, SHA-384, SHA-512, SHA3-256, SHA3-384, SHA3-512, BLAKE2b-256, BLAKE2b-384, BLAKE2b-512, BLAKE3). Do not assume a specific encoding from this field alone."
+                          },
+                          "value": {
+                            "type": "string",
+                            "description": "The hash value as stored for the component (hex, base64, or other encoding as stored). Do not assume a specific encoding unless explicitly documented."
+                          }
+                        },
+                        "required": [
+                          "algorithm",
+                          "value"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "created_at": {
+                        "type": "string",
+                        "description": "Timestamp or date string indicating when the component was added to the database. No specific format is enforced here."
+                      },
+                      "metadata": {
+                        "type": "object",
+                        "description": "Additional arbitrary metadata about the component.",
+                        "properties": {},
+                        "additionalProperties": true
+                      }
+                    },
+                    "required": [
+                      "component_id",
+                      "hash"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/SearchApi_vulnerable_software_search": {
+      "post": {
+        "operationId": "SearchApi_vulnerable_software_search",
+        "summary": "Simulate vulnerable-software search by query or CPE",
+        "description": "Return a simulated list of software items known to be vulnerable. If a cpe is provided, prefer CPE-based matching; otherwise perform a free-text query search.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "description": "The search query string to find vulnerabilities. It can include software names, versions, or any relevant keywords."
+                  },
+                  "cpe": {
+                    "type": "string",
+                    "description": "The CPE identifier to specify the software product and version for a more precise search.",
+                    "default": null
+                  }
+                },
+                "required": [
+                  "query"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search results for vulnerable software (successful response payload).",
+                  "properties": {
+                    "total_count": {
+                      "type": "integer",
+                      "description": "Total number of matching vulnerable software entries for the query."
+                    },
+                    "results": {
+                      "type": "array",
+                      "description": "List of matching vulnerable software entries. Results are sorted by relevance.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for this result item (e.g., an internal ID or vulnerability identifier)."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Human-readable software name."
+                          },
+                          "cpe": {
+                            "type": "string",
+                            "description": "The CPE identifier associated with this software entry, if available. May be null when not applicable.",
+                            "nullable": true
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Short description of the vulnerable software or the vulnerability context."
+                          },
+                          "vulnerable_versions": {
+                            "type": "array",
+                            "description": "List of version strings that are known to be vulnerable (not necessarily exhaustive).",
+                            "items": {
+                              "type": "string",
+                              "description": "Array item"
+                            }
+                          },
+                          "severity": {
+                            "type": "string",
+                            "description": "Severity classification or score description provided by the data source (free-text; may be a label or numeric score represented as a string)."
+                          },
+                          "references": {
+                            "type": "array",
+                            "description": "External references (advisories, CVE pages, vendor notes) related to this vulnerability entry.",
+                            "items": {
+                              "type": "object",
+                              "description": "Array item",
+                              "properties": {
+                                "title": {
+                                  "type": "string",
+                                  "description": "Short title of the reference."
+                                },
+                                "url": {
+                                  "type": "string",
+                                  "description": "URL linking to the reference resource."
+                                }
+                              },
+                              "required": [
+                                "url"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "total_count",
+                    "results"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/team_api_delete_team": {
+      "post": {
+        "operationId": "team_api_delete_team",
+        "summary": "Delete a team (irreversible)",
+        "description": "Simulate permanently removing the specified team. This operation is irreversible and requires explicit confirmation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "team_id": {
+                    "type": "string",
+                    "description": "The unique identifier of the team to be deleted."
+                  },
+                  "confirm_deletion": {
+                    "type": "boolean",
+                    "description": "A flag to confirm the deletion request.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "team_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Indicates successful deletion of the team.",
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean",
+                      "description": "True when the team was successfully deleted."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable confirmation message."
+                    }
+                  },
+                  "required": [
+                    "deleted",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/SearchApi_project_search": {
+      "post": {
+        "operationId": "SearchApi_project_search",
+        "summary": "Execute project search",
+        "description": "Simulates executing a search for projects using the provided query and returns ranked results.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "description": "The search query string specifying the criteria used for finding projects."
+                  }
+                },
+                "required": [
+                  "query"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search results payload",
+                  "properties": {
+                    "total": {
+                      "type": "integer",
+                      "description": "Total number of projects matching the query."
+                    },
+                    "results": {
+                      "type": "array",
+                      "description": "List of matching projects ordered by relevance.",
+                      "items": {
+                        "type": "object",
+                        "description": "A single project search result",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique project identifier."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Project title."
+                          },
+                          "snippet": {
+                            "type": "string",
+                            "description": "Short text excerpt or highlight from the project relevant to the query."
+                          },
+                          "score": {
+                            "type": "number",
+                            "description": "Relevance score for the project. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "score"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "total",
+                    "results"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/SearchApi_component_search": {
+      "post": {
+        "operationId": "SearchApi_component_search",
+        "summary": "Search components by query",
+        "description": "Simulate executing a search for components matching the provided query string and return relevant results with relevance scores and brief snippets.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "description": "The search term used to find relevant components."
+                  }
+                },
+                "required": [
+                  "query"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search results payload",
+                  "properties": {
+                    "total": {
+                      "type": "integer",
+                      "description": "Total number of matching results across all pages (may be an approximation)."
+                    },
+                    "results": {
+                      "type": "array",
+                      "description": "List of matched components ordered by relevance (highest first).",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the component or result item."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Short, human-readable title for the result."
+                          },
+                          "snippet": {
+                            "type": "string",
+                            "description": "A short excerpt or summary highlighting why this result matched the query."
+                          },
+                          "url": {
+                            "type": "string",
+                            "description": "Optional URL or reference to the full component or documentation resource."
+                          },
+                          "score": {
+                            "type": "number",
+                            "description": "Relevance score for the result. Use float format (e.g., 1.0 not 1). Higher values indicate stronger relevance.",
+                            "format": "double"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "snippet",
+                          "score"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "next_page_token": {
+                      "type": "string",
+                      "description": "Opaque token to fetch the next page of results, if any. Absent or empty when there are no more pages."
+                    }
+                  },
+                  "required": [
+                    "total",
+                    "results"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

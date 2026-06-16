@@ -1,0 +1,263 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM1014",
+    "version": "1.0.0",
+    "description": "LM1014 is a concise REST API collection for managing Identity Provider group mappings and access restrictions: create external-to-Instana group mappings, update IdP settings to enforce or relax restrictions on users with empty mappings, and check whether the system currently denies access when RestrictEmptyIdpGroups is enabled; designed for programmatic administration of login mapping rules and enforcement state during deployments and automation."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM1014"
+    }
+  ],
+  "paths": {
+    "/update_identity_provider": {
+      "post": {
+        "operationId": "update_identity_provider",
+        "summary": "Update identity provider setting for empty IdP group mappings",
+        "description": "Simulate updating the identity provider configuration that controls whether users with empty IdP group mappings are allowed or restricted. Use this to toggle enforcement of restrictions for users who do not map to any IdP groups.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "RestrictEmptyIdpGroups": {
+                    "type": "boolean",
+                    "description": "A flag to set whether users with empty IdP group mappings are allowed or restricted. When true, such users are restricted; when false, they are allowed."
+                  }
+                },
+                "required": [
+                  "RestrictEmptyIdpGroups"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Representation of the updated identity provider setting",
+                  "properties": {
+                    "RestrictEmptyIdpGroups": {
+                      "type": "boolean",
+                      "description": "A flag indicating whether users with empty IdP group mappings are restricted (true) or allowed (false)."
+                    }
+                  },
+                  "required": [
+                    "RestrictEmptyIdpGroups"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_identity_provider_patch": {
+      "post": {
+        "operationId": "get_identity_provider_patch",
+        "summary": "Check RestrictEmptyIdpGroups and optionally include mapping rules",
+        "description": "Simulate whether the tenant denies access to users with empty Identity Provider (Idp) group mappings. Optionally include the mapping rules applied to the user when requested.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "tenant_id": {
+                    "type": "string",
+                    "description": "The unique identifier of the tenant for which the restriction on empty Idp group mapping is checked."
+                  },
+                  "include_rules": {
+                    "type": "boolean",
+                    "description": "Determines whether to include the mapping rules applied to the user in the response. Defaults to false.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "tenant_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Response indicating whether empty Idp group mappings are restricted and optional mapping rules.",
+                  "properties": {
+                    "restrictEmptyIdpGroups": {
+                      "type": "boolean",
+                      "description": "When true, the tenant denies access to users who have no active Identity Provider (Idp) group mappings."
+                    },
+                    "locked": {
+                      "type": "boolean",
+                      "description": "True when the tenant is in a locked state (generally equivalent to restrictEmptyIdpGroups for the tenant)."
+                    },
+                    "allowed": {
+                      "type": "boolean",
+                      "description": "Informational: whether a user with the evaluated mappings would be allowed access. Actual access is enforced at login and may differ."
+                    },
+                    "mappingRules": {
+                      "type": "array",
+                      "description": "List of mapping rules applied to the user (included only when include_rules is true).",
+                      "items": {
+                        "type": "object",
+                        "description": "A mapping rule that may permit or deny access based on Idp group membership or other conditions.",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier of the mapping rule."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Human-readable name of the mapping rule."
+                          },
+                          "active": {
+                            "type": "boolean",
+                            "description": "Whether the mapping rule is currently active."
+                          },
+                          "conditions": {
+                            "type": "array",
+                            "description": "Conditions or expressions that must match for this rule to apply.",
+                            "items": {
+                              "type": "string",
+                              "description": "A single condition expression or description."
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "active"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "restrictEmptyIdpGroups",
+                    "locked"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/GroupsApi_create_group_mapping": {
+      "post": {
+        "operationId": "GroupsApi_create_group_mapping",
+        "summary": "Create an IdP-to-Instana group mapping",
+        "description": "Simulate creation of a mapping between an external Identity Provider group and an Instana group. The request's 'id' field (if provided) is ignored; the server generates and returns a unique identifier for the created mapping.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "group_mapping_payload": {
+                    "type": "object",
+                    "description": "The payload containing the mapping details between the IdP group and the Instana group. The 'id' field within this payload will be ignored.",
+                    "properties": {
+                      "groupId": {
+                        "type": "string",
+                        "description": "The unique identifier for the Instana group to which users will be mapped."
+                      },
+                      "mappingAttributes": {
+                        "type": "array",
+                        "description": "A list of user attributes sent by the IdP that are used to evaluate the mapping. Each attribute is represented as a string.",
+                        "items": {
+                          "type": "string",
+                          "description": "Array item"
+                        }
+                      },
+                      "mappingValues": {
+                        "type": "array",
+                        "description": "A list of values corresponding to the mappingAttributes that must be matched for the mapping to be successful.",
+                        "items": {
+                          "type": "string",
+                          "description": "Array item"
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "group_mapping_payload"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "The created group mapping returned on success. This payload reflects the mapping stored by Instana; the `id` is generated by the service.",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Unique identifier generated by Instana for this mapping."
+                    },
+                    "groupId": {
+                      "type": "string",
+                      "description": "The unique identifier for the Instana group to which users will be mapped."
+                    },
+                    "mappingAttributes": {
+                      "type": "array",
+                      "description": "A list of user attributes sent by the Identity Provider used to evaluate the mapping. The attribute at index i corresponds to the value at index i in mappingValues.",
+                      "items": {
+                        "type": "string",
+                        "description": "Array item"
+                      }
+                    },
+                    "mappingValues": {
+                      "type": "array",
+                      "description": "A list of values corresponding to mappingAttributes that must be matched for the mapping to be successful. The value at index i corresponds to the attribute at index i in mappingAttributes.",
+                      "items": {
+                        "type": "string",
+                        "description": "Array item"
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "groupId",
+                    "mappingAttributes",
+                    "mappingValues"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

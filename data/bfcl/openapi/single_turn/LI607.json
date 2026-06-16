@@ -1,0 +1,1025 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI607",
+    "version": "1.0.0",
+    "description": "LI607 is a unified travel services API collection enabling programmatic search, booking, and reservation workflows across buses, flights, and rental cars. Developers can query itineraries, filter flight searches by class and carriers, purchase bus tickets with passenger and luggage options, and list or reserve rental vehicles with pickup, timing, and insurance choices. Endpoints are designed for synchronous request/response integration in booking and transactional flows."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI607"
+    }
+  ],
+  "paths": {
+    "/Buses_3_FindBus": {
+      "post": {
+        "operationId": "Buses_3_FindBus",
+        "summary": "Search for bus itineraries between two cities on a date",
+        "description": "Simulate searching available bus itineraries from a departure city to a destination city on the given departure date.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "from_city": {
+                    "type": "string",
+                    "description": "The city of departure, in the format 'City, State', such as 'New York, NY'."
+                  },
+                  "to_city": {
+                    "type": "string",
+                    "description": "The destination city of the trip, in the format 'City, State', such as 'Los Angeles, CA'."
+                  },
+                  "departure_date": {
+                    "type": "string",
+                    "description": "The date of departure in the format 'YYYY-MM-DD'."
+                  },
+                  "num_passengers": {
+                    "type": "integer",
+                    "description": "The number of passengers for the trip.",
+                    "enum": [
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ],
+                    "default": 1
+                  },
+                  "category": {
+                    "type": "string",
+                    "description": "The category of the trip based on the number of stops.",
+                    "enum": [
+                      "direct",
+                      "one-stop"
+                    ],
+                    "default": "direct"
+                  }
+                },
+                "required": [
+                  "from_city",
+                  "to_city",
+                  "departure_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful search result payload containing matching itineraries and search metadata.",
+                  "properties": {
+                    "itineraries": {
+                      "type": "array",
+                      "description": "Array of matching itineraries (at least one required when results exist).",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "itinerary_id": {
+                            "type": "string",
+                            "description": "Unique identifier for this itinerary."
+                          },
+                          "operator": {
+                            "type": "string",
+                            "description": "Name of the bus operator or carrier."
+                          },
+                          "total_duration_minutes": {
+                            "type": "integer",
+                            "description": "Total travel duration in minutes."
+                          },
+                          "total_stops": {
+                            "type": "integer",
+                            "description": "Number of intermediate stops (0 indicates a direct trip)."
+                          },
+                          "segments": {
+                            "type": "array",
+                            "description": "Ordered list of segments composing the itinerary.",
+                            "items": {
+                              "type": "object",
+                              "description": "Array item",
+                              "properties": {
+                                "departure_city": {
+                                  "type": "string",
+                                  "description": "City of departure for this segment (format as returned by the system)."
+                                },
+                                "arrival_city": {
+                                  "type": "string",
+                                  "description": "City of arrival for this segment (format as returned by the system)."
+                                },
+                                "departure_time": {
+                                  "type": "string",
+                                  "description": "Scheduled departure time for the segment as a string (local time representation)."
+                                },
+                                "arrival_time": {
+                                  "type": "string",
+                                  "description": "Scheduled arrival time for the segment as a string (local time representation)."
+                                },
+                                "duration_minutes": {
+                                  "type": "integer",
+                                  "description": "Segment duration in minutes."
+                                },
+                                "seat_types": {
+                                  "type": "array",
+                                  "description": "List of available seat type labels for this segment (e.g., \"standard\", \"premium\").",
+                                  "items": {
+                                    "type": "string",
+                                    "description": "Array item"
+                                  }
+                                }
+                              },
+                              "required": [
+                                "departure_city",
+                                "arrival_city",
+                                "departure_time",
+                                "arrival_time"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "availability": {
+                            "type": "object",
+                            "description": "Parameter availability",
+                            "properties": {
+                              "seats_remaining": {
+                                "type": "integer",
+                                "description": "Approximate number of seats remaining for this itinerary."
+                              },
+                              "fares": {
+                                "type": "array",
+                                "description": "List of fare options for this itinerary.",
+                                "items": {
+                                  "type": "object",
+                                  "description": "Array item",
+                                  "properties": {
+                                    "fare_id": {
+                                      "type": "string",
+                                      "description": "Identifier for this fare option."
+                                    },
+                                    "price": {
+                                      "type": "number",
+                                      "description": "Monetary amount for the fare. Do not assume a unit; currency may be indicated by the operator in other systems."
+                                    },
+                                    "refundable": {
+                                      "type": "boolean",
+                                      "description": "Whether this fare is refundable."
+                                    }
+                                  },
+                                  "required": [
+                                    "fare_id",
+                                    "price"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "itinerary_id",
+                          "segments"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "search_metadata": {
+                      "type": "object",
+                      "description": "Echo of key search parameters and metadata about the search.",
+                      "properties": {
+                        "from_city": {
+                          "type": "string",
+                          "description": "The requested departure city as provided in the request."
+                        },
+                        "to_city": {
+                          "type": "string",
+                          "description": "The requested destination city as provided in the request."
+                        },
+                        "departure_date": {
+                          "type": "string",
+                          "description": "The requested departure date as provided in the request (YYYY-MM-DD)."
+                        }
+                      },
+                      "required": [
+                        "from_city",
+                        "to_city",
+                        "departure_date"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "itineraries"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Buses_3_BuyBusTicket": {
+      "post": {
+        "operationId": "Buses_3_BuyBusTicket",
+        "summary": "Simulate purchasing bus tickets and return a booking confirmation",
+        "description": "Process a bus ticket purchase: validate inputs, check availability, reserve seats, process payment, and return a confirmation payload.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "from_city": {
+                    "type": "string",
+                    "description": "The city where the journey begins, in the format of 'City, State', such as 'New York, NY'."
+                  },
+                  "to_city": {
+                    "type": "string",
+                    "description": "The destination city for the trip, in the format of 'City, State', such as 'Los Angeles, CA'."
+                  },
+                  "departure_date": {
+                    "type": "string",
+                    "description": "The departure date in 'YYYY-MM-DD' format, for example, '2023-04-21'."
+                  },
+                  "departure_time": {
+                    "type": "string",
+                    "description": "The time of departure in 24-hour format 'HH:MM', such as '14:30' for 2:30 PM."
+                  },
+                  "num_passengers": {
+                    "type": "integer",
+                    "description": "The number of passengers for whom the tickets are being purchased. Must be a positive integer."
+                  },
+                  "additional_luggage": {
+                    "type": "boolean",
+                    "description": "Indicates whether additional luggage will be carried on the bus.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "from_city",
+                  "to_city",
+                  "departure_date",
+                  "departure_time",
+                  "num_passengers"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful booking confirmation payload",
+                  "properties": {
+                    "booking_id": {
+                      "type": "string",
+                      "description": "Unique booking identifier generated for this purchase."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Booking status, e.g., \"confirmed\"."
+                    },
+                    "total_amount": {
+                      "type": "number",
+                      "description": "Total amount charged for the booking. Specify as a decimal number (e.g., 123.45)."
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Currency code (ISO 4217), e.g., \"USD\"."
+                    },
+                    "tickets": {
+                      "type": "array",
+                      "description": "One entry per passenger with ticket details.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "ticket_id": {
+                            "type": "string",
+                            "description": "Unique identifier for this ticket."
+                          },
+                          "passenger_index": {
+                            "type": "integer",
+                            "description": "Passenger ordinal number, starting at 1."
+                          },
+                          "seat": {
+                            "type": "string",
+                            "description": "Assigned seat label, if applicable."
+                          }
+                        },
+                        "required": [
+                          "ticket_id",
+                          "passenger_index"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "additional_luggage_included": {
+                      "type": "boolean",
+                      "description": "Whether additional luggage was included in this booking."
+                    }
+                  },
+                  "required": [
+                    "booking_id",
+                    "status",
+                    "total_amount",
+                    "currency",
+                    "tickets"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Flights_4_SearchOnewayFlight": {
+      "post": {
+        "operationId": "Flights_4_SearchOnewayFlight",
+        "summary": "Simulate search for one-way flights",
+        "description": "Generate realistic one-way flight search results for the given origin, destination, and departure date, honoring seating class, number of tickets, and preferred airline when provided.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "origin_airport": {
+                    "type": "string",
+                    "description": "The IATA code or the name of the airport or city to depart from. For example, 'SFO' for San Francisco."
+                  },
+                  "destination_airport": {
+                    "type": "string",
+                    "description": "The IATA code or the name of the airport or city to arrive at. For example, 'LAX' for Los Angeles."
+                  },
+                  "departure_date": {
+                    "type": "string",
+                    "description": "The departure date for the flight in the format 'YYYY-MM-DD'. For example, '2023-04-15'."
+                  },
+                  "seating_class": {
+                    "type": "string",
+                    "description": "The class of the cabin seat.",
+                    "enum": [
+                      "Economy",
+                      "Premium Economy",
+                      "Business"
+                    ],
+                    "default": "Economy"
+                  },
+                  "number_of_tickets": {
+                    "type": "integer",
+                    "description": "The number of flight tickets required for the trip.",
+                    "default": 1
+                  },
+                  "airlines": {
+                    "type": "string",
+                    "description": "The preferred airline for the flight. Use 'dontcare' for no preference.",
+                    "enum": [
+                      "United Airlines",
+                      "American Airlines",
+                      "Delta Airlines",
+                      "Southwest Airlines",
+                      "Alaska Airlines",
+                      "British Airways",
+                      "Air Canada",
+                      "Air France",
+                      "South African Airways",
+                      "LOT Polish Airlines",
+                      "LATAM Brasil"
+                    ]
+                  }
+                },
+                "required": [
+                  "origin_airport",
+                  "destination_airport",
+                  "departure_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful search response containing matching one-way flight options",
+                  "properties": {
+                    "flights": {
+                      "type": "array",
+                      "description": "List of matching one-way flight options. Order can reflect price, duration, or relevance.",
+                      "maxItems": 100,
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for this flight option (opaque ID)."
+                          },
+                          "airline": {
+                            "type": "string",
+                            "description": "Airline operating the flight."
+                          },
+                          "flight_number": {
+                            "type": "string",
+                            "description": "Airline flight number (e.g., 'UA123')."
+                          },
+                          "departure_airport": {
+                            "type": "string",
+                            "description": "Departure airport IATA code or name."
+                          },
+                          "arrival_airport": {
+                            "type": "string",
+                            "description": "Arrival airport IATA code or name."
+                          },
+                          "departure_time": {
+                            "type": "string",
+                            "description": "Local departure date and time for the flight (ISO 8601 recommended)."
+                          },
+                          "arrival_time": {
+                            "type": "string",
+                            "description": "Local arrival date and time for the flight (ISO 8601 recommended)."
+                          },
+                          "duration_minutes": {
+                            "type": "integer",
+                            "description": "Total scheduled duration of the flight in minutes.",
+                            "minimum": 0
+                          },
+                          "stops": {
+                            "type": "integer",
+                            "description": "Number of stops for the itinerary (0 = nonstop).",
+                            "minimum": 0
+                          },
+                          "seating_class": {
+                            "type": "string",
+                            "description": "Cabin class for this fare (e.g., Economy, Premium Economy, Business)."
+                          },
+                          "available_seats": {
+                            "type": "integer",
+                            "description": "Number of seats currently available for this fare at time of search.",
+                            "minimum": 0
+                          },
+                          "price": {
+                            "type": "object",
+                            "description": "Price information for the quoted fare.",
+                            "properties": {
+                              "amount": {
+                                "type": "number",
+                                "description": "Fare amount. Use float format (e.g., 1.0 not 1).",
+                                "format": "double"
+                              },
+                              "currency": {
+                                "type": "string",
+                                "description": "Currency code for the amount (ISO 4217), e.g., \"USD\"."
+                              }
+                            },
+                            "required": [
+                              "amount",
+                              "currency"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "booking_code": {
+                            "type": "string",
+                            "description": "Carrier fare booking code or cabin booking class (if available)."
+                          },
+                          "fare_rules_url": {
+                            "type": "string",
+                            "description": "URL to fare rules or ticketing conditions (if available)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "airline",
+                          "flight_number",
+                          "departure_airport",
+                          "arrival_airport",
+                          "departure_time",
+                          "arrival_time",
+                          "duration_minutes",
+                          "stops",
+                          "seating_class",
+                          "price",
+                          "available_seats"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "description": "Supplementary metadata about the search result",
+                      "properties": {
+                        "total_results": {
+                          "type": "integer",
+                          "description": "Total number of matching flight options returned by this response."
+                        },
+                        "searched_at": {
+                          "type": "string",
+                          "description": "Timestamp when the search was executed (ISO 8601 recommended)."
+                        },
+                        "returned_count": {
+                          "type": "integer",
+                          "description": "Number of flight entries included in the flights array."
+                        }
+                      },
+                      "required": [
+                        "total_results",
+                        "returned_count"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "flights"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Flights_4_SearchRoundtripFlights": {
+      "post": {
+        "operationId": "Flights_4_SearchRoundtripFlights",
+        "summary": "Simulate searching roundtrip flights between two airports",
+        "description": "Return simulated roundtrip flight itineraries for the requested origin, destination, departure_date and return_date with options for seating_class, number_of_tickets, and airlines.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "origin_airport": {
+                    "type": "string",
+                    "description": "The IATA airport code or city name to depart from, such as 'JFK' for John F. Kennedy International Airport or 'New York'."
+                  },
+                  "destination_airport": {
+                    "type": "string",
+                    "description": "The IATA airport code or city name to arrive at, such as 'LAX' for Los Angeles International Airport or 'Los Angeles'."
+                  },
+                  "departure_date": {
+                    "type": "string",
+                    "description": "The departure date for the outbound flight, in the format 'YYYY-MM-DD', such as '2023-07-15'."
+                  },
+                  "return_date": {
+                    "type": "string",
+                    "description": "The return date for the inbound flight, in the format 'YYYY-MM-DD', such as '2023-07-22'."
+                  },
+                  "seating_class": {
+                    "type": "string",
+                    "description": "The class of the cabin seat for the flight.",
+                    "enum": [
+                      "Economy",
+                      "Premium Economy",
+                      "Business"
+                    ],
+                    "default": "Economy"
+                  },
+                  "number_of_tickets": {
+                    "type": "integer",
+                    "description": "The total number of tickets required for the trip.",
+                    "default": 1
+                  },
+                  "airlines": {
+                    "type": "string",
+                    "description": "The preferred airline for the trip. Use 'dontcare' if there is no preference.",
+                    "enum": [
+                      "United Airlines",
+                      "American Airlines",
+                      "Delta Airlines",
+                      "Southwest Airlines",
+                      "Alaska Airlines",
+                      "British Airways",
+                      "Air Canada",
+                      "Air France",
+                      "South African Airways",
+                      "LOT Polish Airlines",
+                      "LATAM Brasil"
+                    ]
+                  }
+                },
+                "required": [
+                  "origin_airport",
+                  "destination_airport",
+                  "departure_date",
+                  "return_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search results for roundtrip flight query",
+                  "properties": {
+                    "itineraries": {
+                      "type": "array",
+                      "description": "List of matching roundtrip itineraries (one item per full roundtrip)",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "itinerary_id": {
+                            "type": "string",
+                            "description": "Unique identifier for this itinerary"
+                          },
+                          "price": {
+                            "type": "object",
+                            "description": "Total price for the itinerary covering all passengers",
+                            "properties": {
+                              "amount": {
+                                "type": "number",
+                                "description": "Total price for all passengers. Provide as a float (e.g., 1.0, not 1)",
+                                "format": "double"
+                              },
+                              "currency": {
+                                "type": "string",
+                                "description": "Currency code (ISO 4217), for example 'USD'"
+                              }
+                            },
+                            "required": [
+                              "amount",
+                              "currency"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "total_duration_minutes": {
+                            "type": "integer",
+                            "description": "Total elapsed time for the roundtrip itinerary in minutes"
+                          },
+                          "segments": {
+                            "type": "array",
+                            "description": "Ordered list of flight segments making up the roundtrip (outbound segments first, then inbound)",
+                            "items": {
+                              "type": "object",
+                              "description": "Array item",
+                              "properties": {
+                                "direction": {
+                                  "type": "string",
+                                  "description": "Leg of the trip: 'outbound' or 'inbound'"
+                                },
+                                "airline": {
+                                  "type": "string",
+                                  "description": "Operating airline name"
+                                },
+                                "flight_number": {
+                                  "type": "string",
+                                  "description": "Flight number assigned by the airline"
+                                },
+                                "departure_airport": {
+                                  "type": "string",
+                                  "description": "IATA airport code or city name for departure"
+                                },
+                                "arrival_airport": {
+                                  "type": "string",
+                                  "description": "IATA airport code or city name for arrival"
+                                },
+                                "departure_time": {
+                                  "type": "string",
+                                  "description": "Departure date and time in ISO 8601 (e.g., 2023-07-15T08:00:00Z)"
+                                },
+                                "arrival_time": {
+                                  "type": "string",
+                                  "description": "Arrival date and time in ISO 8601"
+                                },
+                                "duration_minutes": {
+                                  "type": "integer",
+                                  "description": "Duration of this segment in minutes"
+                                }
+                              },
+                              "required": [
+                                "direction",
+                                "airline",
+                                "flight_number",
+                                "departure_airport",
+                                "arrival_airport",
+                                "departure_time",
+                                "arrival_time",
+                                "duration_minutes"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "available_seats": {
+                            "type": "integer",
+                            "description": "Approximate number of seats available in the requested seating class"
+                          },
+                          "seating_class": {
+                            "type": "string",
+                            "description": "Seating class for this itinerary (matches request.seating_class when available)"
+                          },
+                          "fare_rules": {
+                            "type": "string",
+                            "description": "Short human-readable summary of important fare rules (changes, cancellations)"
+                          }
+                        },
+                        "required": [
+                          "itinerary_id",
+                          "price",
+                          "total_duration_minutes",
+                          "segments",
+                          "seating_class"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "matched_airlines": {
+                      "type": "array",
+                      "description": "List of airlines represented in the returned itineraries",
+                      "items": {
+                        "type": "string",
+                        "description": "Array item"
+                      }
+                    },
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of matching itineraries (may be larger than the number returned in the itineraries array)"
+                    },
+                    "search_id": {
+                      "type": "string",
+                      "description": "Server-generated identifier for this search (useful for follow-up requests)"
+                    }
+                  },
+                  "required": [
+                    "itineraries"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/RentalCars_3_GetCarsAvailable": {
+      "post": {
+        "operationId": "RentalCars_3_GetCarsAvailable",
+        "summary": "List available rental cars for a city and date/time window",
+        "description": "Simulate retrieval of cars available for rent in the specified city between the provided start_date/pickup_time and end_date. Return an array of available car objects with basic details and pricing.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "city": {
+                    "type": "string",
+                    "description": "The city where the rental car will be picked up, such as 'Los Angeles, CA' or 'New York, NY'."
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "description": "The start date for the car rental, in the format 'YYYY-MM-DD'."
+                  },
+                  "pickup_time": {
+                    "type": "string",
+                    "description": "The time for picking up the rental car, in 24-hour format 'HH:MM'."
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "description": "The end date for the car rental, in the format 'YYYY-MM-DD'."
+                  },
+                  "car_type": {
+                    "type": "string",
+                    "description": "The preferred type of car to rent.",
+                    "enum": [
+                      "Hatchback",
+                      "Sedan",
+                      "SUV"
+                    ]
+                  }
+                },
+                "required": [
+                  "city",
+                  "start_date",
+                  "pickup_time",
+                  "end_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing available cars.",
+                  "properties": {
+                    "cars": {
+                      "type": "array",
+                      "description": "Array of available cars matching the query.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the car."
+                          },
+                          "make": {
+                            "type": "string",
+                            "description": "Manufacturer of the car (e.g., 'Toyota')."
+                          },
+                          "model": {
+                            "type": "string",
+                            "description": "Model name of the car (e.g., 'Camry')."
+                          },
+                          "year": {
+                            "type": "integer",
+                            "description": "Model year of the car."
+                          },
+                          "car_type": {
+                            "type": "string",
+                            "description": "Vehicle category (for example: 'Hatchback', 'Sedan', 'SUV', or 'dontcare')."
+                          },
+                          "available": {
+                            "type": "boolean",
+                            "description": "Whether the listed car is available for the requested window."
+                          },
+                          "price_per_day": {
+                            "type": "number",
+                            "description": "Rental price per day. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "currency": {
+                            "type": "string",
+                            "description": "Currency code for price values (e.g., 'USD')."
+                          },
+                          "pickup_location": {
+                            "type": "string",
+                            "description": "Text description of the pickup location or address."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "make",
+                          "model",
+                          "year",
+                          "car_type",
+                          "available",
+                          "price_per_day"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of matching cars available for the query."
+                    }
+                  },
+                  "required": [
+                    "cars"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/RentalCars_3_ReserveCar": {
+      "post": {
+        "operationId": "RentalCars_3_ReserveCar",
+        "summary": "Simulate making a rental car reservation",
+        "description": "Create a reservation for a rental car by specifying pickup location, dates, time, desired car type, and whether additional insurance is requested. This simulation validates dates and times and returns a confirmation payload when successful.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "pickup_location": {
+                    "type": "string",
+                    "description": "The location where the car will be picked up, in the format of 'City, State', such as 'Los Angeles, CA'."
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "description": "The start date for the car rental in the format 'YYYY-MM-DD', such as '2023-07-01'."
+                  },
+                  "pickup_time": {
+                    "type": "string",
+                    "description": "The pickup time for the car rental in the format 'HH:MM', such as '09:00'."
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "description": "The end date for the car rental in the format 'YYYY-MM-DD', such as '2023-07-10'."
+                  },
+                  "car_type": {
+                    "type": "string",
+                    "description": "The type of car to reserve.",
+                    "enum": [
+                      "Hatchback",
+                      "Sedan",
+                      "SUV"
+                    ]
+                  },
+                  "add_insurance": {
+                    "type": "boolean",
+                    "description": "Indicates whether to purchase additional insurance for the rental. Set to true to add insurance; otherwise, false."
+                  }
+                },
+                "required": [
+                  "pickup_location",
+                  "start_date",
+                  "pickup_time",
+                  "end_date",
+                  "add_insurance"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful reservation response",
+                  "properties": {
+                    "reservation_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the confirmed reservation."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Reservation processing status.",
+                      "enum": [
+                        "confirmed",
+                        "pending"
+                      ]
+                    },
+                    "car_type": {
+                      "type": "string",
+                      "description": "The confirmed car type for the reservation (one of the available types)."
+                    },
+                    "insurance_added": {
+                      "type": "boolean",
+                      "description": "Whether additional insurance was added to the reservation."
+                    },
+                    "total_price": {
+                      "type": "number",
+                      "description": "Total price for the reservation. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    }
+                  },
+                  "required": [
+                    "reservation_id",
+                    "status",
+                    "car_type",
+                    "insurance_added",
+                    "total_price"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

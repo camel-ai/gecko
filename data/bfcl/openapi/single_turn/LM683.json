@@ -1,0 +1,410 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM683",
+    "version": "1.0.0",
+    "description": "LM683 provides a compact travel-planning API suite that combines ride booking, attraction discovery, and weather lookup into a single programmable workflow. Use it to check forecast for a city and date, find child-friendly or paid/free attractions by category, then book a cab with desired seats and ride type. Endpoints are parameter-driven for quick integration into travel apps and automated itinerary builders."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM683"
+    }
+  ],
+  "paths": {
+    "/RideSharing_2_GetRide": {
+      "post": {
+        "operationId": "RideSharing_2_GetRide",
+        "summary": "Simulate booking a cab ride",
+        "description": "Simulates booking a cab to a specified destination with the requested number of seats and ride type. Return ride assignment, ETA, fare estimate, and driver/vehicle details.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "destination": {
+                    "type": "string",
+                    "description": "The destination address or location for the cab, formatted as 'Street, City, State' (e.g., '123 Main St, Springfield, IL')."
+                  },
+                  "number_of_seats": {
+                    "type": "integer",
+                    "description": "The number of seats to reserve in the cab.",
+                    "enum": [
+                      1,
+                      2,
+                      3,
+                      4
+                    ]
+                  },
+                  "ride_type": {
+                    "type": "string",
+                    "description": "The type of cab ride desired.",
+                    "enum": [
+                      "Pool",
+                      "Regular",
+                      "Luxury"
+                    ]
+                  }
+                },
+                "required": [
+                  "destination",
+                  "number_of_seats",
+                  "ride_type"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful ride booking payload",
+                  "properties": {
+                    "ride_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the booked ride."
+                    },
+                    "driver": {
+                      "type": "object",
+                      "description": "Assigned driver details (if available).",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "Driver's full name."
+                        },
+                        "phone": {
+                          "type": "string",
+                          "description": "Driver contact phone number in local dialing format."
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "vehicle": {
+                      "type": "object",
+                      "description": "Assigned vehicle details (if available).",
+                      "properties": {
+                        "make": {
+                          "type": "string",
+                          "description": "Vehicle manufacturer (e.g., Toyota, Ford)."
+                        },
+                        "model": {
+                          "type": "string",
+                          "description": "Vehicle model (e.g., Camry, Focus)."
+                        },
+                        "plate_number": {
+                          "type": "string",
+                          "description": "Vehicle license plate number."
+                        }
+                      },
+                      "required": [
+                        "plate_number"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "eta_minutes": {
+                      "type": "integer",
+                      "description": "Estimated time of arrival in minutes."
+                    },
+                    "estimated_fare": {
+                      "type": "number",
+                      "description": "Estimated fare for the ride. Provide as a float (e.g., 5.0, not 5).",
+                      "format": "double"
+                    },
+                    "seats_confirmed": {
+                      "type": "integer",
+                      "description": "Number of seats reserved for this booking."
+                    },
+                    "ride_type": {
+                      "type": "string",
+                      "description": "Type of ride allocated for this booking (e.g., Pool, Regular, Luxury)."
+                    }
+                  },
+                  "required": [
+                    "ride_id",
+                    "eta_minutes",
+                    "estimated_fare",
+                    "seats_confirmed",
+                    "ride_type"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Travel_1_FindAttractions": {
+      "post": {
+        "operationId": "Travel_1_FindAttractions",
+        "summary": "Find attractions in a city",
+        "description": "Simulate browsing attractions in the specified city, applying optional filters for free entry, category, and child suitability.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "City or town where the attraction is located, in the format of 'City, State' or 'City, Country' if the city does not locate in the United States. For example, 'Paris, FR' or 'New York, NY'."
+                  },
+                  "free_entry": {
+                    "type": "string",
+                    "description": "Flag indicating whether the attraction has free entry. Use 'True' for free entry, 'False' for paid entry, or 'dontcare' if no preference.",
+                    "enum": [
+                      "True",
+                      "False"
+                    ]
+                  },
+                  "category": {
+                    "type": "string",
+                    "description": "Category of the attraction, such as 'Museum' or 'Park'. Select 'dontcare' if no specific category is preferred.",
+                    "enum": [
+                      "Place of Worship",
+                      "Theme Park",
+                      "Museum",
+                      "Historical Landmark",
+                      "Park",
+                      "Tourist Attraction",
+                      "Sports Venue",
+                      "Shopping Area",
+                      "Performing Arts Venue",
+                      "Nature Preserve"
+                    ]
+                  },
+                  "good_for_kids": {
+                    "type": "string",
+                    "description": "Flag indicating whether the attraction is suitable for children. Use 'True' if suitable, 'False' if not, or 'dontcare' if no preference.",
+                    "enum": [
+                      "True",
+                      "False"
+                    ]
+                  }
+                },
+                "required": [
+                  "location"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search results containing attractions that match the request filters.",
+                  "properties": {
+                    "attractions": {
+                      "type": "array",
+                      "description": "List of matching attractions (ordered by relevance).",
+                      "maxItems": 50,
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the attraction."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Official or common name of the attraction."
+                          },
+                          "category": {
+                            "type": "string",
+                            "description": "Category of the attraction (e.g., Museum, Park)."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Short, human-readable description of the attraction."
+                          },
+                          "address": {
+                            "type": "string",
+                            "description": "Street address or general location information."
+                          },
+                          "city": {
+                            "type": "string",
+                            "description": "City where the attraction is located."
+                          },
+                          "country": {
+                            "type": "string",
+                            "description": "Country name or code where the attraction is located."
+                          },
+                          "free_entry": {
+                            "type": "boolean",
+                            "description": "True if entry is free; false if there is an entry fee."
+                          },
+                          "entry_fee": {
+                            "type": "number",
+                            "description": "Typical entry price in local currency. Use float format (e.g., 1.0 not 1). May be omitted or null when free_entry is true.",
+                            "format": "double"
+                          },
+                          "suitable_for_children": {
+                            "type": "boolean",
+                            "description": "True if the attraction is suitable for children."
+                          },
+                          "rating": {
+                            "type": "number",
+                            "description": "Average user rating if available. Provide as a float (e.g., 4.5).",
+                            "format": "double"
+                          },
+                          "tags": {
+                            "type": "array",
+                            "description": "Optional short tags or keywords describing the attraction.",
+                            "items": {
+                              "type": "string",
+                              "description": "Array item"
+                            }
+                          },
+                          "url": {
+                            "type": "string",
+                            "description": "URL for more information or the official site, if available."
+                          },
+                          "opening_hours": {
+                            "type": "string",
+                            "description": "Human-readable summary of typical opening hours, if available."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "category",
+                          "city",
+                          "country",
+                          "free_entry"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of matching attractions (may be greater than the number returned in 'attractions')."
+                    }
+                  },
+                  "required": [
+                    "attractions"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Weather_1_GetWeather": {
+      "post": {
+        "operationId": "Weather_1_GetWeather",
+        "summary": "Get weather for a city and date",
+        "description": "Simulate retrieval of weather information for a specified city and optional date. If the date is omitted, the service uses the current date.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "city": {
+                    "type": "string",
+                    "description": "The name of the city for which to retrieve weather data, such as 'New York, NY'."
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "The date for which to retrieve the weather, in the format 'YYYY-MM-DD'. If not provided, the current date is used.",
+                    "default": "today"
+                  }
+                },
+                "required": [
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Weather information for the requested city and date.",
+                  "properties": {
+                    "city": {
+                      "type": "string",
+                      "description": "Canonicalized name of the city for which the weather applies (as recognized by the service)."
+                    },
+                    "date": {
+                      "type": "string",
+                      "description": "Date for the returned weather in 'YYYY-MM-DD' as used by the service."
+                    },
+                    "temperature": {
+                      "type": "number",
+                      "description": "Observed or forecast temperature. Use float format (e.g., 1.0 not 1). Unit is reported in 'temperature_unit'.",
+                      "format": "double"
+                    },
+                    "temperature_unit": {
+                      "type": "string",
+                      "description": "Unit for temperature values, for example 'C' or 'F'."
+                    },
+                    "feels_like": {
+                      "type": "number",
+                      "description": "Perceived temperature. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "humidity": {
+                      "type": "integer",
+                      "description": "Relative humidity percentage (0-100).",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "condition": {
+                      "type": "string",
+                      "description": "Short textual description of weather conditions (for example, 'Clear', 'Partly cloudy', 'Rain')."
+                    },
+                    "wind_speed": {
+                      "type": "number",
+                      "description": "Wind speed in meters per second. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "precipitation": {
+                      "type": "number",
+                      "description": "Precipitation volume in millimeters over the reporting period. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    }
+                  },
+                  "required": [
+                    "date",
+                    "temperature",
+                    "temperature_unit",
+                    "condition"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

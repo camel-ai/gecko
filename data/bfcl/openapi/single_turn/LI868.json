@@ -1,0 +1,240 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI868",
+    "version": "1.0.0",
+    "description": "LI868 provides programmatic control and monitoring of air conditioning units through two primary operations: set_ac_state to adjust temperature, mode, fan speed, and position for desired comfort, and get_ac_state to retrieve the current operational state, optionally specifying unit_id or defaulting to the primary unit. The API is designed for straightforward synchronous calls in automation scripts and dashboards, favoring predictable state changes, minimal latency, and simple integration into control flows."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI868"
+    }
+  ],
+  "paths": {
+    "/set_ac_state": {
+      "post": {
+        "operationId": "set_ac_state",
+        "summary": "Set AC state (simulation)",
+        "description": "Simulate setting the air conditioner state by applying temperature, mode, fan speed, and fan position settings.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "temperature": {
+                    "type": "integer",
+                    "description": "Desired temperature setting for the air conditioner in degrees Celsius."
+                  },
+                  "mode": {
+                    "type": "string",
+                    "description": "The air conditioner's operating mode.",
+                    "enum": [
+                      "cool",
+                      "heat",
+                      "dry",
+                      "fan",
+                      "auto"
+                    ]
+                  },
+                  "fan_speed": {
+                    "type": "integer",
+                    "description": "Fan speed level from 1 to 5, where 1 is the lowest speed and 5 is the highest."
+                  },
+                  "fan_position": {
+                    "type": "integer",
+                    "description": "Fan position level from 1 to 5, where 1 is the lowest and 5 is the highest."
+                  }
+                },
+                "required": [
+                  "temperature",
+                  "mode",
+                  "fan_speed",
+                  "fan_position"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Outcome returned after applying the requested AC state. Contains a high-level status and the actual state the controller applied.",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "description": "High-level outcome of the request (for example: success, partial, failed)."
+                    },
+                    "applied_state": {
+                      "type": "object",
+                      "description": "The air conditioner state that was actually applied.",
+                      "properties": {
+                        "temperature": {
+                          "type": "integer",
+                          "description": "The temperature the AC was set to (degrees Celsius)."
+                        },
+                        "mode": {
+                          "type": "string",
+                          "description": "Operating mode the AC was set to.",
+                          "enum": [
+                            "cool",
+                            "heat",
+                            "dry",
+                            "fan",
+                            "auto"
+                          ]
+                        },
+                        "fan_speed": {
+                          "type": "integer",
+                          "description": "Applied fan speed level (1 to 5)."
+                        },
+                        "fan_position": {
+                          "type": "integer",
+                          "description": "Applied fan position level (1 to 5)."
+                        }
+                      },
+                      "required": [
+                        "temperature",
+                        "mode",
+                        "fan_speed",
+                        "fan_position"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Optional human-readable message with details, warnings, or notes about the applied settings."
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "applied_state"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_ac_state": {
+      "post": {
+        "operationId": "get_ac_state",
+        "summary": "Simulate fetching the air conditioner operational state",
+        "description": "Return the AC's current operational state (mode, temperatures, power). If unit_id is omitted, the default unit is used. Include diagnostics only when requested.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "unit_id": {
+                    "type": "string",
+                    "description": "The unique identifier of the air conditioner unit. If omitted, the system will fetch the state of the default AC unit.",
+                    "default": "default_ac_unit"
+                  },
+                  "include_diagnostics": {
+                    "type": "boolean",
+                    "description": "Whether to include diagnostic information in the response."
+                  }
+                },
+                "required": [
+                  "include_diagnostics"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload containing the current operational state of the air conditioner.",
+                  "properties": {
+                    "unit_id": {
+                      "type": "string",
+                      "description": "The unique identifier of the air conditioner unit."
+                    },
+                    "power_on": {
+                      "type": "boolean",
+                      "description": "Whether the air conditioner is powered on."
+                    },
+                    "mode": {
+                      "type": "string",
+                      "description": "Operating mode. Examples: 'cool', 'heat', 'fan'. This is not an exhaustive list of possible modes."
+                    },
+                    "current_temperature": {
+                      "type": "number",
+                      "description": "Current measured temperature; may be a decimal value (e.g., 21.5). The API does not enforce or declare a specific unit."
+                    },
+                    "target_temperature": {
+                      "type": "number",
+                      "description": "Configured target/setpoint temperature; may be a decimal value (e.g., 22.0). The API does not enforce or declare a specific unit."
+                    },
+                    "fan_speed": {
+                      "type": "integer",
+                      "description": "Fan speed level. The scale and range are device-specific and are not enforced by the API."
+                    },
+                    "swing_mode": {
+                      "type": "string",
+                      "description": "Swing or louver mode/state, if supported by the device."
+                    },
+                    "humidity": {
+                      "type": "number",
+                      "description": "Ambient humidity value if available. Value semantics (for example, percent) are device-specific and not enforced by the API."
+                    },
+                    "diagnostics": {
+                      "type": "object",
+                      "description": "Optional diagnostic information; present only when include_diagnostics was true in the request.",
+                      "properties": {
+                        "last_error_code": {
+                          "type": "string",
+                          "description": "Device-reported last error code or identifier, if any."
+                        },
+                        "uptime": {
+                          "type": "integer",
+                          "description": "Device-reported uptime metric. Unit and scale are device-specific and not assumed by the API."
+                        },
+                        "recent_checks": {
+                          "type": "array",
+                          "description": "A list of recent diagnostic check labels or messages, if provided by the device.",
+                          "items": {
+                            "type": "string",
+                            "description": "Array item"
+                          }
+                        }
+                      },
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "unit_id",
+                    "power_on",
+                    "mode",
+                    "current_temperature",
+                    "target_temperature"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

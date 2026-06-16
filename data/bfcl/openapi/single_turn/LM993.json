@@ -1,0 +1,372 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM993",
+    "version": "1.0.0",
+    "description": "LM993 is an Apdex-focused API collection for monitoring and managing application performance, offering endpoints to generate Apdex reports for a specific Apdex ID over a time range, create new Apdex configurations by setting satisfactory/tolerable/frustrated thresholds, and retrieve all existing configurations. Use it to automate threshold management, integrate periodic reporting, and embed Apdex-driven alerts and dashboards into your observability workflows."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM993"
+    }
+  ],
+  "paths": {
+    "/get_apdex_report": {
+      "post": {
+        "operationId": "get_apdex_report",
+        "summary": "Generate an Apdex report for an Apdex ID",
+        "description": "Simulate generating an Apdex Report for a specified apdexId over a given time range. Use millisecond Unix timestamps for _from and to.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "apdexId": {
+                    "type": "string",
+                    "description": "The unique identifier of the Apdex configuration for which the report is generated."
+                  },
+                  "_from": {
+                    "type": "integer",
+                    "description": "The start time for the report as a Unix Timestamp in milliseconds (13 digits), representing the time from which to begin the report data."
+                  },
+                  "to": {
+                    "type": "integer",
+                    "description": "The end time for the report as a Unix Timestamp in milliseconds (13 digits), representing the time at which to end the report data."
+                  }
+                },
+                "required": [
+                  "apdexId",
+                  "_from",
+                  "to"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Apdex report for the requested apdexId and time range.",
+                  "properties": {
+                    "apdexId": {
+                      "type": "string",
+                      "description": "The unique identifier of the Apdex configuration for which the report was generated."
+                    },
+                    "_from": {
+                      "type": "integer",
+                      "description": "The start time for the report as a Unix Timestamp in milliseconds (13 digits), representing the time from which the report data begins."
+                    },
+                    "to": {
+                      "type": "integer",
+                      "description": "The end time for the report as a Unix Timestamp in milliseconds (13 digits), representing the time at which the report data ends."
+                    },
+                    "apdexScore": {
+                      "type": "number",
+                      "description": "Computed Apdex score for the interval. Value typically ranges from 0.0 (worst) to 1.0 (best)."
+                    },
+                    "satisfiedCount": {
+                      "type": "integer",
+                      "description": "Number of satisfied samples (within the Apdex satisfied threshold)."
+                    },
+                    "toleratedCount": {
+                      "type": "integer",
+                      "description": "Number of tolerated samples (within the Apdex tolerated threshold)."
+                    },
+                    "frustratedCount": {
+                      "type": "integer",
+                      "description": "Number of frustrated samples (outside tolerated threshold)."
+                    },
+                    "totalSamples": {
+                      "type": "integer",
+                      "description": "Total number of samples considered when computing the Apdex score."
+                    },
+                    "timeSeries": {
+                      "type": "array",
+                      "description": "Optional chronological series of Apdex samples or aggregated points within the requested interval.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "timestamp": {
+                            "type": "integer",
+                            "description": "Bucket timestamp as Unix Timestamp in milliseconds."
+                          },
+                          "apdex": {
+                            "type": "number",
+                            "description": "Apdex score for the bucket."
+                          },
+                          "satisfied": {
+                            "type": "integer",
+                            "description": "Satisfied sample count in the bucket."
+                          },
+                          "tolerated": {
+                            "type": "integer",
+                            "description": "Tolerated sample count in the bucket."
+                          },
+                          "frustrated": {
+                            "type": "integer",
+                            "description": "Frustrated sample count in the bucket."
+                          }
+                        },
+                        "required": [
+                          "timestamp",
+                          "apdex"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "apdexId",
+                    "_from",
+                    "to",
+                    "apdexScore",
+                    "totalSamples"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ApdexSettingsApi_create_apdex_configuration": {
+      "post": {
+        "operationId": "ApdexSettingsApi_create_apdex_configuration",
+        "summary": "Create Apdex configuration (simulation)",
+        "description": "Simulates creating an Apdex configuration by setting thresholds for satisfactory, tolerable, and frustrated user experience levels.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "thresholds": {
+                    "type": "object",
+                    "description": "Threshold levels for Apdex score calculations.",
+                    "properties": {
+                      "satisfactory": {
+                        "type": "number",
+                        "format": "double",
+                        "description": "The threshold for a satisfactory user experience (in seconds).. Use float format (e.g., 1.0 not 1).",
+                        "minimum": 0
+                      },
+                      "tolerable": {
+                        "type": "number",
+                        "format": "double",
+                        "description": "The threshold for a tolerable user experience (in seconds).. Use float format (e.g., 1.0 not 1).",
+                        "minimum": 0
+                      },
+                      "frustrated": {
+                        "type": "number",
+                        "format": "double",
+                        "description": "The threshold beyond which the user experience is considered frustrated (in seconds).. Use float format (e.g., 1.0 not 1).",
+                        "minimum": 0
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "satisfactory",
+                      "tolerable",
+                      "frustrated"
+                    ]
+                  },
+                  "application_id": {
+                    "type": "string",
+                    "description": "The unique identifier of the application for which the Apdex configuration is created.",
+                    "default": "default_app_id"
+                  },
+                  "enabled": {
+                    "type": "boolean",
+                    "description": "A flag to enable or disable the Apdex configuration.",
+                    "default": true
+                  }
+                },
+                "required": [
+                  "thresholds"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Representation of the created Apdex configuration.",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Unique identifier for the created Apdex configuration."
+                    },
+                    "thresholds": {
+                      "type": "object",
+                      "description": "Threshold levels used for Apdex score calculations.",
+                      "properties": {
+                        "satisfactory": {
+                          "type": "number",
+                          "description": "The threshold for a satisfactory user experience (in seconds). Use float format (e.g., 1.0 not 1).",
+                          "format": "double"
+                        },
+                        "tolerable": {
+                          "type": "number",
+                          "description": "The threshold for a tolerable user experience (in seconds). Use float format (e.g., 1.0 not 1).",
+                          "format": "double"
+                        },
+                        "frustrated": {
+                          "type": "number",
+                          "description": "The threshold beyond which the user experience is considered frustrated (in seconds). Use float format (e.g., 1.0 not 1).",
+                          "format": "double"
+                        }
+                      },
+                      "required": [
+                        "satisfactory",
+                        "tolerable",
+                        "frustrated"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "application_id": {
+                      "type": "string",
+                      "description": "The unique identifier of the application for which the Apdex configuration was created."
+                    },
+                    "enabled": {
+                      "type": "boolean",
+                      "description": "Whether the Apdex configuration is enabled."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp when the Apdex configuration was created."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "thresholds",
+                    "application_id",
+                    "enabled"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ApdexSettingsApi_get_all_apdex_configurations": {
+      "post": {
+        "operationId": "ApdexSettingsApi_get_all_apdex_configurations",
+        "summary": "List Apdex threshold configurations",
+        "description": "Simulate returning all Apdex threshold configurations. Supports filtering by application_id (use 'all' to retrieve global/all applications) and by active_only flag.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "application_id": {
+                    "type": "string",
+                    "description": "The unique identifier of the application for which Apdex settings are being retrieved. For example, 'app_12345'.",
+                    "default": "all"
+                  },
+                  "active_only": {
+                    "type": "boolean",
+                    "description": "A flag to filter the configurations. If set to true, only active Apdex settings are returned.",
+                    "default": true
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "A page of Apdex threshold configurations matching the request filters.",
+                  "properties": {
+                    "configurations": {
+                      "type": "array",
+                      "description": "Array of Apdex threshold configuration objects.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the Apdex configuration."
+                          },
+                          "application_id": {
+                            "type": "string",
+                            "description": "Identifier of the application this configuration applies to. Use 'all' to indicate global configurations."
+                          },
+                          "threshold": {
+                            "type": "number",
+                            "description": "Apdex threshold value. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "active": {
+                            "type": "boolean",
+                            "description": "Whether the Apdex configuration is currently active."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Optional human-readable notes about the configuration."
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "description": "Timestamp when the configuration was created (ISO 8601 recommended)."
+                          },
+                          "updated_at": {
+                            "type": "string",
+                            "description": "Timestamp of the last update to the configuration (ISO 8601 recommended)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "application_id",
+                          "threshold",
+                          "active"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_count": {
+                      "type": "integer",
+                      "description": "Total number of configurations that match the filters."
+                    }
+                  },
+                  "required": [
+                    "configurations"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

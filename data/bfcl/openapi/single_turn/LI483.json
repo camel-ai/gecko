@@ -1,0 +1,129 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI483",
+    "version": "1.0.0",
+    "description": "LI483 is a compact tax-calculation API designed to compute owed taxes based on income, allowable deductions, and credits. Clients submit income details and optional deduction/credit data and receive precise tax liabilities and breakdowns suitable for single calls or batch processing; responses are machine-friendly for integration into payroll, accounting, or consumer tax tools. The service emphasizes accuracy, predictable request/response patterns, and clear error reporting for invalid inputs."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI483"
+    }
+  ],
+  "paths": {
+    "/calculate_tax": {
+      "post": {
+        "operationId": "calculate_tax",
+        "summary": "Simulate tax calculation for a given income",
+        "description": "Calculate total tax owed (federal plus optional state) given income, deductions, credits, and filing status. Returns taxable income, tax components, and an overall effective tax rate.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "income": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The total income of the individual for the year in dollars.. Use float format (e.g., 1.0 not 1)."
+                  },
+                  "filing_status": {
+                    "type": "string",
+                    "description": "The tax filing status of the individual.",
+                    "enum": [
+                      "single",
+                      "married_filing_jointly",
+                      "married_filing_separately",
+                      "head_of_household"
+                    ]
+                  },
+                  "deductions": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The total amount of deductions the individual is claiming in dollars.. Use float format (e.g., 1.0 not 1).",
+                    "default": 0
+                  },
+                  "tax_credits": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The total amount of tax credits the individual is claiming in dollars.. Use float format (e.g., 1.0 not 1).",
+                    "default": 0
+                  },
+                  "state": {
+                    "type": "string",
+                    "description": "The state in which the individual resides, used for determining state-specific taxes.",
+                    "default": "federal"
+                  }
+                },
+                "required": [
+                  "income",
+                  "filing_status"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful tax calculation result",
+                  "properties": {
+                    "taxable_income": {
+                      "type": "number",
+                      "description": "Income after subtracting deductions, in dollars. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "federal_tax": {
+                      "type": "number",
+                      "description": "Calculated federal tax owed in dollars before state tax and after applying tax credits that affect federal tax. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "state_tax": {
+                      "type": "number",
+                      "description": "Calculated state tax owed in dollars (0 if 'state' is 'federal' or if no state tax applies). Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "tax_owed": {
+                      "type": "number",
+                      "description": "Total tax owed (federal_tax + state_tax - any applicable credits applied to total tax), in dollars. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "effective_tax_rate": {
+                      "type": "number",
+                      "description": "Effective tax rate expressed as a decimal fraction of gross income (tax_owed / income). Provide as a float (e.g., 0.22 for 22%, 1.0 for 100%).",
+                      "format": "double"
+                    },
+                    "applied_deductions": {
+                      "type": "number",
+                      "description": "The deduction amount actually applied in the calculation (may equal the 'deductions' input unless limited by rules). Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "applied_tax_credits": {
+                      "type": "number",
+                      "description": "The amount of tax credits applied against tax liability in dollars. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    }
+                  },
+                  "required": [
+                    "taxable_income",
+                    "tax_owed",
+                    "federal_tax",
+                    "effective_tax_rate"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

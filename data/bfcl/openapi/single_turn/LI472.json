@@ -1,0 +1,120 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI472",
+    "version": "1.0.0",
+    "description": "LI472 is an inventory-management API collection designed to adjust product quantities after sales, using the update_inventory operation to decrement stock, enforce minimum thresholds, and flag items for restock. Clients call the service synchronously per transaction or batch, supplying product identifiers, quantities, and transaction metadata; the API emphasizes idempotent updates, atomic transactions, and audit-friendly responses to ensure consistent inventory state and easy integration with POS systems."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI472"
+    }
+  ],
+  "paths": {
+    "/update_inventory": {
+      "post": {
+        "operationId": "update_inventory",
+        "summary": "Simulate inventory update after a sales transaction",
+        "description": "Apply reductions to product inventory quantities for sold items and mark items for restock if their updated quantity is below the configured threshold.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "transaction_items": {
+                    "type": "array",
+                    "description": "A list of items sold in the transaction. Each item is represented by a dictionary detailing the product ID and the quantity sold.",
+                    "items": {
+                      "type": "object",
+                      "description": "Array item",
+                      "properties": {}
+                    },
+                    "minItems": 1
+                  },
+                  "restock_threshold": {
+                    "type": "integer",
+                    "description": "The minimum inventory level before an item is flagged for restocking. Expressed in units.",
+                    "default": 10
+                  },
+                  "update_timestamp": {
+                    "type": "string",
+                    "description": "The timestamp when the inventory update occurs, in the format of 'YYYY-MM-DD HH:MM:SS', such as '2023-01-15 13:45:00'.",
+                    "default": null
+                  }
+                },
+                "required": [
+                  "transaction_items"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Result of the inventory update operation",
+                  "properties": {
+                    "processed_item_count": {
+                      "type": "integer",
+                      "description": "Number of transaction items processed by this update"
+                    },
+                    "flagged_count": {
+                      "type": "integer",
+                      "description": "Number of items flagged for restocking after the update"
+                    },
+                    "updated_items": {
+                      "type": "array",
+                      "description": "Per-product update results",
+                      "items": {
+                        "type": "object",
+                        "description": "Inventory update for a single product",
+                        "properties": {
+                          "product_id": {
+                            "type": "string",
+                            "description": "Unique identifier for the product"
+                          },
+                          "previous_quantity": {
+                            "type": "integer",
+                            "description": "Quantity before applying the transaction"
+                          },
+                          "updated_quantity": {
+                            "type": "integer",
+                            "description": "Quantity after applying the transaction"
+                          },
+                          "restock_required": {
+                            "type": "boolean",
+                            "description": "True if updated_quantity is below the restock threshold and the item should be restocked"
+                          }
+                        },
+                        "required": [
+                          "product_id",
+                          "updated_quantity",
+                          "restock_required"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "processed_item_count",
+                    "flagged_count",
+                    "updated_items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

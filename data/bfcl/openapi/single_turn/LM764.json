@@ -1,0 +1,358 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM764",
+    "version": "1.0.0",
+    "description": "LM764 is a REST-style bus travel API that lets clients search itineraries and purchase tickets; use Buses_3_FindBus to query schedules and availability between origin and destination for a given date and passenger count, then call Buses_3_BuyBusTicket to complete bookings with selected departure time and optional extra-luggage option. Designed for simple synchronous integration with clear parameters for cities, date, passenger count and luggage."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM764"
+    }
+  ],
+  "paths": {
+    "/Buses_3_FindBus": {
+      "post": {
+        "operationId": "Buses_3_FindBus",
+        "summary": "Simulate searching bus itineraries between two cities for a given date and passenger count.",
+        "description": "Find available bus itineraries from from_city to to_city on departure_date for the requested number of passengers. Respect the optional category filter when provided.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "from_city": {
+                    "type": "string",
+                    "description": "The city to depart from, in the format of 'City, State', such as 'Austin, TX'."
+                  },
+                  "to_city": {
+                    "type": "string",
+                    "description": "The destination city of the trip, in the format of 'City, State', such as 'Dallas, TX'."
+                  },
+                  "departure_date": {
+                    "type": "string",
+                    "description": "The date of departure in the format 'YYYY-MM-DD', such as '2023-04-15'."
+                  },
+                  "num_passengers": {
+                    "type": "integer",
+                    "description": "The number of passengers for whom tickets are to be booked. Must be a positive integer.",
+                    "default": 1
+                  },
+                  "category": {
+                    "type": "string",
+                    "description": "The category of the bus trip based on the number of stops en route.",
+                    "enum": [
+                      "direct",
+                      "one-stop"
+                    ],
+                    "default": "direct"
+                  }
+                },
+                "required": [
+                  "from_city",
+                  "to_city",
+                  "departure_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing matching bus itineraries.",
+                  "properties": {
+                    "itineraries": {
+                      "type": "array",
+                      "description": "Array of matching itineraries. Results may be ordered by relevance, price, or departure time.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique itinerary identifier."
+                          },
+                          "operator": {
+                            "type": "string",
+                            "description": "Name of the bus operator or company."
+                          },
+                          "category": {
+                            "type": "string",
+                            "description": "Trip category, matching request category values (e.g., 'direct', 'one-stop')."
+                          },
+                          "price": {
+                            "type": "object",
+                            "description": "Price details for the itinerary.",
+                            "properties": {
+                              "amount": {
+                                "type": "number",
+                                "description": "Monetary amount. Use float format (e.g., 1.0 not 1).",
+                                "format": "double"
+                              },
+                              "currency": {
+                                "type": "string",
+                                "description": "Currency code (typically ISO 4217, e.g., 'USD')."
+                              }
+                            },
+                            "required": [
+                              "amount",
+                              "currency"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "departure": {
+                            "type": "object",
+                            "description": "Departure location and time.",
+                            "properties": {
+                              "city": {
+                                "type": "string",
+                                "description": "Departure city (e.g., 'Austin, TX')."
+                              },
+                              "datetime": {
+                                "type": "string",
+                                "description": "Departure date and time in ISO 8601 (e.g., 2023-04-15T08:30:00-05:00)."
+                              }
+                            },
+                            "required": [
+                              "city",
+                              "datetime"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "arrival": {
+                            "type": "object",
+                            "description": "Arrival location and time.",
+                            "properties": {
+                              "city": {
+                                "type": "string",
+                                "description": "Arrival city (e.g., 'Dallas, TX')."
+                              },
+                              "datetime": {
+                                "type": "string",
+                                "description": "Arrival date and time in ISO 8601."
+                              }
+                            },
+                            "required": [
+                              "city",
+                              "datetime"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "duration_minutes": {
+                            "type": "integer",
+                            "description": "Total trip duration in minutes.",
+                            "minimum": 0
+                          },
+                          "stops": {
+                            "type": "integer",
+                            "description": "Number of intermediate stops.",
+                            "minimum": 0
+                          },
+                          "seats_available": {
+                            "type": "integer",
+                            "description": "Number of seats currently available for this itinerary.",
+                            "minimum": 0
+                          },
+                          "segments": {
+                            "type": "array",
+                            "description": "Detailed segments making up the itinerary (one or more).",
+                            "minItems": 1,
+                            "items": {
+                              "type": "object",
+                              "description": "Array item",
+                              "properties": {
+                                "from_city": {
+                                  "type": "string",
+                                  "description": "Segment origin city."
+                                },
+                                "to_city": {
+                                  "type": "string",
+                                  "description": "Segment destination city."
+                                },
+                                "departure_datetime": {
+                                  "type": "string",
+                                  "description": "Segment departure date and time in ISO 8601."
+                                },
+                                "arrival_datetime": {
+                                  "type": "string",
+                                  "description": "Segment arrival date and time in ISO 8601."
+                                },
+                                "operator": {
+                                  "type": "string",
+                                  "description": "Operator for this segment, if different from overall itinerary operator."
+                                }
+                              },
+                              "required": [
+                                "from_city",
+                                "to_city",
+                                "departure_datetime",
+                                "arrival_datetime"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "operator",
+                          "price",
+                          "departure",
+                          "arrival",
+                          "seats_available",
+                          "segments"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "itineraries"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Buses_3_BuyBusTicket": {
+      "post": {
+        "operationId": "Buses_3_BuyBusTicket",
+        "summary": "Simulate purchasing bus tickets between cities",
+        "description": "Simulate creating a bus ticket reservation for a given route, date, time, passenger count, and optional additional luggage.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "from_city": {
+                    "type": "string",
+                    "description": "The city from which the bus will depart."
+                  },
+                  "to_city": {
+                    "type": "string",
+                    "description": "The destination city for the bus trip."
+                  },
+                  "departure_date": {
+                    "type": "string",
+                    "description": "The departure date for the trip, in the format 'YYYY-MM-DD'."
+                  },
+                  "departure_time": {
+                    "type": "string",
+                    "description": "The departure time for the trip, in the format 'HH:MM' (24-hour clock)."
+                  },
+                  "num_passengers": {
+                    "type": "integer",
+                    "description": "The number of passengers for whom tickets need to be purchased.",
+                    "enum": [
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ],
+                    "default": 1
+                  },
+                  "additional_luggage": {
+                    "type": "boolean",
+                    "description": "Indicates whether additional luggage will be carried on the bus.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "from_city",
+                  "to_city",
+                  "departure_date",
+                  "departure_time"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful ticket purchase payload",
+                  "properties": {
+                    "reservation_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the created reservation (e.g., UUID)."
+                    },
+                    "from_city": {
+                      "type": "string",
+                      "description": "The city from which the bus will depart."
+                    },
+                    "to_city": {
+                      "type": "string",
+                      "description": "The destination city for the bus trip."
+                    },
+                    "departure_date": {
+                      "type": "string",
+                      "description": "The departure date for the trip, in the format 'YYYY-MM-DD'."
+                    },
+                    "departure_time": {
+                      "type": "string",
+                      "description": "The departure time for the trip, in the format 'HH:MM' (24-hour clock)."
+                    },
+                    "num_passengers": {
+                      "type": "integer",
+                      "description": "The number of passengers for whom tickets were purchased."
+                    },
+                    "additional_luggage": {
+                      "type": "boolean",
+                      "description": "Indicates whether additional luggage will be carried on the bus."
+                    },
+                    "total_price": {
+                      "type": "number",
+                      "description": "Total price charged for the reservation. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "ISO 4217 currency code used for total_price (e.g., 'USD')."
+                    },
+                    "issued_at": {
+                      "type": "string",
+                      "description": "Timestamp when the reservation was issued (ISO 8601 recommended, e.g., '2023-01-02T15:04:05Z')."
+                    }
+                  },
+                  "required": [
+                    "reservation_id",
+                    "from_city",
+                    "to_city",
+                    "departure_date",
+                    "departure_time",
+                    "num_passengers",
+                    "additional_luggage",
+                    "total_price",
+                    "currency",
+                    "issued_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

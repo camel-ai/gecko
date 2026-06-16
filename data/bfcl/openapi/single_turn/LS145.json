@@ -1,0 +1,81 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LS145",
+    "version": "1.0.0",
+    "description": "LS145 is a Windows-focused API collection for executing system-level commands via a single tool, cmd_controller_execute. It provides a simple synchronous interface to run one or multiple shell commands chained with '&&', suitable for administrative automation, diagnostics, and scripted workflows. Use it cautiously with proper input validation and privileges, as it calls os.system() directly and executes commands in the host environment. Responses are returned as execution status codes and console output."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LS145"
+    }
+  ],
+  "paths": {
+    "/cmd_controller_execute": {
+      "post": {
+        "operationId": "cmd_controller_execute",
+        "summary": "Execute Windows system command (simulation)",
+        "description": "Simulate execution of a Windows system command invoked via os.system(). Supports single or chained commands using '&&'. The simulation returns an exit status and execution time; stdout/stderr are not captured by os.system() and thus are not returned here.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "description": "The exact Windows command to execute. If the user already provided a command snippet, copy that command text verbatim instead of expanding, reordering, or adding redirects/extra arguments. Preserve canonical Windows syntax and argument order. To execute multiple commands, separate them with '&&'. Examples: 'dir C:\\\\', 'dir D:\\\\ && echo done', 'taskkill /F /IM timer.exe', 'date /t', 'timeout 10'."
+                  },
+                  "unit": {
+                    "type": "string",
+                    "description": "Optional unit label for the reported execution time. Leave this unset or use 'N/A' unless the user explicitly asks for a specific unit such as 'seconds' or 'milliseconds'.",
+                    "enum": [
+                      "N/A",
+                      "seconds",
+                      "milliseconds"
+                    ],
+                    "default": "N/A"
+                  }
+                },
+                "required": [
+                  "command"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Result of executing the requested command using os.system() on Windows.",
+                  "properties": {
+                    "exit_code": {
+                      "type": "integer",
+                      "description": "Process exit status as returned by os.system(). By convention, 0 typically indicates success."
+                    },
+                    "execution_time_seconds": {
+                      "type": "number",
+                      "description": "Elapsed wall-clock time for the command execution in seconds. Use float format (e.g., 1.0 not 1)."
+                    }
+                  },
+                  "required": [
+                    "exit_code",
+                    "execution_time_seconds"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

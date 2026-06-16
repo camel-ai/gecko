@@ -1,0 +1,346 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM1005",
+    "version": "1.0.0",
+    "description": "The LM1005 API collection enables efficient management and retrieval of host agent data by providing endpoints to capture detailed snapshots of specific agents within defined time frames, search and filter host agent snapshots based on various parameters, and obtain comprehensive support information for individual agents identified by host and support IDs. This collection facilitates streamlined monitoring and support workflows for host agents in diverse environments."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM1005"
+    }
+  ],
+  "paths": {
+    "/HostAgentApi_get_agent_snapshot": {
+      "post": {
+        "operationId": "HostAgentApi_get_agent_snapshot",
+        "summary": "Retrieve a host agent snapshot within a specified time window.",
+        "description": "Simulates retrieval of detailed snapshot data for a host agent identified by 'id', optionally bounded by an end time 'to' and a time window size 'windowSize' in minutes.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The unique identifier of the host agent."
+                  },
+                  "to": {
+                    "type": "string",
+                    "description": "The end time for the snapshot data retrieval. If not specified, defaults to the current time.",
+                    "default": null
+                  },
+                  "windowSize": {
+                    "type": "integer",
+                    "description": "The size of the time window for the snapshot in minutes.",
+                    "default": 60
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "agentId": {
+                      "type": "string",
+                      "description": "The unique identifier of the host agent."
+                    },
+                    "snapshotTime": {
+                      "type": "string",
+                      "description": "The timestamp when the snapshot was taken.",
+                      "format": "date-time"
+                    },
+                    "metrics": {
+                      "type": "object",
+                      "description": "Performance and status metrics of the host agent during the snapshot window.",
+                      "properties": {
+                        "cpuUsagePercent": {
+                          "type": "number",
+                          "description": "CPU usage percentage.",
+                          "minimum": 0,
+                          "maximum": 100
+                        },
+                        "memoryUsageMB": {
+                          "type": "number",
+                          "description": "Memory usage in megabytes.",
+                          "minimum": 0
+                        },
+                        "diskUsagePercent": {
+                          "type": "number",
+                          "description": "Disk usage percentage.",
+                          "minimum": 0,
+                          "maximum": 100
+                        },
+                        "networkInKBps": {
+                          "type": "number",
+                          "description": "Network inbound throughput in KB per second.",
+                          "minimum": 0
+                        },
+                        "networkOutKBps": {
+                          "type": "number",
+                          "description": "Network outbound throughput in KB per second.",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "cpuUsagePercent",
+                        "memoryUsageMB",
+                        "diskUsagePercent",
+                        "networkInKBps",
+                        "networkOutKBps"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "agentId",
+                    "snapshotTime",
+                    "metrics"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/HostAgentApi_search_host_agents": {
+      "post": {
+        "operationId": "HostAgentApi_search_host_agents",
+        "summary": "Search host agent snapshots with filtering and time window parameters.",
+        "description": "Simulates querying host agent snapshots filtered by a search query, optional end date, time window size, result size limit, and offline inclusion flag.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "description": "The search query for filtering host agent snapshots, such as 'status:active'."
+                  },
+                  "to": {
+                    "type": "string",
+                    "description": "The end date for the query in the format 'YYYY-MM-DD'. If not specified, defaults to the current date.",
+                    "default": null,
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "nullable": true
+                  },
+                  "windowSize": {
+                    "type": "integer",
+                    "description": "The size of the time window in hours for the query.",
+                    "default": 24,
+                    "minimum": 1
+                  },
+                  "size": {
+                    "type": "integer",
+                    "description": "The maximum number of host agent snapshots to return.",
+                    "default": 100,
+                    "minimum": 1,
+                    "maximum": 1000
+                  },
+                  "offline": {
+                    "type": "boolean",
+                    "description": "A flag indicating whether to include offline host agents in the results.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "query"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "description": "Parameter results",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "agentId": {
+                            "type": "string",
+                            "description": "Unique identifier of the host agent."
+                          },
+                          "status": {
+                            "type": "string",
+                            "description": "Current status of the host agent.",
+                            "enum": [
+                              "active",
+                              "inactive",
+                              "offline"
+                            ]
+                          },
+                          "lastSeen": {
+                            "type": "string",
+                            "description": "Timestamp of the last snapshot received from the host agent.",
+                            "format": "date-time"
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "description": "Additional metadata about the host agent.",
+                            "properties": {},
+                            "additionalProperties": true
+                          }
+                        },
+                        "required": [
+                          "agentId",
+                          "status",
+                          "lastSeen"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "Total number of host agent snapshots matching the query."
+                    }
+                  },
+                  "required": [
+                    "results",
+                    "total"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_agent_support_information": {
+      "post": {
+        "operationId": "get_agent_support_information",
+        "summary": "Retrieve agent support information by host and support info IDs",
+        "description": "Simulates retrieval of support information for a specified agent on a host, identified by hostId and supportInfoId.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "hostId": {
+                    "type": "string",
+                    "description": "Unique identifier for the host where the agent is running."
+                  },
+                  "supportInfoId": {
+                    "type": "string",
+                    "description": "Unique identifier for the support information related to the agent."
+                  }
+                },
+                "required": [
+                  "hostId",
+                  "supportInfoId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "agentName": {
+                      "type": "string",
+                      "description": "Name of the agent."
+                    },
+                    "hostId": {
+                      "type": "string",
+                      "description": "Unique identifier for the host where the agent is running."
+                    },
+                    "supportInfoId": {
+                      "type": "string",
+                      "description": "Unique identifier for the support information related to the agent."
+                    },
+                    "supportDetails": {
+                      "type": "object",
+                      "description": "Detailed support information for the agent.",
+                      "properties": {
+                        "version": {
+                          "type": "string",
+                          "description": "Agent version."
+                        },
+                        "lastUpdated": {
+                          "type": "string",
+                          "description": "Timestamp of the last update to the support information.",
+                          "format": "date-time"
+                        },
+                        "status": {
+                          "type": "string",
+                          "description": "Current status of the agent.",
+                          "enum": [
+                            "active",
+                            "inactive",
+                            "error"
+                          ]
+                        },
+                        "logs": {
+                          "type": "array",
+                          "description": "Recent log entries related to the agent.",
+                          "items": {
+                            "type": "string",
+                            "description": "Array item"
+                          }
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "lastUpdated",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "agentName",
+                    "hostId",
+                    "supportInfoId",
+                    "supportDetails"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

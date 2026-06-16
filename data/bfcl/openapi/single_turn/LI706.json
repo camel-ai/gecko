@@ -1,0 +1,571 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI706",
+    "version": "1.0.0",
+    "description": "LI706 provides unified travel booking endpoints for searching and reserving houses and trains. Use Hotels_2_SearchHouse to filter properties by location, laundry availability, guest count, and rating, then Hotels_2_BookHouse to reserve selected houses with dates and adult count. Use Trains_1_FindTrains to discover train options to a destination and Trains_1_GetTrainTickets to reserve seats with fare class, trip protection, and passenger count. Designed for synchronous request/response integration."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI706"
+    }
+  ],
+  "paths": {
+    "/Hotels_2_BookHouse": {
+      "post": {
+        "operationId": "Hotels_2_BookHouse",
+        "summary": "Reserve a house for specified dates",
+        "description": "Simulate booking the specified house for the requested date range and number of adults. Validate date correctness and ordering; return a reservation confirmation payload on success.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "where_to": {
+                    "type": "string",
+                    "description": "The location of the house to be booked, in the format of 'City, State', such as 'Berkeley, CA' or 'New York, NY'."
+                  },
+                  "number_of_adults": {
+                    "type": "integer",
+                    "description": "The number of adults included in the reservation. Select 'dontcare' for no preference.",
+                    "enum": [
+                      "1",
+                      "2",
+                      "3",
+                      "4",
+                      "5"
+                    ]
+                  },
+                  "check_in_date": {
+                    "type": "string",
+                    "description": "The start date for the reservation in the format 'YYYY-MM-DD'."
+                  },
+                  "check_out_date": {
+                    "type": "string",
+                    "description": "The end date for the reservation in the format 'YYYY-MM-DD'."
+                  }
+                },
+                "required": [
+                  "where_to",
+                  "check_in_date",
+                  "check_out_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Confirmation payload for a successful house reservation.",
+                  "properties": {
+                    "reservation_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the confirmed reservation."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Booking status (for example: confirmed)."
+                    },
+                    "house_id": {
+                      "type": "string",
+                      "description": "Internal identifier of the booked house."
+                    },
+                    "reserved_period": {
+                      "type": "object",
+                      "description": "The reserved date range.",
+                      "properties": {
+                        "start_date": {
+                          "type": "string",
+                          "description": "Reservation start date in 'YYYY-MM-DD'."
+                        },
+                        "end_date": {
+                          "type": "string",
+                          "description": "Reservation end date in 'YYYY-MM-DD'."
+                        }
+                      },
+                      "required": [
+                        "start_date",
+                        "end_date"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "total_nights": {
+                      "type": "integer",
+                      "description": "Total number of nights for the reservation."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp when the reservation was created (ISO 8601 recommended)."
+                    }
+                  },
+                  "required": [
+                    "reservation_id",
+                    "status",
+                    "house_id",
+                    "reserved_period",
+                    "total_nights",
+                    "created_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Hotels_2_SearchHouse": {
+      "post": {
+        "operationId": "Hotels_2_SearchHouse",
+        "summary": "Simulate a house search with filters",
+        "description": "Return a list of houses matching the provided location and optional filters (laundry service, number of adults, minimum rating). Treat 'dontcare' values as no preference.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "where_to": {
+                    "type": "string",
+                    "description": "The location of the house in the format of 'City, State', such as 'Berkeley, CA' or 'New York, NY'."
+                  },
+                  "has_laundry_service": {
+                    "type": "boolean",
+                    "description": "Indicates if the house must have a laundry service available.",
+                    "enum": [
+                      "True",
+                      "False"
+                    ]
+                  },
+                  "number_of_adults": {
+                    "type": "integer",
+                    "description": "The number of adults for the reservation. Use 'dontcare' to indicate no preference.",
+                    "enum": [
+                      "1",
+                      "2",
+                      "3",
+                      "4",
+                      "5"
+                    ]
+                  },
+                  "rating": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The minimum review rating of the house from 1.0 to 5.0, with 5 being the highest. Use 'dontcare' to indicate no preference.. Use float format (e.g., 1.0 not 1).",
+                    "default": "dontcare"
+                  }
+                },
+                "required": [
+                  "where_to"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search results payload containing matching properties and basic pagination.",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "description": "Array of matching house objects, ordered by relevance.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the house."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Display name of the house or property."
+                          },
+                          "address": {
+                            "type": "string",
+                            "description": "Human-readable address or locality description (e.g., 'Berkeley, CA')."
+                          },
+                          "rating": {
+                            "type": "number",
+                            "description": "Average review rating for the house. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "has_laundry_service": {
+                            "type": "boolean",
+                            "description": "Indicates whether the property offers laundry service."
+                          },
+                          "max_adults": {
+                            "type": "integer",
+                            "description": "Maximum number of adults the property comfortably accommodates."
+                          },
+                          "summary": {
+                            "type": "string",
+                            "description": "Short textual summary or highlights of the property."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "address",
+                          "rating",
+                          "has_laundry_service"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of matching results across all pages (may be an estimate)."
+                    },
+                    "page_number": {
+                      "type": "integer",
+                      "description": "Current page number of these results (1-indexed)."
+                    },
+                    "page_size": {
+                      "type": "integer",
+                      "description": "Number of results returned on this page."
+                    }
+                  },
+                  "required": [
+                    "results"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Trains_1_GetTrainTickets": {
+      "post": {
+        "operationId": "Trains_1_GetTrainTickets",
+        "summary": "Reserve train tickets between two cities",
+        "description": "Simulate reserving tickets for a train journey on a specified date and start time, with adult count, trip protection option, and fare class.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "_from": {
+                    "type": "string",
+                    "description": "The starting city for the train journey, in the format 'City, State', such as 'Berkeley, CA' or 'New York, NY'."
+                  },
+                  "to": {
+                    "type": "string",
+                    "description": "The destination city for the train journey, in the format 'City, State', such as 'Berkeley, CA' or 'New York, NY'."
+                  },
+                  "date_of_journey": {
+                    "type": "string",
+                    "description": "The date of the train journey, in the format 'YYYY-MM-DD'."
+                  },
+                  "journey_start_time": {
+                    "type": "string",
+                    "description": "The start time of the train journey, in 24-hour format 'HH:MM'."
+                  },
+                  "number_of_adults": {
+                    "type": "integer",
+                    "description": "The number of adults to reserve train tickets for.",
+                    "minimum": 1
+                  },
+                  "trip_protection": {
+                    "type": "boolean",
+                    "description": "Indicates whether to add trip protection to the reservation for an additional fee."
+                  },
+                  "_class": {
+                    "type": "string",
+                    "description": "The fare class for the train reservation.",
+                    "enum": [
+                      "Value",
+                      "Flexible",
+                      "Business"
+                    ],
+                    "default": "Value"
+                  }
+                },
+                "required": [
+                  "_from",
+                  "to",
+                  "date_of_journey",
+                  "journey_start_time",
+                  "number_of_adults",
+                  "trip_protection"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "reservation_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the confirmed reservation."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "High-level reservation status (e.g., confirmed, pending)."
+                    },
+                    "total_price": {
+                      "type": "number",
+                      "description": "Total amount charged for the reservation. Provide as a float (e.g., 123.45, not 123).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Currency code for total_price (e.g., USD)."
+                    },
+                    "ticket_count": {
+                      "type": "integer",
+                      "description": "Number of tickets issued for the reservation."
+                    },
+                    "tickets": {
+                      "type": "array",
+                      "description": "List of issued tickets (one entry per ticket).",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "ticket_id": {
+                            "type": "string",
+                            "description": "Unique identifier for the individual ticket."
+                          },
+                          "seat": {
+                            "type": "string",
+                            "description": "Seat assignment if allocated (may be omitted if not assigned)."
+                          },
+                          "carriage": {
+                            "type": "string",
+                            "description": "Carriage or coach identifier if assigned."
+                          }
+                        },
+                        "required": [
+                          "ticket_id"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "description": "Additional metadata about the reservation.",
+                      "properties": {
+                        "fare_class": {
+                          "type": "string",
+                          "description": "Fare class applied to this reservation (reflects the requested fare class)."
+                        },
+                        "trip_protection_added": {
+                          "type": "boolean",
+                          "description": "Whether trip protection was added to the reservation."
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "reservation_id",
+                    "status",
+                    "total_price",
+                    "currency",
+                    "ticket_count"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Trains_1_FindTrains": {
+      "post": {
+        "operationId": "Trains_1_FindTrains",
+        "summary": "Simulate finding trains to a destination",
+        "description": "Return a simulated list of available train services for the requested journey.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "_from": {
+                    "type": "string",
+                    "description": "The name of the starting city for the train journey, such as 'New York, NY'."
+                  },
+                  "to": {
+                    "type": "string",
+                    "description": "The name of the destination city for the train journey, such as 'Los Angeles, CA'."
+                  },
+                  "date_of_journey": {
+                    "type": "string",
+                    "description": "The date of the train journey in the format 'MM/DD/YYYY'.",
+                    "pattern": "^\\d{2}\\/\\d{2}\\/\\d{4}$"
+                  },
+                  "_class": {
+                    "type": "string",
+                    "description": "The fare class for the train reservation.",
+                    "enum": [
+                      "Value",
+                      "Flexible",
+                      "Business"
+                    ],
+                    "default": "Value"
+                  },
+                  "number_of_adults": {
+                    "type": "integer",
+                    "description": "The number of adults to reserve train tickets for. Must be an integer between 1 and 5.",
+                    "default": 1,
+                    "minimum": 1,
+                    "maximum": 5
+                  }
+                },
+                "required": [
+                  "_from",
+                  "to",
+                  "date_of_journey"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "A successful response listing matching train services.",
+                  "properties": {
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Number of matching train services returned."
+                    },
+                    "trains": {
+                      "type": "array",
+                      "description": "List of matching train services.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "train_number": {
+                            "type": "string",
+                            "description": "Identifier or number of the train service."
+                          },
+                          "operator": {
+                            "type": "string",
+                            "description": "Company or operator running the service."
+                          },
+                          "departure_station": {
+                            "type": "string",
+                            "description": "Name of the departure station."
+                          },
+                          "arrival_station": {
+                            "type": "string",
+                            "description": "Name of the arrival station."
+                          },
+                          "departure_time": {
+                            "type": "string",
+                            "description": "Scheduled departure time (local time)."
+                          },
+                          "arrival_time": {
+                            "type": "string",
+                            "description": "Scheduled arrival time (local time)."
+                          },
+                          "duration": {
+                            "type": "string",
+                            "description": "Human-readable total journey duration (e.g., '5h 30m'). Do not assume a specific unit unless documented elsewhere."
+                          },
+                          "available_classes": {
+                            "type": "array",
+                            "description": "Availability and pricing for each fare class. Class names are not restricted to any single list.",
+                            "items": {
+                              "type": "object",
+                              "description": "Array item",
+                              "properties": {
+                                "class": {
+                                  "type": "string",
+                                  "description": "Fare class name (for example: 'Value', 'Flexible', 'Business'). This is illustrative, not exhaustive."
+                                },
+                                "price": {
+                                  "type": "number",
+                                  "description": "Total fare amount for this class. Do not assume a currency; caller should handle currency context if needed."
+                                },
+                                "seats_available": {
+                                  "type": "integer",
+                                  "description": "Number of seats currently available in this class."
+                                }
+                              },
+                              "required": [
+                                "class",
+                                "price",
+                                "seats_available"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "stops": {
+                            "type": "integer",
+                            "description": "Number of intermediate stops (if any)."
+                          },
+                          "notes": {
+                            "type": "string",
+                            "description": "Optional free-text notes about the service (e.g., delays, amenities)."
+                          }
+                        },
+                        "required": [
+                          "train_number",
+                          "departure_station",
+                          "arrival_station",
+                          "departure_time",
+                          "arrival_time",
+                          "duration",
+                          "available_classes"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "total_results",
+                    "trains"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

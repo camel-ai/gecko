@@ -1,0 +1,690 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM515",
+    "version": "1.0.0",
+    "description": "LM515 is an integrated entertainment API collection that lets applications search theaters and movie showings, retrieve showtimes, buy tickets, and manage music playback and discovery across devices. Use Movies_1 endpoints to find films, get times, and purchase tickets by location and date; use Music_3 endpoints to look up tracks by artist, album, genre, or year and to start playback on target devices. Designed for seamless cross-service orchestration in consumer apps."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM515"
+    }
+  ],
+  "paths": {
+    "/Movies_1_BuyMovieTickets": {
+      "post": {
+        "operationId": "Movies_1_BuyMovieTickets",
+        "summary": "Purchase movie tickets (simulation)",
+        "description": "Simulate buying tickets for a selected movie showing and return a booking confirmation payload.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "movie_name": {
+                    "type": "string",
+                    "description": "The full title of the movie for which tickets are being purchased."
+                  },
+                  "number_of_tickets": {
+                    "type": "integer",
+                    "description": "The total count of tickets to be bought.",
+                    "enum": [
+                      1,
+                      2,
+                      3,
+                      4,
+                      5,
+                      6,
+                      7,
+                      8,
+                      9
+                    ]
+                  },
+                  "show_date": {
+                    "type": "string",
+                    "description": "The date when the show is scheduled, in the format 'YYYY-MM-DD'."
+                  },
+                  "location": {
+                    "type": "string",
+                    "description": "The location of the theater, in the format of 'City, State', such as 'Berkeley, CA' and 'New York, NY'."
+                  },
+                  "show_time": {
+                    "type": "string",
+                    "description": "The starting time of the movie show, in 24-hour format 'HH:MM'."
+                  },
+                  "show_type": {
+                    "type": "string",
+                    "description": "The format of the show being booked.",
+                    "enum": [
+                      "regular",
+                      "3d",
+                      "imax"
+                    ],
+                    "default": "regular"
+                  }
+                },
+                "required": [
+                  "movie_name",
+                  "number_of_tickets",
+                  "show_date",
+                  "location",
+                  "show_time"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful booking confirmation returned when ticket purchase completes.",
+                  "properties": {
+                    "booking_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the confirmed booking."
+                    },
+                    "confirmation_code": {
+                      "type": "string",
+                      "description": "Short code the user can use to retrieve or reference the booking."
+                    },
+                    "total_price": {
+                      "type": "number",
+                      "description": "Total amount charged for the booking. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Currency for total_price, expressed as a currency code (e.g., USD)."
+                    },
+                    "expires_at": {
+                      "type": "string",
+                      "description": "Timestamp when the booking hold or reservation expires (UTC)."
+                    },
+                    "tickets": {
+                      "type": "array",
+                      "description": "List of issued ticket entries for this booking.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "ticket_id": {
+                            "type": "string",
+                            "description": "Unique identifier for the individual ticket."
+                          },
+                          "seat": {
+                            "type": "string",
+                            "description": "Assigned seat identifier when applicable (may be null or omitted for general admission)."
+                          }
+                        },
+                        "required": [
+                          "ticket_id"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "confirmation_url": {
+                      "type": "string",
+                      "description": "URL where the user can view or manage their booking."
+                    }
+                  },
+                  "required": [
+                    "booking_id",
+                    "confirmation_code",
+                    "total_price",
+                    "currency"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Movies_1_FindMovies": {
+      "post": {
+        "operationId": "Movies_1_FindMovies",
+        "summary": "Find movies by location, theater, genre, or show type",
+        "description": "Search for movies playing at theaters in a given city/state. The API filters by location (required), and optionally by theater_name, genre, and show_type. Simulation should follow request rules and return a list of matching movies.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "The city where the theater is located, in the format of 'City, State' (e.g., 'Los Angeles, CA'). State names must be abbreviated"
+                  },
+                  "theater_name": {
+                    "type": "string",
+                    "description": "The name of the theater. If no specific theater is desired, the search will include all theaters.",
+                    "default": "dontcare"
+                  },
+                  "genre": {
+                    "type": "string",
+                    "description": "The genre of the movie. If no specific genre is desired, the search will include all genres.",
+                    "enum": [
+                      "World",
+                      "Offbeat",
+                      "Mystery",
+                      "Supernatural",
+                      "Horror",
+                      "Animation",
+                      "Sci-fi",
+                      "Documentary",
+                      "Drama",
+                      "War",
+                      "Family",
+                      "Action"
+                    ]
+                  },
+                  "show_type": {
+                    "type": "string",
+                    "description": "The type of movie show. Options include regular screenings, 3D, and IMAX formats. If no preference is indicated, all types will be included in the search.",
+                    "enum": [
+                      "regular",
+                      "3d",
+                      "imax"
+                    ]
+                  }
+                },
+                "required": [
+                  "location"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing matching movies",
+                  "properties": {
+                    "movies": {
+                      "type": "array",
+                      "description": "Parameter movies",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique movie identifier"
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Movie title"
+                          },
+                          "genre": {
+                            "type": "string",
+                            "description": "Movie genre"
+                          },
+                          "show_type": {
+                            "type": "string",
+                            "description": "Show format (e.g., regular, 3d, imax)"
+                          },
+                          "theater": {
+                            "type": "object",
+                            "description": "Parameter theater",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "description": "Theater name"
+                              },
+                              "address": {
+                                "type": "string",
+                                "description": "Theater address (free-text)"
+                              }
+                            },
+                            "required": [
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "show_times": {
+                            "type": "array",
+                            "description": "List of show time strings (human-readable, e.g., '7:30 PM')",
+                            "items": {
+                              "type": "string",
+                              "description": "Array item"
+                            }
+                          },
+                          "runtime_minutes": {
+                            "type": "integer",
+                            "description": "Runtime in minutes"
+                          },
+                          "rating": {
+                            "type": "number",
+                            "description": "Average viewer rating. Provide as a float (e.g., 1.0, not 1)",
+                            "format": "double"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "theater",
+                          "show_times"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "movies"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Movies_1_GetTimesForMovie": {
+      "post": {
+        "operationId": "Movies_1_GetTimesForMovie",
+        "summary": "Get showtimes for a movie at a theater on a specified date",
+        "description": "Simulate retrieval of available showtimes for the requested movie at theaters matching the provided location and optional filters (theater_name, show_type) for the given date.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "movie_name": {
+                    "type": "string",
+                    "description": "The title of the movie for which showtimes are being requested."
+                  },
+                  "location": {
+                    "type": "string",
+                    "description": "The location of the theater in the format of 'City, State', such as 'Berkeley, CA' or 'New York, NY'."
+                  },
+                  "show_date": {
+                    "type": "string",
+                    "description": "The date when the show will be screened, in the format 'YYYY-MM-DD'."
+                  },
+                  "theater_name": {
+                    "type": "string",
+                    "description": "The name of the theater where the movie is showing. If unspecified, any theater is considered.",
+                    "default": "Any Theater"
+                  },
+                  "show_type": {
+                    "type": "string",
+                    "description": "The format of the movie showing, such as 'regular', '3D', or 'IMAX'.",
+                    "enum": [
+                      "regular",
+                      "3d",
+                      "imax",
+                      "any"
+                    ],
+                    "default": "any"
+                  }
+                },
+                "required": [
+                  "movie_name",
+                  "location",
+                  "show_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "A list of theaters and their showings for the requested movie and date.",
+                  "properties": {
+                    "date": {
+                      "type": "string",
+                      "description": "The date for which showtimes are returned, in 'YYYY-MM-DD'."
+                    },
+                    "theaters": {
+                      "type": "array",
+                      "description": "A list of theaters that have showings for the requested movie on the specified date.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "description": "The name of the theater."
+                          },
+                          "address": {
+                            "type": "string",
+                            "description": "The theater's address (may be partial or empty if not available)."
+                          },
+                          "distance_miles": {
+                            "type": "number",
+                            "description": "Approximate distance from the requested location in miles. Use float format (e.g., 1.0 not 1)."
+                          },
+                          "showings": {
+                            "type": "array",
+                            "description": "Available showings for this movie at this theater on the requested date.",
+                            "items": {
+                              "type": "object",
+                              "description": "Array item",
+                              "properties": {
+                                "time": {
+                                  "type": "string",
+                                  "description": "Start time of the showing in the theater's local time (examples: '19:30' or '7:30 PM')."
+                                },
+                                "show_type": {
+                                  "type": "string",
+                                  "description": "Format of the showing when available (for example, 'regular', '3D', 'IMAX')."
+                                },
+                                "ticket_price": {
+                                  "type": "number",
+                                  "description": "Ticket price for this showing. Provide as a float (e.g., 12.50)."
+                                },
+                                "available_seats": {
+                                  "type": "integer",
+                                  "description": "Number of seats currently available for this showing, if known."
+                                },
+                                "language": {
+                                  "type": "string",
+                                  "description": "Primary audio language or track for the showing, if known."
+                                }
+                              },
+                              "required": [
+                                "time"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "showings"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "date",
+                    "theaters"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Music_3_PlayMedia": {
+      "post": {
+        "operationId": "Music_3_PlayMedia",
+        "summary": "Simulate initiating playback of a music track on a device",
+        "description": "Simulates playing a specified track on a media player device. Use this only when the user already named the specific track to play now. If the user only gives artist, album, genre, or year preferences and wants something matching those preferences, use Music_3_LookupMusic instead.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "track": {
+                    "type": "string",
+                    "description": "The title of the song to be played."
+                  },
+                  "artist": {
+                    "type": "string",
+                    "description": "The name of the artist performing the track. When unspecified, any artist is acceptable.",
+                    "default": "dontcare"
+                  },
+                  "device": {
+                    "type": "string",
+                    "description": "The name of the device where the music will be played, such as 'Living room speaker' or 'Kitchen sound system'.",
+                    "enum": [
+                      "Living room",
+                      "Kitchen",
+                      "Patio"
+                    ],
+                    "default": "Living room"
+                  },
+                  "album": {
+                    "type": "string",
+                    "description": "The name of the album that the track is part of. Optional and when unspecified, any album is acceptable.",
+                    "default": "dontcare"
+                  }
+                },
+                "required": [
+                  "track"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful playback result payload.",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "description": "Outcome status for the playback request (e.g., playing, queued, failed)."
+                    },
+                    "playback": {
+                      "type": "object",
+                      "description": "Details about the initiated playback session.",
+                      "properties": {
+                        "track": {
+                          "type": "string",
+                          "description": "The title of the song being played."
+                        },
+                        "artist": {
+                          "type": "string",
+                          "description": "The artist for the track. May be the original value or a wildcard if not specified."
+                        },
+                        "album": {
+                          "type": "string",
+                          "description": "The album for the track. May be the original value or a wildcard if not specified."
+                        },
+                        "device": {
+                          "type": "string",
+                          "description": "The device where playback was started (matches the requested device)."
+                        },
+                        "position_seconds": {
+                          "type": "number",
+                          "description": "Playback start position in seconds (0.0 indicates start). Provide as a float when fractional seconds are required (e.g., 1.0, not 1)."
+                        },
+                        "started_at": {
+                          "type": "string",
+                          "description": "Timestamp when playback was initiated. Recommended ISO 8601 string, but no specific format is enforced here."
+                        }
+                      },
+                      "required": [
+                        "track",
+                        "device",
+                        "position_seconds",
+                        "started_at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "playback"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Music_3_LookupMusic": {
+      "post": {
+        "operationId": "Music_3_LookupMusic",
+        "summary": "Lookup music matching user preferences",
+        "description": "Simulate retrieving songs matching user preferences by artist, album, genre, and year. Use this for broad music requests driven by artist, album, genre, or year preferences, even when the user says they want to hear or listen to something, as long as they did not name an exact track to play immediately.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "artist": {
+                    "type": "string",
+                    "description": "The name of the artist or group. If no preference, use 'dontcare'.",
+                    "default": "dontcare"
+                  },
+                  "album": {
+                    "type": "string",
+                    "description": "The name of the album. If no preference, use 'dontcare'.",
+                    "default": "dontcare"
+                  },
+                  "genre": {
+                    "type": "string",
+                    "description": "The musical style or genre of the song. If no preference, use 'dontcare'.",
+                    "enum": [
+                      "Reggae",
+                      "Holiday",
+                      "Electropop",
+                      "Pop",
+                      "Asia",
+                      "House",
+                      "Electronica",
+                      "Funk",
+                      "Rock",
+                      "Metal",
+                      "Dubstep",
+                      "Country"
+                    ]
+                  },
+                  "year": {
+                    "type": "string",
+                    "description": "The year the song was released, formatted as a four-digit number (e.g., '2020'). If no preference, use 'dontcare'.",
+                    "enum": [
+                      "2010",
+                      "2011",
+                      "2012",
+                      "2013",
+                      "2014",
+                      "2015",
+                      "2016",
+                      "2017",
+                      "2018",
+                      "2019"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "A page of matching songs and metadata.",
+                  "properties": {
+                    "songs": {
+                      "type": "array",
+                      "description": "List of matching songs ordered by relevance.",
+                      "items": {
+                        "type": "object",
+                        "description": "A single song result.",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the song."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "The song title."
+                          },
+                          "artist": {
+                            "type": "string",
+                            "description": "The artist or group name."
+                          },
+                          "album": {
+                            "type": "string",
+                            "description": "The album name, if available."
+                          },
+                          "genre": {
+                            "type": "string",
+                            "description": "The musical genre."
+                          },
+                          "year": {
+                            "type": "string",
+                            "description": "Release year as a four-digit string (e.g., '2020')."
+                          },
+                          "duration_seconds": {
+                            "type": "integer",
+                            "description": "Duration of the track in seconds."
+                          },
+                          "preview_url": {
+                            "type": "string",
+                            "description": "URL to a short audio preview.",
+                            "format": "uri"
+                          },
+                          "score": {
+                            "type": "number",
+                            "description": "Relevance score (higher is more relevant). Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "artist"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "Total number of matching songs available."
+                    }
+                  },
+                  "required": [
+                    "songs"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,506 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI645",
+    "version": "1.0.0",
+    "description": "LI645 is an API collection for discovering and booking cultural events and rental cars. Use Events_3_FindEvents to search concerts and plays by city and date, Events_3_BuyEventTickets to purchase tickets, RentalCars_3_GetCarsAvailable to list vehicles for a location and period, and RentalCars_3_ReserveCar to reserve with pickup location/time, car type, and insurance. Designed for synchronous query-reserve flows with simple parameter-driven calls and clear confirmations."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI645"
+    }
+  ],
+  "paths": {
+    "/Events_3_FindEvents": {
+      "post": {
+        "operationId": "Events_3_FindEvents",
+        "summary": "Find cultural events in a city (optionally on a date)",
+        "description": "Simulate finding cultural events (e.g., concerts, theater) in the specified city and date. If date is 'dontcare' the simulation returns upcoming events for the city.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "event_type": {
+                    "type": "string",
+                    "description": "The category of the cultural event to find.",
+                    "enum": [
+                      "Music",
+                      "Theater"
+                    ]
+                  },
+                  "city": {
+                    "type": "string",
+                    "description": "The city in which the search for events is to be conducted, in the format of 'City, State' (e.g., 'San Francisco, CA')."
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "The date for which to find events, formatted as 'MM/DD/YYYY'. If left as 'dontcare', the search will include all upcoming events.",
+                    "default": "dontcare"
+                  }
+                },
+                "required": [
+                  "event_type",
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "A list of matching events.",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "description": "Array of event objects matching the query, ordered by start date/time (earliest first).",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the event."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Human-readable title of the event."
+                          },
+                          "event_type": {
+                            "type": "string",
+                            "description": "Category of the event (for example: Music, Theater)."
+                          },
+                          "city": {
+                            "type": "string",
+                            "description": "City where the event takes place (same semantics as request.city)."
+                          },
+                          "date": {
+                            "type": "string",
+                            "description": "Date of the event as provided by the source (e.g., 'MM/DD/YYYY' or another source format)."
+                          },
+                          "start_time": {
+                            "type": "string",
+                            "description": "Local start time string as provided by the source (no enforced format)."
+                          },
+                          "end_time": {
+                            "type": "string",
+                            "description": "Local end time string as provided by the source (no enforced format)."
+                          },
+                          "venue": {
+                            "type": "object",
+                            "description": "Venue information.",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "description": "Venue name."
+                              },
+                              "address": {
+                                "type": "string",
+                                "description": "Venue address."
+                              }
+                            },
+                            "required": [
+                              "name"
+                            ],
+                            "additionalProperties": true
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Free-text description of the event."
+                          },
+                          "price": {
+                            "type": "object",
+                            "description": "Ticket price information. If price is unknown or the event is free, amount may be null.",
+                            "properties": {
+                              "amount": {
+                                "type": "number",
+                                "description": "Ticket price amount. Use float format (e.g., 1.0 not 1).",
+                                "format": "double",
+                                "nullable": true
+                              },
+                              "currency": {
+                                "type": "string",
+                                "description": "Currency code or label if provided by the source (no enforced format)."
+                              }
+                            },
+                            "required": [
+                              "amount"
+                            ],
+                            "additionalProperties": true
+                          },
+                          "tickets_url": {
+                            "type": "string",
+                            "description": "URL to purchase or view tickets, if available."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "event_type",
+                          "city"
+                        ],
+                        "additionalProperties": true
+                      }
+                    }
+                  },
+                  "required": [
+                    "events"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Events_3_BuyEventTickets": {
+      "post": {
+        "operationId": "Events_3_BuyEventTickets",
+        "summary": "Simulate purchasing tickets for a cultural event",
+        "description": "Simulate a ticket purchase transaction for a named event on a specific date in a given city. Return a purchase confirmation payload on success.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "event_name": {
+                    "type": "string",
+                    "description": "The exact title of the artist's performance or play for which tickets are being purchased."
+                  },
+                  "number_of_tickets": {
+                    "type": "integer",
+                    "description": "The quantity of tickets to book for the event."
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "The scheduled date of the event, in the format 'MM/DD/YYYY'."
+                  },
+                  "city": {
+                    "type": "string",
+                    "description": "The city where the event will take place, formatted as 'City, State', such as 'Los Angeles, CA' or 'New York, NY'."
+                  }
+                },
+                "required": [
+                  "event_name",
+                  "number_of_tickets",
+                  "date",
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Confirmation payload returned when a ticket purchase is successful.",
+                  "properties": {
+                    "confirmation_id": {
+                      "type": "string",
+                      "description": "A unique identifier for this purchase confirmation."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Outcome of the purchase operation (e.g., confirmed, pending, failed)."
+                    },
+                    "issued_at": {
+                      "type": "string",
+                      "description": "Timestamp when the confirmation was issued."
+                    },
+                    "ticket_tokens": {
+                      "type": "array",
+                      "description": "A list of one-time ticket tokens or codes issued for this purchase. Tokens are opaque strings used to redeem or view tickets.",
+                      "items": {
+                        "type": "string",
+                        "description": "Array item"
+                      }
+                    },
+                    "instructions": {
+                      "type": "string",
+                      "description": "Human-readable follow-up instructions for the buyer (e.g., how to present tickets, cancellation policy)."
+                    }
+                  },
+                  "required": [
+                    "confirmation_id",
+                    "status",
+                    "issued_at",
+                    "ticket_tokens"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/RentalCars_3_GetCarsAvailable": {
+      "post": {
+        "operationId": "RentalCars_3_GetCarsAvailable",
+        "summary": "List available rental cars",
+        "description": "Simulate retrieving available rental cars for the given city and rental period.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "city": {
+                    "type": "string",
+                    "description": "The city in which the rental car will be picked up, such as 'Los Angeles, CA'."
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "description": "The start date for the rental period, in the format 'YYYY-MM-DD'.",
+                    "pattern": "^\\\\d{4}-\\\\d{2}-\\\\d{2}$"
+                  },
+                  "pickup_time": {
+                    "type": "string",
+                    "description": "The pickup time on the start date, in 24-hour format 'HH:MM'.",
+                    "pattern": "^([01]\\\\d|2[0-3]):[0-5]\\\\d$"
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "description": "The end date for the rental period, in the format 'YYYY-MM-DD'.",
+                    "pattern": "^\\\\d{4}-\\\\d{2}-\\\\d{2}$"
+                  },
+                  "car_type": {
+                    "type": "string",
+                    "description": "The preferred type of rental car.",
+                    "enum": [
+                      "Hatchback",
+                      "Sedan",
+                      "SUV"
+                    ]
+                  }
+                },
+                "required": [
+                  "city",
+                  "start_date",
+                  "pickup_time",
+                  "end_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "A list of available cars matching the query.",
+                  "properties": {
+                    "cars": {
+                      "type": "array",
+                      "description": "Available cars for the requested rental period and location.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the car."
+                          },
+                          "make": {
+                            "type": "string",
+                            "description": "Manufacturer of the car."
+                          },
+                          "model": {
+                            "type": "string",
+                            "description": "Model name of the car."
+                          },
+                          "year": {
+                            "type": "integer",
+                            "description": "Model year of the car."
+                          },
+                          "type": {
+                            "type": "string",
+                            "description": "Car type (e.g., Hatchback, Sedan, SUV)."
+                          },
+                          "seats": {
+                            "type": "integer",
+                            "description": "Number of passenger seats."
+                          },
+                          "price_per_day": {
+                            "type": "number",
+                            "description": "Daily rental price. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "currency": {
+                            "type": "string",
+                            "description": "Currency for the price (ISO 4217 code recommended, e.g., USD)."
+                          },
+                          "available_pickup_locations": {
+                            "type": "array",
+                            "description": "Pickup locations where this car is available.",
+                            "items": {
+                              "type": "string",
+                              "description": "Array item"
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "make",
+                          "model",
+                          "year",
+                          "type",
+                          "price_per_day",
+                          "currency"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "Total number of available cars returned in this response."
+                    }
+                  },
+                  "required": [
+                    "cars"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/RentalCars_3_ReserveCar": {
+      "post": {
+        "operationId": "RentalCars_3_ReserveCar",
+        "summary": "Simulate creating a rental car reservation",
+        "description": "Simulate making a rental car reservation (pickup location, dates/times, car type, insurance). Return a confirmation payload. Do not perform real payments or external bookings in the simulation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "pickup_location": {
+                    "type": "string",
+                    "description": "The location where the car will be picked up, in the format of 'City, State', such as 'San Francisco, CA'."
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "description": "The start date for the car rental in the format 'MM/DD/YYYY'."
+                  },
+                  "pickup_time": {
+                    "type": "string",
+                    "description": "The time for picking up the car in the format 'HH:MM AM/PM'."
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "description": "The end date for returning the rental car, in the format 'MM/DD/YYYY'."
+                  },
+                  "car_type": {
+                    "type": "string",
+                    "description": "The desired type of rental car.",
+                    "enum": [
+                      "Hatchback",
+                      "Sedan",
+                      "SUV"
+                    ]
+                  },
+                  "add_insurance": {
+                    "type": "boolean",
+                    "description": "Indicates whether additional insurance is to be purchased. True to add insurance, False otherwise."
+                  }
+                },
+                "required": [
+                  "pickup_location",
+                  "start_date",
+                  "pickup_time",
+                  "end_date",
+                  "car_type",
+                  "add_insurance"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Reservation confirmation payload returned on successful reservation creation.",
+                  "properties": {
+                    "reservation_id": {
+                      "type": "string",
+                      "description": "A unique identifier for the created reservation."
+                    },
+                    "confirmation_code": {
+                      "type": "string",
+                      "description": "A short human-readable confirmation code for reference."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "High-level reservation state.",
+                      "enum": [
+                        "confirmed",
+                        "pending"
+                      ]
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "ISO 8601 timestamp when the reservation was created (e.g., 2021-03-10T14:30:00Z)."
+                    },
+                    "pickup_instructions": {
+                      "type": "string",
+                      "description": "Concise instructions for pickup (e.g., where to go on arrival, required ID). This is a summary and does not echo the full input payload."
+                    },
+                    "notes": {
+                      "type": "array",
+                      "description": "Optional additional notes relevant to the reservation.",
+                      "items": {
+                        "type": "string",
+                        "description": "Array item"
+                      }
+                    }
+                  },
+                  "required": [
+                    "reservation_id",
+                    "confirmation_code",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

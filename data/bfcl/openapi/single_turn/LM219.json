@@ -1,0 +1,567 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM219",
+    "version": "1.0.0",
+    "description": "LM219 is a sensor-readings API collection offering three tools to retrieve latest per-sensor metrics, interval-aggregated history across a timespan, and raw timestamped readings. Clients query by network IDs, sensor serials, metric types, and time ranges; history-by-interval returns interval summaries sorted descending by interval start, while raw history is sorted by timestamp. Use query parameters to filter and paginate results for efficient monitoring and analysis."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM219"
+    }
+  ],
+  "paths": {
+    "/get_sensor_readings_latest": {
+      "post": {
+        "operationId": "get_sensor_readings_latest",
+        "summary": "Return latest metric reading per sensor (paginated, filterable)",
+        "description": "Simulate returning the most recent reading for each requested metric from sensors. Supports filtering by sensor serials and network IDs and paginated results.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "perPage": {
+                    "type": "integer",
+                    "description": "The number of entries per page returned. Must be an integer within the range of 3 to 100."
+                  },
+                  "startingAfter": {
+                    "type": "string",
+                    "description": "A cursor for use in pagination. 'startingAfter' is a server-generated token that represents the start of the page and is typically a timestamp or an ID. If not provided, the default is to start at the beginning of the dataset (represented by null).",
+                    "default": null
+                  },
+                  "endingBefore": {
+                    "type": "string",
+                    "description": "A cursor for use in pagination. 'endingBefore' is a server-generated token that represents the end of the page and is typically a timestamp or an ID. If not provided, the default is to end at the current dataset's end (represented by null).",
+                    "default": null
+                  },
+                  "networkIds": {
+                    "type": "array",
+                    "description": "Filter the returned data by specifying network IDs. Provide an array of network ID strings.",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  },
+                  "serials": {
+                    "type": "array",
+                    "description": "Filter readings by sensor serial numbers. Provide an array of serial number strings.",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  },
+                  "metrics": {
+                    "type": "array",
+                    "description": "The types of sensor readings to retrieve, such as 'temperature', 'humidity', 'co2', etc. If not specified, all available types of readings will be retrieved.",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  }
+                },
+                "required": [
+                  "perPage"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Payload containing the latest readings grouped by sensor and pagination metadata.",
+                  "properties": {
+                    "readings": {
+                      "type": "array",
+                      "description": "Array of sensor entries. Each entry contains sensor identifiers and the most recent value for each metric requested (or all metrics if none specified).",
+                      "items": {
+                        "type": "object",
+                        "description": "Latest readings for a single sensor.",
+                        "properties": {
+                          "serial": {
+                            "type": "string",
+                            "description": "Sensor serial number."
+                          },
+                          "networkId": {
+                            "type": "string",
+                            "description": "Network ID the sensor belongs to."
+                          },
+                          "metrics": {
+                            "type": "array",
+                            "description": "Array of latest metric readings for this sensor. If a sensor has no reading for a given metric, that metric is omitted for the sensor.",
+                            "items": {
+                              "type": "object",
+                              "description": "A single metric latest reading.",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "description": "Metric type (for example: 'temperature', 'humidity', 'co2')."
+                                },
+                                "value": {
+                                  "type": "number",
+                                  "description": "Numeric metric value. Use float format (e.g., 1.0 not 1).",
+                                  "format": "double"
+                                },
+                                "unit": {
+                                  "type": "string",
+                                  "description": "Unit of the metric when applicable (for example: '°C', '%', 'ppm')."
+                                },
+                                "timestamp": {
+                                  "type": "string",
+                                  "description": "Timestamp when this reading was recorded (ISO 8601 recommended)."
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "value",
+                                "timestamp"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "serial",
+                          "networkId",
+                          "metrics"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "description": "Pagination state for this response page.",
+                      "properties": {
+                        "perPage": {
+                          "type": "integer",
+                          "description": "Number of sensor entries returned on this page. Matches the request perPage value."
+                        },
+                        "startingAfter": {
+                          "type": "string",
+                          "description": "Cursor token representing the start of this page (may be null)."
+                        },
+                        "endingBefore": {
+                          "type": "string",
+                          "description": "Cursor token representing the end of this page (may be null)."
+                        },
+                        "hasMore": {
+                          "type": "boolean",
+                          "description": "True when additional pages are available after this one."
+                        }
+                      },
+                      "required": [
+                        "perPage",
+                        "hasMore"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "readings",
+                    "pagination"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_sensor_readings_history_by_interval": {
+      "post": {
+        "operationId": "get_sensor_readings_history_by_interval",
+        "summary": "Simulate retrieving sensor reading summaries aggregated by interval",
+        "description": "Returns sensor-reading summaries aggregated into intervals (sorted by interval start descending). Each interval contains per-metric aggregated values (min/max/avg/count) and a total reading count. Pagination tokens for fetching adjacent pages are included.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "perPage": {
+                    "type": "integer",
+                    "description": "The number of entries per page returned. Must be a minimum of 3 and a maximum of 100."
+                  },
+                  "startingAfter": {
+                    "type": "string",
+                    "description": "A server-defined token indicating the start of the page, often a timestamp or ID. Not to be manually set by clients; use HTTP Link header instead.",
+                    "default": null
+                  },
+                  "endingBefore": {
+                    "type": "string",
+                    "description": "A server-defined token indicating the end of the page, often a timestamp or ID. Not to be manually set by clients; use HTTP Link header instead.",
+                    "default": null
+                  },
+                  "networkIds": {
+                    "type": "array",
+                    "description": "Filters the returned data by network IDs.",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  },
+                  "serials": {
+                    "type": "array",
+                    "description": "Filters readings by sensor serial numbers.",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  },
+                  "metrics": {
+                    "type": "array",
+                    "description": "Specifies the types of sensor readings to retrieve. Defaults to all types if not provided.",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  },
+                  "timespan": {
+                    "type": "integer",
+                    "description": "The duration for which data will be retrieved, in seconds. Must not exceed 730 days and 12 hours."
+                  },
+                  "t0": {
+                    "type": "string",
+                    "description": "The start time for the data timespan, formatted as an ISO 8601 timestamp (e.g., '2023-04-05T14:48:00Z'). Maximum lookback is 730 days and 12 hours. If not provided, defaults to the current time.",
+                    "default": null
+                  },
+                  "t1": {
+                    "type": "string",
+                    "description": "The end time for the data timespan, formatted as an ISO 8601 timestamp (e.g., '2023-04-12T14:48:00Z'). Must be within 730 days and 12 hours after 't0'.",
+                    "default": null
+                  },
+                  "interval": {
+                    "type": "integer",
+                    "description": "The time interval, in seconds, for the returned data. Valid values are 15, 120, 300, 900, 3600, 14400, 86400, or 604800. Calculated if 't0' and 't1' are provided.",
+                    "enum": [
+                      15,
+                      120,
+                      300,
+                      900,
+                      3600,
+                      14400,
+                      86400,
+                      604800
+                    ],
+                    "default": 86400
+                  },
+                  "models": {
+                    "type": "array",
+                    "description": "Filters readings by one or more sensor models.",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  }
+                },
+                "required": [
+                  "perPage",
+                  "timespan"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response: aggregated sensor readings by interval.",
+                  "properties": {
+                    "intervals": {
+                      "type": "array",
+                      "description": "List of interval summaries ordered by interval start (newest first).",
+                      "items": {
+                        "type": "object",
+                        "description": "Summary for a single time interval.",
+                        "properties": {
+                          "start": {
+                            "type": "string",
+                            "description": "Interval start time as an ISO 8601 timestamp (e.g., '2023-04-05T14:48:00Z')."
+                          },
+                          "end": {
+                            "type": "string",
+                            "description": "Interval end time as an ISO 8601 timestamp (exclusive)."
+                          },
+                          "readingCount": {
+                            "type": "integer",
+                            "description": "Total number of raw readings included in this interval."
+                          },
+                          "metrics": {
+                            "type": "array",
+                            "description": "Aggregated values for each metric present in this interval.",
+                            "items": {
+                              "type": "object",
+                              "description": "Aggregated values for a single metric.",
+                              "properties": {
+                                "metric": {
+                                  "type": "string",
+                                  "description": "The metric name (e.g., 'temperature', 'humidity')."
+                                },
+                                "unit": {
+                                  "type": "string",
+                                  "description": "Unit for the metric values, if applicable (e.g., 'C', '%')."
+                                },
+                                "min": {
+                                  "type": "number",
+                                  "description": "Minimum observed value for this metric within the interval."
+                                },
+                                "max": {
+                                  "type": "number",
+                                  "description": "Maximum observed value for this metric within the interval."
+                                },
+                                "avg": {
+                                  "type": "number",
+                                  "description": "Arithmetic mean of observed values for this metric within the interval."
+                                },
+                                "count": {
+                                  "type": "integer",
+                                  "description": "Number of readings that contributed to this metric's aggregation."
+                                }
+                              },
+                              "required": [
+                                "metric",
+                                "count"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "start",
+                          "end",
+                          "readingCount",
+                          "metrics"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "paging": {
+                      "type": "object",
+                      "description": "Server-provided tokens for fetching adjacent pages. Tokens are opaque; use them with startingAfter/endingBefore or the HTTP Link header as documented.",
+                      "properties": {
+                        "next": {
+                          "type": "string",
+                          "description": "Token to request the next (older) page, or null if none."
+                        },
+                        "previous": {
+                          "type": "string",
+                          "description": "Token to request the previous (newer) page, or null if none."
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "intervals",
+                    "paging"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_sensor_readings_history": {
+      "post": {
+        "operationId": "get_sensor_readings_history",
+        "summary": "Return sensor readings within a timespan (filtered, sorted, paginated)",
+        "description": "Simulate returning all reported sensor readings in the requested timespan, filtered by network IDs, sensor serials, and metric types. Results are paginated and sorted by timestamp.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "perPage": {
+                    "type": "integer",
+                    "description": "The number of entries per page returned. Must be between 3 and 100.",
+                    "default": 10
+                  },
+                  "startingAfter": {
+                    "type": "string",
+                    "description": "A server-side token indicating the start of the page, typically a timestamp in ISO 8601 format or an ID. Should be provided by server responses and not by client applications.",
+                    "default": null
+                  },
+                  "endingBefore": {
+                    "type": "string",
+                    "description": "A server-side token indicating the end of the page, usually a timestamp in ISO 8601 format or an ID. Should be provided by server responses and not by client applications.",
+                    "default": null
+                  },
+                  "networkIds": {
+                    "type": "array",
+                    "description": "Filter the data by network IDs. If omitted, all networks are included.",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  },
+                  "serials": {
+                    "type": "array",
+                    "description": "Filter readings by sensor serial numbers. If omitted, all sensors are included.",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  },
+                  "metrics": {
+                    "type": "array",
+                    "description": "Types of sensor readings to retrieve, such as 'temperature', 'humidity', or 'co2'. If omitted, all available types are retrieved.",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  },
+                  "timespan": {
+                    "type": "integer",
+                    "description": "The duration for which data will be fetched, in seconds. Must be less than or equal to 604800 seconds (7 days)."
+                  },
+                  "t0": {
+                    "type": "string",
+                    "description": "The start of the timespan for the data, formatted as an ISO 8601 timestamp (e.g., '2023-01-01T00:00:00Z'). The maximum lookback period is 365 days and 6 hours from today."
+                  },
+                  "t1": {
+                    "type": "string",
+                    "description": "The end of the timespan for the data, formatted as an ISO 8601 timestamp (e.g., '2023-01-08T00:00:00Z'). 't1' can be a maximum of 7 days after 't0'.",
+                    "default": null
+                  }
+                },
+                "required": [
+                  "timespan",
+                  "t0"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response: list of sensor readings and pagination information.",
+                  "properties": {
+                    "readings": {
+                      "type": "array",
+                      "description": "Ordered list of sensor readings sorted by timestamp (ascending).",
+                      "items": {
+                        "type": "object",
+                        "description": "A single sensor reading.",
+                        "properties": {
+                          "timestamp": {
+                            "type": "string",
+                            "description": "ISO 8601 timestamp (UTC) when the reading was recorded, e.g., '2023-01-01T00:00:00Z'.",
+                            "format": "date-time"
+                          },
+                          "networkId": {
+                            "type": "string",
+                            "description": "Identifier of the network that produced this reading."
+                          },
+                          "serial": {
+                            "type": "string",
+                            "description": "Sensor serial number that produced this reading."
+                          },
+                          "metric": {
+                            "type": "string",
+                            "description": "Metric type for the reading (for example: 'temperature', 'humidity', 'co2')."
+                          },
+                          "value": {
+                            "type": "number",
+                            "description": "Numeric value of the reading. Units depend on the metric and are provided in 'unit' when applicable."
+                          },
+                          "unit": {
+                            "type": "string",
+                            "description": "Unit for the reading value when applicable (e.g., 'C' for temperature). May be null for unitless metrics."
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "description": "Optional free-form metadata attached to the reading (implementation-specific).",
+                            "properties": {},
+                            "additionalProperties": true
+                          }
+                        },
+                        "required": [
+                          "timestamp",
+                          "networkId",
+                          "serial",
+                          "metric",
+                          "value"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "description": "Pagination metadata. Tokens are server-generated and should be used as-is for subsequent requests.",
+                      "properties": {
+                        "perPage": {
+                          "type": "integer",
+                          "description": "Number of readings returned per page in this response."
+                        },
+                        "hasMore": {
+                          "type": "boolean",
+                          "description": "True if additional pages are available."
+                        },
+                        "nextStartingAfter": {
+                          "type": "string",
+                          "description": "Server-provided token to request the next page (use as 'startingAfter'); null when no next page."
+                        },
+                        "prevEndingBefore": {
+                          "type": "string",
+                          "description": "Server-provided token to request the previous page (use as 'endingBefore'); null when no previous page."
+                        }
+                      },
+                      "required": [
+                        "perPage",
+                        "hasMore"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "readings",
+                    "pagination"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,856 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM452",
+    "version": "1.0.0",
+    "description": "LM452 is a travel booking and discovery API that lets clients search one-way and roundtrip flights, find and sort vacation houses, book selected houses, and discover city attractions filtered by fees, category, and family suitability. It's designed for programmatic, preference-driven queries (dates, class, airlines, amenities, ratings) and returns normalized results you can quickly filter, sort, and integrate into booking flows or travel planning interfaces."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM452"
+    }
+  ],
+  "paths": {
+    "/Flights_4_SearchOnewayFlight": {
+      "post": {
+        "operationId": "Flights_4_SearchOnewayFlight",
+        "summary": "Simulate one-way flight search",
+        "description": "Simulate searching one-way flights from an origin to a destination on a given departure date. Supports seating class and a preferred airline filter ('dontcare' means no preference). Returns a list of matching flight offers.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "origin_airport": {
+                    "type": "string",
+                    "description": "The IATA code or the name of the airport or city to depart from."
+                  },
+                  "destination_airport": {
+                    "type": "string",
+                    "description": "The IATA code or the name of the airport or city to arrive at."
+                  },
+                  "departure_date": {
+                    "type": "string",
+                    "description": "The start date of the trip in the format of 'YYYY-MM-DD'."
+                  },
+                  "seating_class": {
+                    "type": "string",
+                    "description": "The cabin seat class for the flight.",
+                    "enum": [
+                      "Economy",
+                      "Premium Economy",
+                      "Business"
+                    ],
+                    "default": "Economy"
+                  },
+                  "number_of_tickets": {
+                    "type": "integer",
+                    "description": "The number of flight tickets required for the trip.",
+                    "default": 1
+                  },
+                  "airlines": {
+                    "type": "string",
+                    "description": "Preferred airline for the flight. Use 'dontcare' for no preference.",
+                    "enum": [
+                      "United Airlines",
+                      "American Airlines",
+                      "Delta Airlines",
+                      "Southwest Airlines",
+                      "Alaska Airlines",
+                      "British Airways",
+                      "Air Canada",
+                      "Air France",
+                      "South African Airways",
+                      "LOT Polish Airlines",
+                      "LATAM Brasil"
+                    ]
+                  }
+                },
+                "required": [
+                  "origin_airport",
+                  "destination_airport",
+                  "departure_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search results for one-way flights",
+                  "properties": {
+                    "search_id": {
+                      "type": "string",
+                      "description": "Server-generated identifier for this search session."
+                    },
+                    "origin_airport": {
+                      "type": "string",
+                      "description": "The requested origin airport or city (mirrors request)."
+                    },
+                    "destination_airport": {
+                      "type": "string",
+                      "description": "The requested destination airport or city (mirrors request)."
+                    },
+                    "departure_date": {
+                      "type": "string",
+                      "description": "The requested departure date (YYYY-MM-DD)."
+                    },
+                    "results": {
+                      "type": "array",
+                      "description": "Matching one-way flight offers, sorted by best-match (usually price or duration).",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "offer_id": {
+                            "type": "string",
+                            "description": "Unique identifier for this offer."
+                          },
+                          "itinerary": {
+                            "type": "array",
+                            "description": "One or more flight segments for this offer (one-way may be single-segment).",
+                            "items": {
+                              "type": "object",
+                              "description": "Array item",
+                              "properties": {
+                                "segment_id": {
+                                  "type": "string",
+                                  "description": "Identifier for the segment."
+                                },
+                                "airline": {
+                                  "type": "string",
+                                  "description": "Operating airline name."
+                                },
+                                "flight_number": {
+                                  "type": "string",
+                                  "description": "Airline flight number."
+                                },
+                                "origin_airport": {
+                                  "type": "string",
+                                  "description": "Departure airport IATA code or name."
+                                },
+                                "destination_airport": {
+                                  "type": "string",
+                                  "description": "Arrival airport IATA code or name."
+                                },
+                                "departure_datetime": {
+                                  "type": "string",
+                                  "description": "Scheduled departure date and time in ISO 8601 when available (local timezone)."
+                                },
+                                "arrival_datetime": {
+                                  "type": "string",
+                                  "description": "Scheduled arrival date and time in ISO 8601 when available (local timezone)."
+                                },
+                                "duration_minutes": {
+                                  "type": "integer",
+                                  "description": "Duration of this segment in minutes."
+                                }
+                              },
+                              "required": [
+                                "segment_id",
+                                "airline",
+                                "flight_number",
+                                "origin_airport",
+                                "destination_airport",
+                                "departure_datetime",
+                                "arrival_datetime",
+                                "duration_minutes"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "seating_class": {
+                            "type": "string",
+                            "description": "Cabin class for this offer (matches requested seating_class when available)."
+                          },
+                          "total_price": {
+                            "type": "object",
+                            "description": "Total price for the requested number_of_tickets and seating class.",
+                            "properties": {
+                              "amount": {
+                                "type": "number",
+                                "description": "Total monetary amount. Use float format (e.g., 1.0 not 1).",
+                                "format": "double"
+                              },
+                              "currency": {
+                                "type": "string",
+                                "description": "Three-letter currency code (ISO 4217)."
+                              }
+                            },
+                            "required": [
+                              "amount",
+                              "currency"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "seats_remaining": {
+                            "type": "integer",
+                            "description": "Estimated seats remaining in the offered booking class."
+                          },
+                          "booking_url": {
+                            "type": "string",
+                            "description": "URL to proceed with booking this offer, if applicable."
+                          }
+                        },
+                        "required": [
+                          "offer_id",
+                          "itinerary",
+                          "seating_class",
+                          "total_price"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "metadata": {
+                      "type": "object",
+                      "description": "Additional metadata about the search results.",
+                      "properties": {
+                        "returned_offers_count": {
+                          "type": "integer",
+                          "description": "Number of offers returned in this response."
+                        },
+                        "currency": {
+                          "type": "string",
+                          "description": "Currency used for all amounts in results (ISO 4217)."
+                        },
+                        "notes": {
+                          "type": "string",
+                          "description": "Informational notes about availability, taxes, or baggage rules (if any)."
+                        }
+                      },
+                      "required": [
+                        "returned_offers_count",
+                        "currency"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "search_id",
+                    "origin_airport",
+                    "destination_airport",
+                    "departure_date",
+                    "results",
+                    "metadata"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Flights_4_SearchRoundtripFlights": {
+      "post": {
+        "operationId": "Flights_4_SearchRoundtripFlights",
+        "summary": "Simulate searching roundtrip flights and return matching itineraries.",
+        "description": "Given origin, destination, optional dates, seating class, ticket count, and airline preference, return a set of matching roundtrip itineraries with pricing and segment details.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "origin_airport": {
+                    "type": "string",
+                    "description": "The IATA airport code or name of the city to depart from, such as 'JFK' for John F. Kennedy International Airport."
+                  },
+                  "destination_airport": {
+                    "type": "string",
+                    "description": "The IATA airport code or name of the city to arrive at, such as 'LAX' for Los Angeles International Airport."
+                  },
+                  "departure_date": {
+                    "type": "string",
+                    "description": "The departure date for the trip in the format 'YYYY-MM-DD'.",
+                    "default": "null"
+                  },
+                  "return_date": {
+                    "type": "string",
+                    "description": "The return date for the trip in the format 'YYYY-MM-DD'.",
+                    "default": "null"
+                  },
+                  "seating_class": {
+                    "type": "string",
+                    "description": "The class of the cabin seat for the flight.",
+                    "enum": [
+                      "Economy",
+                      "Premium Economy",
+                      "Business"
+                    ],
+                    "default": "Economy"
+                  },
+                  "number_of_tickets": {
+                    "type": "integer",
+                    "description": "The number of flight tickets required for the trip.",
+                    "default": 1
+                  },
+                  "airlines": {
+                    "type": "string",
+                    "description": "Preferred airline for the flight. If no preference, 'dontcare' can be specified.",
+                    "enum": [
+                      "United Airlines",
+                      "American Airlines",
+                      "Delta Airlines",
+                      "Southwest Airlines",
+                      "Alaska Airlines",
+                      "British Airways",
+                      "Air Canada",
+                      "Air France",
+                      "South African Airways",
+                      "LOT Polish Airlines",
+                      "LATAM Brasil"
+                    ]
+                  }
+                },
+                "required": [
+                  "origin_airport",
+                  "destination_airport"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search results payload containing matching roundtrip itineraries.",
+                  "properties": {
+                    "itineraries": {
+                      "type": "array",
+                      "description": "List of matching roundtrip itineraries, ordered by relevance or price.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Provider- or system-specific itinerary identifier."
+                          },
+                          "price": {
+                            "type": "object",
+                            "description": "Total price for the itinerary for all passengers combined.",
+                            "properties": {
+                              "amount": {
+                                "type": "number",
+                                "description": "Total monetary amount. Use float format (e.g., 1.0 not 1)."
+                              },
+                              "currency": {
+                                "type": "string",
+                                "description": "ISO 4217 currency code for the amount (e.g., 'USD')."
+                              }
+                            },
+                            "required": [
+                              "amount",
+                              "currency"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "seating_class": {
+                            "type": "string",
+                            "description": "Cabin class for the itinerary (may match requested seating_class)."
+                          },
+                          "segments": {
+                            "type": "array",
+                            "description": "Ordered list of flight segments for the roundtrip (both outbound and inbound).",
+                            "minItems": 2,
+                            "items": {
+                              "type": "object",
+                              "description": "Array item",
+                              "properties": {
+                                "direction": {
+                                  "type": "string",
+                                  "description": "Whether this segment is outbound or inbound for the roundtrip.",
+                                  "enum": [
+                                    "outbound",
+                                    "inbound"
+                                  ]
+                                },
+                                "carrier": {
+                                  "type": "string",
+                                  "description": "Operating carrier name."
+                                },
+                                "flight_number": {
+                                  "type": "string",
+                                  "description": "Flight number assigned by the carrier (e.g., 'AA100')."
+                                },
+                                "departure_airport": {
+                                  "type": "string",
+                                  "description": "IATA code or airport name for the departure airport."
+                                },
+                                "arrival_airport": {
+                                  "type": "string",
+                                  "description": "IATA code or airport name for the arrival airport."
+                                },
+                                "departure_datetime": {
+                                  "type": "string",
+                                  "description": "Departure date and time (e.g., ISO 8601 or provider local datetime)."
+                                },
+                                "arrival_datetime": {
+                                  "type": "string",
+                                  "description": "Arrival date and time (e.g., ISO 8601 or provider local datetime)."
+                                },
+                                "duration_minutes": {
+                                  "type": "integer",
+                                  "description": "Segment duration in minutes."
+                                }
+                              },
+                              "required": [
+                                "direction",
+                                "carrier",
+                                "flight_number",
+                                "departure_airport",
+                                "arrival_airport",
+                                "departure_datetime",
+                                "arrival_datetime"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "available_tickets": {
+                            "type": "integer",
+                            "description": "Number of seats available at the quoted price."
+                          },
+                          "fare_rules": {
+                            "type": "string",
+                            "description": "Human-readable summary of important fare rules (cancellation, change fees, baggage allowances)."
+                          },
+                          "booking_token": {
+                            "type": "string",
+                            "description": "Opaque token used to proceed to booking with the provider (if applicable)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "price",
+                          "segments"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "itineraries"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Hotels_2_BookHouse": {
+      "post": {
+        "operationId": "Hotels_2_BookHouse",
+        "summary": "Book a house for given dates and adults",
+        "description": "Simulate booking the selected house for the provided location, check-in/check-out dates, and number of adults. Return a booking confirmation on success.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "where_to": {
+                    "type": "string",
+                    "description": "The location of the house in the format of 'City, State', such as 'Berkeley, CA' or 'New York, NY'."
+                  },
+                  "number_of_adults": {
+                    "type": "integer",
+                    "description": "The number of adults included in the reservation."
+                  },
+                  "check_in_date": {
+                    "type": "string",
+                    "description": "The start date for the reservation, in the format 'YYYY-MM-DD'."
+                  },
+                  "check_out_date": {
+                    "type": "string",
+                    "description": "The end date for the reservation, in the format 'YYYY-MM-DD'."
+                  }
+                },
+                "required": [
+                  "where_to",
+                  "number_of_adults",
+                  "check_in_date",
+                  "check_out_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Booking confirmation returned when the reservation is successful.",
+                  "properties": {
+                    "booking_id": {
+                      "type": "string",
+                      "description": "Unique booking identifier generated by the system (for example, 'bk_12345')."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Booking status (e.g., 'confirmed')."
+                    },
+                    "reserved": {
+                      "type": "object",
+                      "description": "Confirmed reservation details.",
+                      "properties": {
+                        "where_to": {
+                          "type": "string",
+                          "description": "The location of the house in the format of 'City, State', such as 'Berkeley, CA' or 'New York, NY'."
+                        },
+                        "check_in_date": {
+                          "type": "string",
+                          "description": "The start date for the reservation, in the format 'YYYY-MM-DD'."
+                        },
+                        "check_out_date": {
+                          "type": "string",
+                          "description": "The end date for the reservation, in the format 'YYYY-MM-DD'."
+                        },
+                        "number_of_adults": {
+                          "type": "integer",
+                          "description": "The number of adults included in the reservation."
+                        }
+                      },
+                      "required": [
+                        "where_to",
+                        "check_in_date",
+                        "check_out_date",
+                        "number_of_adults"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "total_price": {
+                      "type": "number",
+                      "description": "Total price charged for the stay in the specified currency. Provide as a float (e.g., 123.50)."
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Currency code (ISO 4217) used for total_price, e.g., 'USD'."
+                    },
+                    "cancellation_policy": {
+                      "type": "string",
+                      "description": "Human-readable cancellation policy for the reservation."
+                    }
+                  },
+                  "required": [
+                    "booking_id",
+                    "status",
+                    "reserved"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Hotels_2_SearchHouse": {
+      "post": {
+        "operationId": "Hotels_2_SearchHouse",
+        "summary": "Search available houses by location with optional filters",
+        "description": "Simulate searching for available houses at the provided location. Optional filters: laundry service requirement and number of adults. Results can be sorted or filtered by rating.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "where_to": {
+                    "type": "string",
+                    "description": "The location of the house to search for, in the format of 'City, State' or 'City, Country'."
+                  },
+                  "has_laundry_service": {
+                    "type": "string",
+                    "description": "Indicates if the house must have laundry service available.",
+                    "enum": [
+                      "True",
+                      "False"
+                    ]
+                  },
+                  "number_of_adults": {
+                    "type": "integer",
+                    "description": "The number of adults that the house needs to accommodate.",
+                    "default": 1
+                  },
+                  "rating": {
+                    "type": "string",
+                    "description": "The minimum review rating (1-5 stars) that the house must have. Use 'dontcare' for no preference.",
+                    "enum": [
+                      "1",
+                      "2",
+                      "3",
+                      "4",
+                      "5"
+                    ]
+                  }
+                },
+                "required": [
+                  "where_to"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search results payload returning matching houses",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "description": "List of matching house properties",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique property identifier"
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Display name of the house"
+                          },
+                          "location": {
+                            "type": "string",
+                            "description": "City and region for the property (e.g., 'City, State' or 'City, Country')"
+                          },
+                          "rating": {
+                            "type": "number",
+                            "description": "Average review rating (1-5). Use a numeric value between 1 and 5."
+                          },
+                          "has_laundry_service": {
+                            "type": "string",
+                            "description": "Indicates if the property offers laundry service (values in request are 'True', 'False', or 'dontcare')."
+                          },
+                          "max_adults": {
+                            "type": "integer",
+                            "description": "Maximum number of adults the property can accommodate"
+                          },
+                          "amenities": {
+                            "type": "array",
+                            "description": "List of amenities provided by the property",
+                            "items": {
+                              "type": "string",
+                              "description": "Array item"
+                            }
+                          },
+                          "price_per_night": {
+                            "type": "number",
+                            "description": "Estimated price per night in the displayed currency"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "location",
+                          "rating"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of matching properties found"
+                    }
+                  },
+                  "required": [
+                    "results",
+                    "total_results"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Travel_1_FindAttractions": {
+      "post": {
+        "operationId": "Travel_1_FindAttractions",
+        "summary": "Find attractions in a city filtered by fee, category, and kid-friendliness",
+        "description": "Simulate retrieval of attractions within the specified location, applying filters for free entry, category, and suitability for children. Return a paginated list of matching attractions with key metadata and pricing where applicable.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "The name of the city or town where attractions are being searched for, in the format of 'City, State' or 'City, Country'; for example, 'Paris, France' or 'New York, NY'. State names must be abbreviated"
+                  },
+                  "free_entry": {
+                    "type": "string",
+                    "description": "A flag indicating if only attractions with no entry fee should be listed. Use 'True' for free attractions, 'False' for paid, and 'dontcare' for no preference.",
+                    "enum": [
+                      "True",
+                      "False"
+                    ]
+                  },
+                  "category": {
+                    "type": "string",
+                    "description": "The category of attractions to filter by, such as 'Museum' or 'Park'. The 'dontcare' option includes all categories.",
+                    "enum": [
+                      "Place of Worship",
+                      "Theme Park",
+                      "Museum",
+                      "Historical Landmark",
+                      "Park",
+                      "Tourist Attraction",
+                      "Sports Venue",
+                      "Shopping Area",
+                      "Performing Arts Venue",
+                      "Nature Preserve"
+                    ]
+                  },
+                  "good_for_kids": {
+                    "type": "string",
+                    "description": "Indicates whether to filter attractions based on their suitability for children. Options are 'True' for child-friendly attractions, 'False' for attractions not suitable for children, and 'dontcare' for no preference.",
+                    "enum": [
+                      "True",
+                      "False"
+                    ]
+                  }
+                },
+                "required": [
+                  "location"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload containing matching attractions and pagination info",
+                  "properties": {
+                    "attractions": {
+                      "type": "array",
+                      "description": "Array of attraction objects matching the query",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the attraction"
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Name of the attraction"
+                          },
+                          "category": {
+                            "type": "string",
+                            "description": "Category of the attraction (for example, Museum, Park, Theme Park, etc.)"
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Short description of the attraction"
+                          },
+                          "address": {
+                            "type": "string",
+                            "description": "Address or approximate location of the attraction"
+                          },
+                          "free_entry": {
+                            "type": "boolean",
+                            "description": "True if the attraction has no entry fee"
+                          },
+                          "entry_fee": {
+                            "type": "number",
+                            "description": "Typical entry fee in local currency when not free. Provide as a float (e.g., 1.0, not 1)",
+                            "format": "double"
+                          },
+                          "good_for_kids": {
+                            "type": "boolean",
+                            "description": "True if the attraction is considered suitable for children"
+                          },
+                          "hours": {
+                            "type": "string",
+                            "description": "Typical opening hours or a short note if hours vary"
+                          },
+                          "score": {
+                            "type": "number",
+                            "description": "Relevance score (higher = more relevant); normalized between 0 and 1"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "category",
+                          "free_entry"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of matching attractions across all pages"
+                    },
+                    "query_location": {
+                      "type": "string",
+                      "description": "Resolved location used for the search (e.g., 'Paris, France')"
+                    },
+                    "page": {
+                      "type": "integer",
+                      "description": "Returned page number"
+                    },
+                    "per_page": {
+                      "type": "integer",
+                      "description": "Number of attractions returned per page"
+                    }
+                  },
+                  "required": [
+                    "attractions",
+                    "total_results"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,507 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI256",
+    "version": "1.0.0",
+    "description": "LI256 is an API collection designed to streamline DevOps workflows by automating key tasks such as generating Dockerfiles with default configurations, creating Kubernetes deployment and service YAML files, and analyzing repository contents to identify the primary programming language. It enables developers to efficiently prepare and deploy applications by integrating containerization and orchestration setup with repository analysis in a cohesive manner."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI256"
+    }
+  ],
+  "paths": {
+    "/create_a_docker_file": {
+      "post": {
+        "operationId": "create_a_docker_file",
+        "summary": "Simulate Dockerfile creation with default and custom settings.",
+        "description": "Generates a Dockerfile in the specified repository directory using provided parameters or defaults, simulating the creation process.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "directory_name": {
+                    "type": "string",
+                    "description": "The name of the repository directory where the Dockerfile will be created. It should be a valid directory name within the filesystem.",
+                    "minLength": 1,
+                    "pattern": "^[^\\/:*?\"<>|]+$"
+                  },
+                  "base_image": {
+                    "type": "string",
+                    "description": "The base image to use in the Dockerfile. For example, 'python:3.8-slim'.",
+                    "default": "alpine:latest"
+                  },
+                  "maintainer": {
+                    "type": "string",
+                    "description": "The maintainer information to be added to the Dockerfile. Format should be 'Name <email@example.com>'.",
+                    "default": null,
+                    "pattern": "^.+ <.+@.+\\..+>$"
+                  },
+                  "port": {
+                    "type": "integer",
+                    "description": "The port number that the container will expose. For example, '80' for a web server.",
+                    "default": 80,
+                    "minimum": 1,
+                    "maximum": 65535
+                  },
+                  "commands": {
+                    "type": "string",
+                    "description": "Additional commands to be executed when building the image, separated by ';'. For example, 'apt-get update; apt-get install -y git'.",
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "directory_name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "dockerfile_path": {
+                      "type": "string",
+                      "description": "The full path to the created Dockerfile."
+                    },
+                    "content": {
+                      "type": "string",
+                      "description": "The content of the generated Dockerfile."
+                    }
+                  },
+                  "required": [
+                    "dockerfile_path",
+                    "content"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/create_kubernetes_yaml_file": {
+      "post": {
+        "operationId": "create_kubernetes_yaml_file",
+        "summary": "Simulate Kubernetes YAML file creation with deployment and service specs.",
+        "description": "Generates a Kubernetes deployment and service YAML file in the specified directory based on provided deployment parameters.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "directory_name": {
+                    "type": "string",
+                    "description": "The name of the directory where the Kubernetes YAML file will be created. This should be a valid path relative to the project root.",
+                    "minLength": 1
+                  },
+                  "deployment_name": {
+                    "type": "string",
+                    "description": "The name to assign to the Kubernetes deployment. This name must be unique within the Kubernetes namespace.",
+                    "default": "default-deployment"
+                  },
+                  "image_name": {
+                    "type": "string",
+                    "description": "The name of the Docker image to use for the deployment. This should include the repository name and tag, if applicable, in the format 'repository/image:tag'.",
+                    "default": "nginx:latest"
+                  },
+                  "replicas": {
+                    "type": "integer",
+                    "description": "The number of instances to deploy for the specified Docker image.",
+                    "default": 1
+                  },
+                  "service_type": {
+                    "type": "string",
+                    "description": "The type of service to create for the deployment. Typical values include 'ClusterIP', 'NodePort', and 'LoadBalancer'.",
+                    "enum": [
+                      "ClusterIP",
+                      "NodePort",
+                      "LoadBalancer"
+                    ],
+                    "default": "ClusterIP"
+                  },
+                  "port": {
+                    "type": "integer",
+                    "description": "The port number that the service should expose. This should correspond to the port that the application inside the Docker container is set to listen on.",
+                    "default": 80
+                  },
+                  "target_port": {
+                    "type": "integer",
+                    "description": "The target port on the pod to which the service will send requests. This should be the same as the port that the application inside the Docker container is set to listen on.",
+                    "default": 80
+                  }
+                },
+                "required": [
+                  "directory_name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "deployment": {
+                      "type": "object",
+                      "description": "Parameter deployment",
+                      "properties": {
+                        "apiVersion": {
+                          "type": "string",
+                          "description": "Parameter apiVersion",
+                          "enum": [
+                            "apps/v1"
+                          ]
+                        },
+                        "kind": {
+                          "type": "string",
+                          "description": "Parameter kind",
+                          "enum": [
+                            "Deployment"
+                          ]
+                        },
+                        "metadata": {
+                          "type": "object",
+                          "description": "Parameter metadata",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "description": "Parameter name"
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "spec": {
+                          "type": "object",
+                          "description": "Parameter spec",
+                          "properties": {
+                            "replicas": {
+                              "type": "integer",
+                              "description": "Parameter replicas"
+                            },
+                            "selector": {
+                              "type": "object",
+                              "description": "Parameter selector",
+                              "properties": {
+                                "matchLabels": {
+                                  "type": "object",
+                                  "description": "Parameter matchLabels",
+                                  "properties": {},
+                                  "additionalProperties": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "required": [
+                                "matchLabels"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "template": {
+                              "type": "object",
+                              "description": "Parameter template",
+                              "properties": {
+                                "metadata": {
+                                  "type": "object",
+                                  "description": "Parameter metadata",
+                                  "properties": {
+                                    "labels": {
+                                      "type": "object",
+                                      "description": "Parameter labels",
+                                      "properties": {},
+                                      "additionalProperties": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "labels"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "spec": {
+                                  "type": "object",
+                                  "description": "Parameter spec",
+                                  "properties": {
+                                    "containers": {
+                                      "type": "array",
+                                      "description": "Parameter containers",
+                                      "items": {
+                                        "type": "object",
+                                        "description": "Array item",
+                                        "properties": {
+                                          "name": {
+                                            "type": "string",
+                                            "description": "Parameter name"
+                                          },
+                                          "image": {
+                                            "type": "string",
+                                            "description": "Parameter image"
+                                          },
+                                          "ports": {
+                                            "type": "array",
+                                            "description": "Parameter ports",
+                                            "items": {
+                                              "type": "object",
+                                              "description": "Array item",
+                                              "properties": {
+                                                "containerPort": {
+                                                  "type": "integer",
+                                                  "description": "Parameter containerPort"
+                                                }
+                                              },
+                                              "required": [
+                                                "containerPort"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          }
+                                        },
+                                        "required": [
+                                          "name",
+                                          "image"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "containers"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "metadata",
+                                "spec"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "replicas",
+                            "selector",
+                            "template"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "apiVersion",
+                        "kind",
+                        "metadata",
+                        "spec"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "service": {
+                      "type": "object",
+                      "description": "Parameter service",
+                      "properties": {
+                        "apiVersion": {
+                          "type": "string",
+                          "description": "Parameter apiVersion",
+                          "enum": [
+                            "v1"
+                          ]
+                        },
+                        "kind": {
+                          "type": "string",
+                          "description": "Parameter kind",
+                          "enum": [
+                            "Service"
+                          ]
+                        },
+                        "metadata": {
+                          "type": "object",
+                          "description": "Parameter metadata",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "description": "Parameter name"
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "spec": {
+                          "type": "object",
+                          "description": "Parameter spec",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "description": "Parameter type",
+                              "enum": [
+                                "ClusterIP",
+                                "NodePort",
+                                "LoadBalancer"
+                              ]
+                            },
+                            "selector": {
+                              "type": "object",
+                              "description": "Parameter selector",
+                              "properties": {},
+                              "additionalProperties": {
+                                "type": "string"
+                              }
+                            },
+                            "ports": {
+                              "type": "array",
+                              "description": "Parameter ports",
+                              "items": {
+                                "type": "object",
+                                "description": "Array item",
+                                "properties": {
+                                  "port": {
+                                    "type": "integer",
+                                    "description": "Parameter port"
+                                  },
+                                  "targetPort": {
+                                    "type": "integer",
+                                    "description": "Parameter targetPort"
+                                  }
+                                },
+                                "required": [
+                                  "port",
+                                  "targetPort"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "selector",
+                            "ports"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "apiVersion",
+                        "kind",
+                        "metadata",
+                        "spec"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "deployment",
+                    "service"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analyse_repo_contents": {
+      "post": {
+        "operationId": "analyse_repo_contents",
+        "summary": "Simulates analysis of repository contents to identify the predominant programming language.",
+        "description": "Simulates analyzing the specified repository directory, optionally including subdirectories and excluding specified files, to determine the predominant programming language exceeding the given threshold percentage.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "directory_name": {
+                    "type": "string",
+                    "description": "The name of the directory where the repository is located. This should be the root directory of the repository."
+                  },
+                  "include_subdirectories": {
+                    "type": "boolean",
+                    "description": "A flag indicating whether to include subdirectories in the analysis. If set to true, all subdirectories will be recursively analyzed.",
+                    "default": true
+                  },
+                  "excluded_files": {
+                    "type": "array",
+                    "description": "An array of file names or patterns to exclude from the analysis, such as ['README.md', '*.txt'].",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  },
+                  "language_threshold": {
+                    "type": "number",
+                    "description": "The percentage threshold for a language to be considered predominant in the repository. This should be a value between 0 and 100.",
+                    "default": 10.0,
+                    "minimum": 0,
+                    "maximum": 100
+                  }
+                },
+                "required": [
+                  "directory_name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "predominant_language": {
+                      "type": "string",
+                      "description": "The programming language that is predominant in the repository, if any."
+                    },
+                    "language_percentage": {
+                      "type": "number",
+                      "description": "The percentage of the repository's codebase written in the predominant language.",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "required": [
+                    "predominant_language",
+                    "language_percentage"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

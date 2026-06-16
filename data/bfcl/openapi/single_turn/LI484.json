@@ -1,0 +1,117 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI484",
+    "version": "1.0.0",
+    "description": "LI484 is a compact API collection for calculating tax liabilities across incomes, incorporating deductions and credits via the calculate_tax tool. It exposes programmatic endpoints for submitting income, deductions, and credit details, returning detailed breakdowns and audit-ready summaries. Designed for easy integration into payroll or financial apps, it supports structured JSON requests, predictable responses, and error codes for automated workflows and batch processing."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI484"
+    }
+  ],
+  "paths": {
+    "/calculate_tax": {
+      "post": {
+        "operationId": "calculate_tax",
+        "summary": "Simulate tax calculation from income, deductions, and credits",
+        "description": "Given income and filing status (with optional deductions, credits, and state), compute taxable income, federal and state tax components, and the final tax owed.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "income": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The total income of the individual for the year in dollars.. Use float format (e.g., 1.0 not 1)."
+                  },
+                  "filing_status": {
+                    "type": "string",
+                    "description": "The tax filing status of the individual.",
+                    "enum": [
+                      "single",
+                      "married_filing_jointly",
+                      "married_filing_separately",
+                      "head_of_household"
+                    ]
+                  },
+                  "deductions": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The total amount of deductions the individual is claiming in dollars.. Use float format (e.g., 1.0 not 1).",
+                    "default": 0
+                  },
+                  "tax_credits": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The total amount of tax credits the individual is claiming in dollars.. Use float format (e.g., 1.0 not 1).",
+                    "default": 0
+                  },
+                  "state": {
+                    "type": "string",
+                    "description": "The state in which the individual resides, used for determining state-specific taxes.",
+                    "default": "federal"
+                  }
+                },
+                "required": [
+                  "income",
+                  "filing_status"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful tax calculation result",
+                  "properties": {
+                    "tax_owed": {
+                      "type": "number",
+                      "description": "Net amount of tax owed (or refund if negative), in dollars. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "federal_tax": {
+                      "type": "number",
+                      "description": "Calculated federal tax before applying tax credits, in dollars. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "state_tax": {
+                      "type": "number",
+                      "description": "Calculated state tax before credits, in dollars (0 if state is 'federal' or no state tax applies). Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "taxable_income": {
+                      "type": "number",
+                      "description": "Income used as the tax base after deductions, in dollars (typically income minus deductions; not less than 0 in the calculation). Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "effective_tax_rate": {
+                      "type": "number",
+                      "description": "Effective tax rate computed as tax_owed / income (if income is non-zero). Expressed as a decimal (e.g., 0.25 for 25%). Provide as a float (e.g., 0.25, not .25).",
+                      "format": "double"
+                    }
+                  },
+                  "required": [
+                    "tax_owed",
+                    "taxable_income"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

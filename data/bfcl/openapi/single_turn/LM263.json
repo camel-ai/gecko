@@ -1,0 +1,199 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM263",
+    "version": "1.0.0",
+    "description": "LM263 is a calendar management API that lets clients search and reschedule user events; use EventQuery to locate events by matching keywords against titles and descriptions, and reschedule_event to assign a new ISO-8601 datetime to an event. Designed for programmatic workflows, it supports quick discovery and deterministic updates with minimal calls, enabling integration into schedulers, assistants, or automated rescheduling pipelines."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM263"
+    }
+  ],
+  "paths": {
+    "/EventQuery": {
+      "post": {
+        "operationId": "EventQuery",
+        "summary": "Simulate searching calendar events by text query",
+        "description": "Simulate a search for calendar events whose title or description match the provided search_string, optionally restricted to a date range and optionally including recurring events.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "search_string": {
+                    "type": "string",
+                    "description": "The text to search for within the title and description of an event."
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "description": "The start date for the range of events to search, in the format 'YYYY-MM-DD'.",
+                    "default": "null"
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "description": "The end date for the range of events to search, in the format 'YYYY-MM-DD'.",
+                    "default": "null"
+                  },
+                  "include_recurring": {
+                    "type": "boolean",
+                    "description": "A flag to indicate whether to include recurring events in the search.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "search_string"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search results payload containing matching calendar events.",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "description": "List of matching events ordered by start time (ascending).",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the event."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Event title."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Event description or notes."
+                          },
+                          "start_time": {
+                            "type": "string",
+                            "description": "Event start timestamp in ISO 8601 / RFC3339 format (e.g., 2023-05-01T09:00:00Z).",
+                            "format": "date-time"
+                          },
+                          "end_time": {
+                            "type": "string",
+                            "description": "Event end timestamp in ISO 8601 / RFC3339 format (e.g., 2023-05-01T10:00:00Z).",
+                            "format": "date-time"
+                          },
+                          "is_recurring": {
+                            "type": "boolean",
+                            "description": "Whether the event is recurring."
+                          },
+                          "recurrence_rule": {
+                            "type": "string",
+                            "description": "Recurrence rule (for recurring events), e.g., an iCalendar RRULE string; absent or null for non-recurring events.",
+                            "nullable": true
+                          },
+                          "calendar_id": {
+                            "type": "string",
+                            "description": "Identifier of the calendar that contains this event."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "start_time",
+                          "end_time",
+                          "is_recurring"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_count": {
+                      "type": "integer",
+                      "description": "Total number of matching events across the calendar (may be larger than the length of the events array if results are paginated)."
+                    }
+                  },
+                  "required": [
+                    "events"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reschedule_event": {
+      "post": {
+        "operationId": "reschedule_event",
+        "summary": "Reschedule an event",
+        "description": "Simulate rescheduling an event by assigning it a new date/time provided as an ISO-8601 datetime string.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "event_identifier": {
+                    "type": "string",
+                    "description": "A unique identifier for the event, such as a UUID."
+                  },
+                  "new_datetime": {
+                    "type": "string",
+                    "description": "The new date and time to which the event is being rescheduled, in ISO-8601 format (e.g., 'YYYY-MM-DDTHH:MM:SSZ')."
+                  }
+                },
+                "required": [
+                  "event_identifier",
+                  "new_datetime"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response after an event has been rescheduled.",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "description": "Outcome of the operation (e.g., a short status such as 'rescheduled' or 'updated')."
+                    },
+                    "scheduled_at": {
+                      "type": "string",
+                      "description": "Confirmed scheduled datetime for the event in ISO-8601 format (e.g., 'YYYY-MM-DDTHH:MM:SSZ')."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Optional human-readable message providing additional details about the rescheduling result."
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "scheduled_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

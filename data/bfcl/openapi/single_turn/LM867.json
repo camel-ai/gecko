@@ -1,0 +1,788 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM867",
+    "version": "1.0.0",
+    "description": "LM867 is a compact booking API collection for discovering and reserving entertainment and dining: search and filter movies by location, genre, show type and times, retrieve showtimes for specific theaters on chosen dates, and purchase tickets by selecting movie, quantity, date, location, and show type; find restaurants by location and category with optional filters like price range, vegetarian or outdoor seating, and make table reservations by specifying restaurant, guest count, date, and time. Designed for straightforward REST-style calls."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM867"
+    }
+  ],
+  "paths": {
+    "/Movies_1_BuyMovieTickets": {
+      "post": {
+        "operationId": "Movies_1_BuyMovieTickets",
+        "summary": "Simulate purchasing movie tickets for a specified show",
+        "description": "Simulate the end-to-end purchase flow: validate input, check seat availability, reserve seats while processing payment, and return a confirmed booking payload.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "movie_name": {
+                    "type": "string",
+                    "description": "The title of the movie for which tickets are being purchased."
+                  },
+                  "number_of_tickets": {
+                    "type": "integer",
+                    "description": "The total count of tickets to be bought.",
+                    "enum": [
+                      1,
+                      2,
+                      3,
+                      4,
+                      5,
+                      6,
+                      7,
+                      8,
+                      9
+                    ]
+                  },
+                  "show_date": {
+                    "type": "string",
+                    "description": "The date of the movie showing, in the format of 'YYYY-MM-DD'."
+                  },
+                  "location": {
+                    "type": "string",
+                    "description": "The location of the theater, in the format of 'City, State', such as 'Los Angeles, CA'."
+                  },
+                  "show_time": {
+                    "type": "string",
+                    "description": "The start time of the movie showing, in 24-hour format 'HH:MM'."
+                  },
+                  "show_type": {
+                    "type": "string",
+                    "description": "The format in which the movie is being shown.",
+                    "enum": [
+                      "regular",
+                      "3d",
+                      "imax"
+                    ],
+                    "default": "regular"
+                  }
+                },
+                "required": [
+                  "movie_name",
+                  "number_of_tickets",
+                  "show_date",
+                  "location",
+                  "show_time"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Response returned when ticket purchase is successful.",
+                  "properties": {
+                    "booking_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the confirmed booking."
+                    },
+                    "movie_name": {
+                      "type": "string",
+                      "description": "Title of the movie (echoed from the request)."
+                    },
+                    "number_of_tickets": {
+                      "type": "integer",
+                      "description": "Total number of tickets purchased (echoed from the request)."
+                    },
+                    "show_date": {
+                      "type": "string",
+                      "description": "Date of the movie showing (echoed from the request)."
+                    },
+                    "location": {
+                      "type": "string",
+                      "description": "Theater location (echoed from the request)."
+                    },
+                    "show_time": {
+                      "type": "string",
+                      "description": "Start time of the showing (echoed from the request)."
+                    },
+                    "show_type": {
+                      "type": "string",
+                      "description": "Format of the showing (e.g., regular, 3d, imax)."
+                    },
+                    "total_price": {
+                      "type": "number",
+                      "description": "Total amount charged for the booking. Provide as a float (for example, 12.50)."
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Currency code for total_price, in ISO 4217 format (for example, USD)."
+                    },
+                    "seat_numbers": {
+                      "type": "array",
+                      "description": "Allocated seat identifiers (if applicable).",
+                      "items": {
+                        "type": "string",
+                        "description": "Array item"
+                      }
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Booking status (for example, \"confirmed\")."
+                    },
+                    "purchase_time": {
+                      "type": "string",
+                      "description": "Timestamp when the purchase was completed."
+                    }
+                  },
+                  "required": [
+                    "booking_id",
+                    "movie_name",
+                    "number_of_tickets",
+                    "show_date",
+                    "location",
+                    "show_time",
+                    "status",
+                    "total_price",
+                    "currency"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Movies_1_FindMovies": {
+      "post": {
+        "operationId": "Movies_1_FindMovies",
+        "summary": "Find movies by location, genre, and show type",
+        "description": "Simulate searching for movies in the specified city. Use provided location, optional theater_name, genre, and show_type to filter results. Treat any 'dontcare' value as a wildcard that matches all values for that field.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "The city where the theater is located, in the format of 'City, State', such as 'Berkeley, CA' or 'New York, NY'."
+                  },
+                  "theater_name": {
+                    "type": "string",
+                    "description": "The name of the theater. If not provided, all theaters are considered.",
+                    "default": "dontcare"
+                  },
+                  "genre": {
+                    "type": "string",
+                    "description": "The genre of the movie.",
+                    "enum": [
+                      "World",
+                      "Offbeat",
+                      "Mystery",
+                      "Supernatural",
+                      "Horror",
+                      "Animation",
+                      "Sci-fi",
+                      "Documentary",
+                      "Drama",
+                      "War",
+                      "Family",
+                      "Action"
+                    ]
+                  },
+                  "show_type": {
+                    "type": "string",
+                    "description": "The format of the movie show such as regular, 3D, or IMAX.",
+                    "enum": [
+                      "regular",
+                      "3d",
+                      "imax"
+                    ]
+                  }
+                },
+                "required": [
+                  "location"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search results for movies matching the requested criteria.",
+                  "properties": {
+                    "movies": {
+                      "type": "array",
+                      "description": "Array of movies that match the search criteria. If no matches are found, this will be an empty array.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the movie."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "The movie title."
+                          },
+                          "synopsis": {
+                            "type": "string",
+                            "description": "Short synopsis of the movie."
+                          },
+                          "genre": {
+                            "type": "string",
+                            "description": "The movie genre. Matches request.genre values when provided.",
+                            "enum": [
+                              "World",
+                              "Offbeat",
+                              "Mystery",
+                              "Supernatural",
+                              "Horror",
+                              "Animation",
+                              "Sci-fi",
+                              "Documentary",
+                              "Drama",
+                              "War",
+                              "Family",
+                              "Action",
+                              "dontcare"
+                            ]
+                          },
+                          "duration_minutes": {
+                            "type": "integer",
+                            "description": "Duration of the movie in minutes."
+                          },
+                          "rating": {
+                            "type": "number",
+                            "description": "Average rating for the movie. Provide as a float (e.g., 8.5, not 8).",
+                            "format": "double"
+                          },
+                          "show_type": {
+                            "type": "string",
+                            "description": "Format of the movie show.",
+                            "enum": [
+                              "regular",
+                              "3d",
+                              "imax",
+                              "dontcare"
+                            ]
+                          },
+                          "showtimes": {
+                            "type": "array",
+                            "description": "List of upcoming showtimes for this movie at matching theaters.",
+                            "items": {
+                              "type": "object",
+                              "description": "Array item",
+                              "properties": {
+                                "theater_name": {
+                                  "type": "string",
+                                  "description": "Name of the theater showing this screening."
+                                },
+                                "theater_location": {
+                                  "type": "string",
+                                  "description": "Location of the theater, typically 'City, State'."
+                                },
+                                "start_time": {
+                                  "type": "string",
+                                  "description": "Local start time for the screening (ISO 8601 recommended, e.g., 2026-03-12T19:30:00-07:00)."
+                                },
+                                "format": {
+                                  "type": "string",
+                                  "description": "Show format label (e.g., 'regular', '3d', 'imax'). May match movie.show_type when applicable."
+                                },
+                                "ticket_price": {
+                                  "type": "number",
+                                  "description": "Estimated ticket price for this showtime in local currency. Provide as a float (e.g., 12.50, not 12).",
+                                  "format": "double"
+                                }
+                              },
+                              "required": [
+                                "theater_name",
+                                "theater_location",
+                                "start_time"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "genre",
+                          "duration_minutes",
+                          "showtimes"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of matching movies across all pages."
+                    },
+                    "page": {
+                      "type": "integer",
+                      "description": "Current page number of results (1-based)."
+                    },
+                    "per_page": {
+                      "type": "integer",
+                      "description": "Number of movies returned per page."
+                    }
+                  },
+                  "required": [
+                    "movies"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Movies_1_GetTimesForMovie": {
+      "post": {
+        "operationId": "Movies_1_GetTimesForMovie",
+        "summary": "Retrieve available showtimes for a movie at a theater on a date",
+        "description": "Simulate retrieving available showtimes for a specific movie at theaters in a given location for a specified date. Return a list of showtime records (theater, start time, format, pricing, and availability).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "movie_name": {
+                    "type": "string",
+                    "description": "The title of the movie for which showtimes are being requested."
+                  },
+                  "location": {
+                    "type": "string",
+                    "description": "The city in which the theater is located, in the format of 'City, State', such as 'Berkeley, CA' and 'New York, NY'."
+                  },
+                  "show_date": {
+                    "type": "string",
+                    "description": "The date for which to retrieve showtimes, in the format 'YYYY-MM-DD'."
+                  },
+                  "theater_name": {
+                    "type": "string",
+                    "description": "The name of the theater where the movie is showing. If not specified, showtimes for all theaters are considered.",
+                    "default": "All Theaters"
+                  },
+                  "show_type": {
+                    "type": "string",
+                    "description": "The format of the movie showing, such as 'regular', '3D', or 'IMAX'.",
+                    "enum": [
+                      "regular",
+                      "3d",
+                      "imax"
+                    ],
+                    "default": "regular"
+                  }
+                },
+                "required": [
+                  "movie_name",
+                  "location",
+                  "show_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "List of available showtimes matching the request criteria.",
+                  "properties": {
+                    "showtimes": {
+                      "type": "array",
+                      "description": "A list of showtime entries. If no showtimes are available, return an empty array.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "theater_name": {
+                            "type": "string",
+                            "description": "Name of the theater where this showing occurs."
+                          },
+                          "auditorium": {
+                            "type": "string",
+                            "description": "Auditorium or screen identifier within the theater, if known."
+                          },
+                          "start_time": {
+                            "type": "string",
+                            "description": "Local start time for this showing (time-only or datetime as available, e.g., '19:30' or '2024-01-02T19:30:00')."
+                          },
+                          "format": {
+                            "type": "string",
+                            "description": "Format of the showing (e.g., regular, 3D, IMAX)."
+                          },
+                          "language": {
+                            "type": "string",
+                            "description": "Language or audio type for the showing, if available (e.g., 'English', 'Spanish')."
+                          },
+                          "ticket_types": {
+                            "type": "array",
+                            "description": "Available ticket types/pricing options for this showing.",
+                            "items": {
+                              "type": "object",
+                              "description": "Array item",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "description": "Ticket category (e.g., 'adult', 'child', 'senior')."
+                                },
+                                "price": {
+                                  "type": "number",
+                                  "description": "Ticket price for this ticket type. Use float format (e.g., 1.0 not 1).",
+                                  "format": "double"
+                                },
+                                "currency": {
+                                  "type": "string",
+                                  "description": "ISO 4217 currency code for the price (e.g., 'USD')."
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "price",
+                                "currency"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "seats_available": {
+                            "type": "integer",
+                            "description": "Estimated number of seats currently available for this showing (if known).",
+                            "minimum": 0
+                          },
+                          "attributes": {
+                            "type": "array",
+                            "description": "Additional attributes for the showing (e.g., 'subtitled', 'recliner seating').",
+                            "items": {
+                              "type": "string",
+                              "description": "Array item"
+                            }
+                          }
+                        },
+                        "required": [
+                          "theater_name",
+                          "start_time",
+                          "format"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "showtimes"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Restaurants_2_ReserveRestaurant": {
+      "post": {
+        "operationId": "Restaurants_2_ReserveRestaurant",
+        "summary": "Simulate making a restaurant table reservation",
+        "description": "Simulate creating a table reservation at a specified restaurant for a given date and 24-hour time.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "restaurant_name": {
+                    "type": "string",
+                    "description": "The full name of the restaurant where the reservation is to be made."
+                  },
+                  "location": {
+                    "type": "string",
+                    "description": "The location of the restaurant, in the format of 'City, State', such as 'New York, NY' or 'San Francisco, CA'."
+                  },
+                  "time": {
+                    "type": "string",
+                    "description": "The desired time for the reservation, in 24-hour format 'HH:MM', such as '19:00' for 7 PM."
+                  },
+                  "number_of_guests": {
+                    "type": "integer",
+                    "description": "The number of guests for the reservation.",
+                    "default": 2
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "The date for which the reservation is made, in ISO 8601 format 'YYYY-MM-DD', such as '2023-04-15'."
+                  }
+                },
+                "required": [
+                  "restaurant_name",
+                  "location",
+                  "time",
+                  "date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful reservation confirmation payload",
+                  "properties": {
+                    "reservation_id": {
+                      "type": "string",
+                      "description": "Server-generated unique reservation identifier."
+                    },
+                    "confirmation_code": {
+                      "type": "string",
+                      "description": "Short code guests can present for check-in (alphanumeric)."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Reservation status (for example: confirmed, pending)."
+                    },
+                    "scheduled_at": {
+                      "type": "string",
+                      "description": "ISO 8601 date-time when the reservation is scheduled (server-calculated from provided date and time).",
+                      "format": "date-time"
+                    },
+                    "party_size": {
+                      "type": "integer",
+                      "description": "Confirmed number of guests. Provide as an integer."
+                    },
+                    "expires_at": {
+                      "type": "string",
+                      "description": "Timestamp after which the reservation will be automatically canceled if not confirmed.",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "reservation_id",
+                    "status",
+                    "scheduled_at",
+                    "party_size"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Restaurants_2_FindRestaurants": {
+      "post": {
+        "operationId": "Restaurants_2_FindRestaurants",
+        "summary": "Simulate finding restaurants by category and location",
+        "description": "Simulate a restaurant search using required category and location, honoring optional filters: price_range, has_vegetarian_options, and has_seating_outdoors.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "category": {
+                    "type": "string",
+                    "description": "The category of food offered by the restaurant, such as 'Mexican', 'Italian', or 'Japanese'.",
+                    "enum": [
+                      "Mexican",
+                      "Bistro",
+                      "Izakaya",
+                      "Brunch",
+                      "Thai",
+                      "Sandwich",
+                      "Seafood",
+                      "Barbecue",
+                      "European",
+                      "Steakhouse",
+                      "Vietnamese",
+                      "Asian",
+                      "Coffeehouse",
+                      "American",
+                      "Gastropub",
+                      "Austrian",
+                      "Italian",
+                      "Indian",
+                      "Spanish",
+                      "Vegetarian",
+                      "Brasserie",
+                      "Chinese",
+                      "Breakfast",
+                      "Greek",
+                      "California",
+                      "Tapas",
+                      "Take-out",
+                      "Japanese"
+                    ]
+                  },
+                  "location": {
+                    "type": "string",
+                    "description": "The location of the restaurant, in the format of 'City, State', such as 'San Francisco, CA'."
+                  },
+                  "price_range": {
+                    "type": "string",
+                    "description": "The price range for the restaurant, with 'dontcare' indicating no preference.",
+                    "enum": [
+                      "cheap",
+                      "moderate",
+                      "pricey",
+                      "ultra high-end"
+                    ]
+                  },
+                  "has_vegetarian_options": {
+                    "type": "boolean",
+                    "description": "Flag indicating whether the restaurant offers vegetarian options.",
+                    "default": false
+                  },
+                  "has_seating_outdoors": {
+                    "type": "boolean",
+                    "description": "Flag indicating whether the restaurant provides outdoor seating.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "category",
+                  "location"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "List of matching restaurants and summary metadata.",
+                  "properties": {
+                    "restaurants": {
+                      "type": "array",
+                      "description": "Matching restaurants, ordered by relevance and proximity.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the restaurant."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Restaurant name."
+                          },
+                          "category": {
+                            "type": "string",
+                            "description": "Primary category or cuisine of the restaurant."
+                          },
+                          "address": {
+                            "type": "string",
+                            "description": "Full street address."
+                          },
+                          "city": {
+                            "type": "string",
+                            "description": "City where the restaurant is located."
+                          },
+                          "state": {
+                            "type": "string",
+                            "description": "State or region where the restaurant is located."
+                          },
+                          "postal_code": {
+                            "type": "string",
+                            "description": "Postal code for the restaurant address (if available)."
+                          },
+                          "distance_miles": {
+                            "type": "number",
+                            "description": "Approximate distance from the requested location in miles. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "price_range": {
+                            "type": "string",
+                            "description": "Price level label for the restaurant (if available)."
+                          },
+                          "is_vegetarian_friendly": {
+                            "type": "boolean",
+                            "description": "Whether the restaurant offers distinct vegetarian-friendly options."
+                          },
+                          "has_outdoor_seating": {
+                            "type": "boolean",
+                            "description": "Whether the restaurant provides outdoor seating."
+                          },
+                          "rating": {
+                            "type": "number",
+                            "description": "Average customer rating (scale depends on provider). Provide as a float (e.g., 4.5, not 4).",
+                            "format": "double"
+                          },
+                          "url": {
+                            "type": "string",
+                            "description": "Optional link to the restaurant's website or listing."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "category",
+                          "address"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of matching restaurants found by the search."
+                    },
+                    "returned_results": {
+                      "type": "integer",
+                      "description": "Number of restaurants included in this response."
+                    }
+                  },
+                  "required": [
+                    "restaurants",
+                    "total_results",
+                    "returned_results"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

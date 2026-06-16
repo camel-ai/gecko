@@ -1,0 +1,549 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI800",
+    "version": "1.0.0",
+    "description": "LI800 is a query-focused API collection for discovering and cross-referencing xVG product data, business unit mappings, SLA-enabled products, and active product branches over date ranges. Use product_list_retrieve and selector endpoints to enumerate catalogs and filter by anchor status, sce_api_get_products for SLA-tracked items, product_volume_get_active_branches for date-bound branch activity, and sce_api_get_product_information with CRM IDs to fetch SCE-specific entitlement details. Designed for programmatic integration into dashboards and automation pipelines."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI800"
+    }
+  ],
+  "paths": {
+    "/product_list_retrieve": {
+      "post": {
+        "operationId": "product_list_retrieve",
+        "summary": "Retrieve xVG product names",
+        "description": "Simulate retrieving a list of xVG product names from the catalog, filtered and sorted per request parameters.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "category": {
+                    "type": "string",
+                    "description": "The category filter to list products from specific categories only.",
+                    "enum": [
+                      "electronics",
+                      "gaming",
+                      "household",
+                      "books"
+                    ],
+                    "default": "all"
+                  },
+                  "availability": {
+                    "type": "boolean",
+                    "description": "A flag to filter products based on availability. When true, only products in stock are listed.",
+                    "default": true
+                  },
+                  "sort_order": {
+                    "type": "string",
+                    "description": "The order in which the products should be sorted in the list. Possible values are ascending (asc) or descending (desc).",
+                    "enum": [
+                      "asc",
+                      "desc"
+                    ],
+                    "default": "asc"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "The maximum number of product names to retrieve.",
+                    "default": 50
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "description": "An array of product name strings matching the request filters.",
+                  "items": {
+                    "type": "string",
+                    "description": "Product name"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_business_unit_mapping": {
+      "post": {
+        "operationId": "get_business_unit_mapping",
+        "summary": "Retrieve business unit ID-to-name mappings",
+        "description": "Simulate retrieval of all business unit mappings. Return an array where each item maps a bu_id to its bu_name.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "description": "Array of business unit mapping objects.",
+                  "items": {
+                    "type": "object",
+                    "description": "Array item",
+                    "properties": {
+                      "bu_id": {
+                        "type": "string",
+                        "description": "Business unit identifier (bu_id)."
+                      },
+                      "bu_name": {
+                        "type": "string",
+                        "description": "Business unit display name (bu_name)."
+                      }
+                    },
+                    "required": [
+                      "bu_id",
+                      "bu_name"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/product_selector_get_products": {
+      "post": {
+        "operationId": "product_selector_get_products",
+        "summary": "Retrieve products (filter by anchor status)",
+        "description": "Simulate retrieving a list of products for the SLA Dashboard and Patch Self Service. The request must include the anchor filter to return all, user-associated, or anchor products.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "anchor": {
+                    "type": "string",
+                    "description": "Filter to indicate if the retrieved products should be all products, user-associated products, or anchor products. Use 'all' for all products, 'user' for products associated with the current user, and 'anchor' for anchor products.",
+                    "enum": [
+                      "all",
+                      "user",
+                      "anchor"
+                    ]
+                  }
+                },
+                "required": [
+                  "anchor"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "description": "List of product objects matching the requested anchor filter.",
+                  "items": {
+                    "type": "object",
+                    "description": "A product available to the caller",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "Unique identifier for the product."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Human-readable product name."
+                      },
+                      "slug": {
+                        "type": "string",
+                        "description": "Short, URL-friendly identifier for the product (if available)."
+                      },
+                      "is_anchor": {
+                        "type": "boolean",
+                        "description": "Whether this product is an anchor product (true) or not (false)."
+                      },
+                      "associated_with_user": {
+                        "type": "boolean",
+                        "description": "Whether the product is associated with the requesting user (true) or not (false)."
+                      },
+                      "description": {
+                        "type": "string",
+                        "description": "Optional longer description of the product."
+                      },
+                      "tags": {
+                        "type": "array",
+                        "description": "Optional list of short labels or categories for the product.",
+                        "items": {
+                          "type": "string",
+                          "description": "Array item"
+                        }
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sce_api_get_products": {
+      "post": {
+        "operationId": "sce_api_get_products",
+        "summary": "Simulate retrieving products with SLA tracking enabled",
+        "description": "Return a list of products that have SLA metrics tracking enabled. The 'anchor' request field controls whether the response includes all SLA-enabled products, only those assigned to the requesting user, or only products marked as anchors.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "anchor": {
+                    "type": "string",
+                    "description": "Filter to indicate if the returned products should be all products, only those assigned to the user, or only anchor products. 'all' returns every product with SLA enabled, 'user' returns user-specific products, and 'anchor' returns products marked as anchors.",
+                    "enum": [
+                      "all",
+                      "user",
+                      "anchor"
+                    ]
+                  }
+                },
+                "required": [
+                  "anchor"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing products with SLA tracking enabled.",
+                  "properties": {
+                    "products": {
+                      "type": "array",
+                      "description": "List of products matching the requested anchor filter. Each item represents a product that has SLA metrics tracking enabled.",
+                      "items": {
+                        "type": "object",
+                        "description": "A product that has SLA metrics tracking enabled.",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the product."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Human-readable product name."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Optional longer description of the product."
+                          },
+                          "is_anchor": {
+                            "type": "boolean",
+                            "description": "True if the product is marked as an anchor product."
+                          },
+                          "assigned_to_user": {
+                            "type": "boolean",
+                            "description": "True if the product is assigned to the requesting user."
+                          },
+                          "sla_tracking_enabled": {
+                            "type": "boolean",
+                            "description": "Indicates whether SLA metrics tracking is enabled for this product. For this endpoint, returned items will have this set to true."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "is_anchor",
+                          "assigned_to_user",
+                          "sla_tracking_enabled"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "products"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/product_volume_get_active_branches": {
+      "post": {
+        "operationId": "product_volume_get_active_branches",
+        "summary": "Simulate retrieval of active product branches over a date range",
+        "description": "Return a simulated list of branches considered active for the specified product and date window. Use the provided crm_id and optional date parameters to determine which branches fall within the active range.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "crm_id": {
+                    "type": "string",
+                    "description": "The unique Synopsys product ID assigned to this product."
+                  },
+                  "days": {
+                    "type": "integer",
+                    "description": "The number of days from the current date to calculate the active volume products. For example, specifying 30 would retrieve products active in the last 30 days.",
+                    "default": 30
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "description": "The end date up to which valid volume products should be retrieved, in the format 'YYYY-MM-DD'.",
+                    "default": "today"
+                  }
+                },
+                "required": [
+                  "crm_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload containing the product ID and the list of active branches within the requested date window.",
+                  "properties": {
+                    "crm_id": {
+                      "type": "string",
+                      "description": "The unique Synopsys product ID assigned to this product."
+                    },
+                    "days": {
+                      "type": "integer",
+                      "description": "The number of days from the current date used to calculate the active volume products. Provide as an integer (e.g., 30).",
+                      "default": 30
+                    },
+                    "end_date": {
+                      "type": "string",
+                      "description": "The end date up to which valid volume products were retrieved. If set to the string \"today\" the server uses the current date. When a concrete date string is provided, it follows the 'YYYY-MM-DD' date format.",
+                      "default": "today"
+                    },
+                    "branches": {
+                      "type": "array",
+                      "description": "Array of branches that are active for the given product within the requested date range.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "branch_id": {
+                            "type": "string",
+                            "description": "Unique identifier for the branch."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Human-readable name of the branch."
+                          },
+                          "active_from": {
+                            "type": "string",
+                            "description": "Date when the branch became active for this product (inclusive). Uses 'YYYY-MM-DD' when a concrete date is returned."
+                          },
+                          "active_to": {
+                            "type": "object",
+                            "description": "Parameter active_to",
+                            "oneOf": [
+                              {
+                                "type": "string",
+                                "description": "Date when the branch ceased being active for this product (inclusive). Uses 'YYYY-MM-DD' when a concrete date is returned."
+                              },
+                              {
+                                "type": "null",
+                                "description": "Null when the branch is still active with no end date within the system."
+                              }
+                            ],
+                            "properties": {}
+                          },
+                          "is_active": {
+                            "type": "boolean",
+                            "description": "Whether the branch is considered active within the requested window."
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "description": "Optional additional metadata about the branch (implementation-specific).",
+                            "properties": {},
+                            "additionalProperties": true
+                          }
+                        },
+                        "required": [
+                          "branch_id",
+                          "name",
+                          "is_active"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "crm_id",
+                    "branches"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sce_api_get_product_information": {
+      "post": {
+        "operationId": "sce_api_get_product_information",
+        "summary": "Get product information by CRM ID",
+        "description": "Simulate retrieving product details from the Synopsys Customer Entitlement (SCE) system by CRM ID. Optionally limit returned fields using the comma-separated 'fields' parameter; default 'all' returns the full product record.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "crm_id": {
+                    "type": "integer",
+                    "description": "The unique identifier for Synopsys products."
+                  },
+                  "fields": {
+                    "type": "string",
+                    "description": "Comma-separated names of the product info fields to retrieve, such as 'name,version,status'.",
+                    "default": "all"
+                  }
+                },
+                "required": [
+                  "crm_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Product information returned for the requested crm_id",
+                  "properties": {
+                    "crm_id": {
+                      "type": "integer",
+                      "description": "The unique identifier for Synopsys products."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Product display name."
+                    },
+                    "version": {
+                      "type": "string",
+                      "description": "Product version string."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Product lifecycle status (for example: active, deprecated)."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "Long-form product description."
+                    },
+                    "metadata": {
+                      "type": "object",
+                      "description": "Arbitrary key/value metadata attached to the product.",
+                      "properties": {},
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
+                    "licenses": {
+                      "type": "array",
+                      "description": "List of licenses associated with the product.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "license_id": {
+                            "type": "string",
+                            "description": "Identifier for the license record."
+                          },
+                          "type": {
+                            "type": "string",
+                            "description": "License type or category."
+                          },
+                          "quantity": {
+                            "type": "integer",
+                            "description": "Allocated license quantity."
+                          }
+                        },
+                        "required": [
+                          "license_id"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "crm_id",
+                    "name"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

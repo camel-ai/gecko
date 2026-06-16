@@ -1,0 +1,594 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM189",
+    "version": "1.0.0",
+    "description": "LM189 is a lightweight API collection for testing and interactive troubleshooting that exposes utility endpoints and helper actions. Use getDetails to solicit missing context, sendHttpRequest and testProxyHeaders to exercise Httpbin behaviors, simulateStatusCode to check error handling, and getClientRequestData to inspect incoming request components. Designed for rapid diagnostics, reproducible tests, and guided user prompts in conversational integrations."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM189"
+    }
+  ],
+  "paths": {
+    "/getDetails": {
+      "post": {
+        "operationId": "getDetails",
+        "summary": "Request clarifying details for an underspecified question",
+        "description": "Invoke getDetails when the user's question lacks essential information needed to produce an accurate answer. Return a small set of focused clarifying prompts that, when answered, will enable a complete response. Do not invoke for purely optional details unless those details become critical to the task.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "question": {
+                    "type": "string",
+                    "description": "The question to be clarified or expanded upon in order to provide the user with an accurate and effective response."
+                  }
+                },
+                "required": [
+                  "question"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing one or more clarifying prompts to present to the user.",
+                  "properties": {
+                    "follow_up_questions": {
+                      "type": "array",
+                      "description": "A prioritized list of concise clarifying questions to ask the user. Each item is an object containing the actual question text and an optional short reason explaining why the information is needed.",
+                      "minItems": 1,
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "question": {
+                            "type": "string",
+                            "description": "A single concise clarifying question to present to the user."
+                          },
+                          "reason": {
+                            "type": "string",
+                            "description": "Optional brief explanation of why this detail is needed."
+                          }
+                        },
+                        "required": [
+                          "question"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "context_notes": {
+                      "type": "string",
+                      "description": "Optional brief guidance to include when asking the follow-up questions (for example, examples, acceptable formats, or scope limits)."
+                    }
+                  },
+                  "required": [
+                    "follow_up_questions"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sendHttpRequest": {
+      "post": {
+        "operationId": "sendHttpRequest",
+        "summary": "Send an HTTP request to Httpbin and return the parsed response",
+        "description": "Simulate sending an HTTP request (method, headers, optional body) to the Httpbin API for testing and return the response payload (status, headers, body). Follow redirects and return the response body as JSON when possible; otherwise return it as a string.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "method": {
+                    "type": "string",
+                    "description": "The HTTP method to use for the request.",
+                    "enum": [
+                      "GET",
+                      "POST",
+                      "PUT",
+                      "DELETE",
+                      "HEAD",
+                      "PATCH"
+                    ]
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "The endpoint URL to which the request will be sent."
+                  },
+                  "headers": {
+                    "type": "object",
+                    "description": "A dictionary of headers to include in the request. Optional parameter.",
+                    "default": {},
+                    "properties": {
+                      "Content-Type": {
+                        "type": "string",
+                        "description": "The MIME type of the body of the request (e.g., application/json).",
+                        "default": "application/json"
+                      },
+                      "Authorization": {
+                        "type": "string",
+                        "description": "The authorization token (if required by the endpoint).",
+                        "default": null
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "data": {
+                    "type": "object",
+                    "description": "A dictionary of data to include in the request body. Optional parameter.",
+                    "default": {},
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "Name value to include in the JSON request body."
+                      },
+                      "email": {
+                        "type": "string",
+                        "description": "Email value to include in the JSON request body."
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "email"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "method",
+                  "url"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response from the target endpoint.",
+                  "properties": {
+                    "status": {
+                      "type": "integer",
+                      "description": "HTTP status code returned by the endpoint (e.g., 200)."
+                    },
+                    "headers": {
+                      "type": "object",
+                      "description": "Response headers returned by the endpoint. Header names are keys and values are strings.",
+                      "properties": {},
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
+                    "body": {
+                      "type": "object",
+                      "description": "Response body. If the response is JSON, it will be represented as an object or array; otherwise it will be returned as a string.",
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "description": "Parameter body option 1",
+                          "properties": {}
+                        },
+                        {
+                          "type": "array",
+                          "description": "Parameter body option 2",
+                          "items": {
+                            "type": "string",
+                            "description": "Array item"
+                          }
+                        },
+                        {
+                          "type": "string",
+                          "description": "Parameter body option 3"
+                        }
+                      ],
+                      "properties": {}
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "Final URL requested (after redirects), when available.",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "headers",
+                    "body"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/getClientRequestData": {
+      "post": {
+        "operationId": "getClientRequestData",
+        "summary": "Simulate the client's request payload sent to a URL",
+        "description": "Return a representation of the client's outgoing request (URL, HTTP method, headers, form data, uploaded files, and cookies). This simulates what the client sent, not the remote server's response.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "The endpoint URL where the request is sent."
+                  }
+                },
+                "required": [
+                  "url"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Representation of the client's request as sent to the target URL.",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "description": "The endpoint URL that was requested."
+                    },
+                    "method": {
+                      "type": "string",
+                      "description": "HTTP method used for the request (e.g., GET, POST)."
+                    },
+                    "headers": {
+                      "type": "object",
+                      "description": "Request headers. Header names are keys; each value is an array of header values in the order they were sent.",
+                      "properties": {},
+                      "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "cookies": {
+                      "type": "object",
+                      "description": "Cookies sent with the request as name -> value mappings.",
+                      "properties": {},
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
+                    "formData": {
+                      "type": "object",
+                      "description": "Form fields sent in the request body. Each field maps to an array of string values (multiple values possible for a single field name).",
+                      "properties": {},
+                      "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "files": {
+                      "type": "array",
+                      "description": "Files uploaded with the request. File contents are not included by default; include metadata about each uploaded file.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "fieldName": {
+                            "type": "string",
+                            "description": "Form field name associated with the uploaded file."
+                          },
+                          "filename": {
+                            "type": "string",
+                            "description": "Original filename provided by the client."
+                          },
+                          "contentType": {
+                            "type": "string",
+                            "description": "MIME type of the uploaded file as reported by the client."
+                          },
+                          "sizeBytes": {
+                            "type": "integer",
+                            "description": "Size of the uploaded file in bytes.",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "fieldName",
+                          "filename",
+                          "contentType",
+                          "sizeBytes"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "url",
+                    "method",
+                    "headers",
+                    "cookies",
+                    "formData",
+                    "files"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/testProxyHeaders": {
+      "post": {
+        "operationId": "testProxyHeaders",
+        "summary": "Test proxy headers via Httpbin and return the response body",
+        "description": "Send a request to an Httpbin endpoint (for example /headers or /anything) with the provided headers and return the parsed JSON response. Use this to simulate and inspect how a downstream service sees forwarded headers.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "The endpoint URL to send the request to. Example: 'http://httpbin.org/anything'."
+                  },
+                  "headers": {
+                    "type": "object",
+                    "description": "A dictionary of headers to include in the request, where each key is a header field name and its value is the header field value.",
+                    "properties": {
+                      "User-Agent": {
+                        "type": "string",
+                        "description": "The user agent string to be sent with the request. Example: 'Mozilla/5.0'."
+                      },
+                      "Accept": {
+                        "type": "string",
+                        "description": "The content types that the client is capable of understanding. Example: 'application/json'."
+                      },
+                      "Authorization": {
+                        "type": "string",
+                        "description": "Credentials to authenticate a user agent with a server. Example: 'Bearer <token>'.",
+                        "default": null
+                      },
+                      "Content-Type": {
+                        "type": "string",
+                        "description": "The media type of the body of the request. Example: 'application/x-www-form-urlencoded'.",
+                        "default": "application/json"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "url",
+                  "headers"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response body returned by the Httpbin endpoint.",
+                  "properties": {
+                    "args": {
+                      "type": "object",
+                      "description": "Query string parameters sent to the endpoint (if any).",
+                      "properties": {},
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
+                    "data": {
+                      "type": "string",
+                      "description": "Raw request body as a string (if any)."
+                    },
+                    "files": {
+                      "type": "object",
+                      "description": "Files uploaded in the request (if any).",
+                      "properties": {},
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
+                    "form": {
+                      "type": "object",
+                      "description": "Form fields parsed from the request body (if any).",
+                      "properties": {},
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
+                    "headers": {
+                      "type": "object",
+                      "description": "Headers observed by the server. Each key is a header field name and each value is the header field value as a string.",
+                      "properties": {},
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
+                    "json": {
+                      "type": "object",
+                      "description": "Parsed JSON body if the request had a JSON payload; may be an object, array, string, number, or null.",
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "description": "Parameter json option 1",
+                          "properties": {}
+                        },
+                        {
+                          "type": "array",
+                          "description": "Parameter json option 2",
+                          "items": {
+                            "type": "string",
+                            "description": "Array item"
+                          }
+                        },
+                        {
+                          "type": "string",
+                          "description": "Parameter json option 3"
+                        },
+                        {
+                          "type": "number",
+                          "description": "Parameter json option 4"
+                        },
+                        {
+                          "type": "null",
+                          "description": "Parameter json option 5"
+                        }
+                      ],
+                      "properties": {}
+                    },
+                    "method": {
+                      "type": "string",
+                      "description": "HTTP method used for the proxied request (e.g., GET, POST)."
+                    },
+                    "origin": {
+                      "type": "string",
+                      "description": "Client IP address as seen by the server."
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "The full URL that the server received."
+                    }
+                  },
+                  "required": [
+                    "headers",
+                    "url"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/simulateStatusCode": {
+      "post": {
+        "operationId": "simulateStatusCode",
+        "summary": "Simulate an HTTP response for a given URL and status code",
+        "description": "Sends a request to an HTTP endpoint to simulate and return the resulting HTTP response (status, headers, body) for testing client behavior.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "The endpoint URL to which the request is sent. Must be a valid URL format, such as 'https://httpbin.org/status/200'."
+                  },
+                  "statusCode": {
+                    "type": "integer",
+                    "description": "The HTTP status code to simulate. Valid values range from 100 to 599, representing the standard HTTP status codes."
+                  }
+                },
+                "required": [
+                  "url",
+                  "statusCode"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful simulated HTTP response returned from the target endpoint.",
+                  "properties": {
+                    "status": {
+                      "type": "integer",
+                      "description": "HTTP status code returned by the simulated request."
+                    },
+                    "headers": {
+                      "type": "object",
+                      "description": "Response headers as a mapping of header name to header value (string).",
+                      "properties": {},
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
+                    "body": {
+                      "type": "object",
+                      "description": "Response body. For JSON responses this will be a parsed object; for non-JSON responses this will be returned as a string.",
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "description": "Parameter body option 1",
+                          "properties": {}
+                        },
+                        {
+                          "type": "string",
+                          "description": "Parameter body option 2"
+                        }
+                      ],
+                      "properties": {}
+                    },
+                    "durationMs": {
+                      "type": "number",
+                      "description": "Approximate request round-trip duration in milliseconds."
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "headers",
+                    "body"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

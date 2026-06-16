@@ -1,0 +1,272 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM222",
+    "version": "1.0.0",
+    "description": "LM222 is a compact API collection for coordinating transportation and communication: use uber_ride to locate and reserve suitable Uber rides by supplying customer location, preferred ride type, and maximum wait time, and use send_message to dispatch email notifications or confirmations. Its usage style favors straightforward, parameter-driven calls with synchronous responses, explicit input validation, clear error codes, and minimal orchestration so it can be integrated into booking flows, customer notifications, or dispatch systems."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM222"
+    }
+  ],
+  "paths": {
+    "/uber_ride": {
+      "post": {
+        "operationId": "uber_ride",
+        "summary": "Simulate selecting a suitable Uber ride given location, ride type, and max wait time",
+        "description": "Given loc, type, and time, return the best available ride option that meets the customer's maximum wait time. Simulation-focused: prefer nearest available driver of the requested type and respect the requested maximum wait time.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "loc": {
+                    "type": "string",
+                    "description": "The starting location of the Uber ride in the format of 'Street Address, City, State'. For example: '123 Main St, Anytown, CA'."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "The type of Uber ride the user is requesting.",
+                    "enum": [
+                      "plus",
+                      "comfort",
+                      "black"
+                    ]
+                  },
+                  "time": {
+                    "type": "integer",
+                    "description": "The maximum amount of time the customer is willing to wait for the ride, measured in minutes.",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "loc",
+                  "type",
+                  "time"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Selected ride details returned when a suitable ride is found",
+                  "properties": {
+                    "ride_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the assigned ride."
+                    },
+                    "eta_minutes": {
+                      "type": "integer",
+                      "description": "Estimated time of arrival in minutes (rounded up to the nearest minute)."
+                    },
+                    "driver": {
+                      "type": "object",
+                      "description": "Information about the assigned driver.",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "Full name of the driver."
+                        },
+                        "rating": {
+                          "type": "number",
+                          "description": "Driver rating on a 1.0–5.0 scale. Provide as a float (e.g., 4.8, not 4).",
+                          "format": "double"
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "vehicle": {
+                      "type": "object",
+                      "description": "Assigned vehicle details.",
+                      "properties": {
+                        "make": {
+                          "type": "string",
+                          "description": "Vehicle manufacturer (e.g., Toyota)."
+                        },
+                        "model": {
+                          "type": "string",
+                          "description": "Vehicle model (e.g., Camry)."
+                        },
+                        "license_plate": {
+                          "type": "string",
+                          "description": "Vehicle license plate identifier."
+                        },
+                        "color": {
+                          "type": "string",
+                          "description": "Vehicle color."
+                        }
+                      },
+                      "required": [
+                        "make",
+                        "model",
+                        "license_plate"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "price_estimate": {
+                      "type": "object",
+                      "description": "Estimated fare for the ride, if available.",
+                      "properties": {
+                        "currency": {
+                          "type": "string",
+                          "description": "Currency code for the estimate (e.g., USD)."
+                        },
+                        "amount": {
+                          "type": "number",
+                          "description": "Estimated fare amount. Provide as a float (e.g., 12.5, not 12).",
+                          "format": "double"
+                        }
+                      },
+                      "required": [
+                        "amount"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "surge_multiplier": {
+                      "type": "number",
+                      "description": "Surge pricing multiplier if applicable (1.0 means no surge). Provide as a float (e.g., 1.5, not 1).",
+                      "format": "double"
+                    },
+                    "pickup_location": {
+                      "type": "object",
+                      "description": "Resolved pickup location for the ride.",
+                      "properties": {
+                        "address": {
+                          "type": "string",
+                          "description": "Resolved address used for pickup, typically mirroring or normalized from the request loc."
+                        },
+                        "latitude": {
+                          "type": "number",
+                          "description": "Latitude of the pickup point. Provide as a float (e.g., 37.7749, not 37).",
+                          "format": "double"
+                        },
+                        "longitude": {
+                          "type": "number",
+                          "description": "Longitude of the pickup point. Provide as a float (e.g., -122.4194, not -122).",
+                          "format": "double"
+                        }
+                      },
+                      "required": [
+                        "address"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ride_id",
+                    "eta_minutes",
+                    "driver",
+                    "vehicle"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/send_message": {
+      "post": {
+        "operationId": "send_message",
+        "summary": "Send an email message",
+        "description": "Simulate sending an email to the specified recipient (dest) with subject, message body, and optional cc/bcc. Returns metadata about the sent message on success.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "dest": {
+                    "type": "string",
+                    "description": "The email address of the recipient, in standard email format (e.g., 'username@example.com')."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "The body of the email message, summarizing the content to be sent."
+                  },
+                  "subject": {
+                    "type": "string",
+                    "description": "The subject line of the email message.",
+                    "default": "No Subject"
+                  },
+                  "cc": {
+                    "type": "array",
+                    "description": "An array of email addresses to be included as CC in the email, in standard email format.",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  },
+                  "bcc": {
+                    "type": "array",
+                    "description": "An array of email addresses to be included as BCC in the email, in standard email format.",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  }
+                },
+                "required": [
+                  "dest",
+                  "message"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful send result",
+                  "properties": {
+                    "message_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the sent message."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Status of the send request (e.g., queued or sent)."
+                    },
+                    "sent_at": {
+                      "type": "string",
+                      "description": "Timestamp when the message was accepted for delivery (ISO 8601 recommended)."
+                    }
+                  },
+                  "required": [
+                    "message_id",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

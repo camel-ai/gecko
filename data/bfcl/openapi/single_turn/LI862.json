@@ -1,0 +1,139 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI862",
+    "version": "1.0.0",
+    "description": "The LI862 API collection provides endpoints for income tax calculations and related utilities, centered on the calculate_tax operation that computes tax liabilities from income while applying deductions and filing-status-specific rates. Designed for straightforward integration into payroll, accounting, or filing workflows, it accepts numeric income and parameterized deduction and status inputs, returns detailed tax breakdowns and supports validation, error handling, and idempotent, programmatic invocation."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI862"
+    }
+  ],
+  "paths": {
+    "/calculate_tax": {
+      "post": {
+        "operationId": "calculate_tax",
+        "summary": "Simulate tax calculation",
+        "description": "Simulates computing tax for a given income using filing status, deductions, exemptions, and tax-year-specific rates.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "income": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The total income amount in dollars for which the tax is to be calculated.. Use float format (e.g., 1.0 not 1)."
+                  },
+                  "filing_status": {
+                    "type": "string",
+                    "description": "The filing status of the taxpayer.",
+                    "enum": [
+                      "single",
+                      "married_filing_jointly",
+                      "married_filing_separately",
+                      "head_of_household"
+                    ]
+                  },
+                  "deductions": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The total amount of deductions in dollars the taxpayer is claiming. Defaults to 0 if not provided.. Use float format (e.g., 1.0 not 1).",
+                    "default": 0.0
+                  },
+                  "exemptions": {
+                    "type": "integer",
+                    "description": "The number of exemptions the taxpayer is claiming, typically one per dependent. Defaults to 1 if not provided.",
+                    "default": 1
+                  },
+                  "tax_year": {
+                    "type": "integer",
+                    "description": "The tax year for which the calculation is made. Defaults to the current year if not specified.",
+                    "default": 2023
+                  }
+                },
+                "required": [
+                  "income",
+                  "filing_status"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful tax calculation result",
+                  "properties": {
+                    "taxable_income": {
+                      "type": "number",
+                      "description": "Taxable income in dollars after applying deductions and exemptions. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "tax_due": {
+                      "type": "number",
+                      "description": "Total tax owed in dollars for the specified tax year and filing status, after all deductions and exemptions. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "effective_tax_rate": {
+                      "type": "number",
+                      "description": "Effective tax rate expressed as a decimal fraction of income (e.g., 0.25 for 25%). Provide as a float (e.g., 0.25, not 25).",
+                      "format": "double"
+                    },
+                    "brackets": {
+                      "type": "array",
+                      "description": "Breakdown of tax by marginal brackets used in the calculation, ordered from lowest to highest bracket.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "bracket_rate": {
+                            "type": "number",
+                            "description": "Marginal tax rate applied to this bracket, expressed as a decimal (e.g., 0.22 for 22%). Provide as a float (e.g., 0.22, not 22).",
+                            "format": "double"
+                          },
+                          "taxable_amount": {
+                            "type": "number",
+                            "description": "Portion of the taxable income that falls into this bracket, in dollars. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "tax_amount": {
+                            "type": "number",
+                            "description": "Tax owed for this bracket in dollars (bracket_rate * taxable_amount). Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          }
+                        },
+                        "required": [
+                          "bracket_rate",
+                          "taxable_amount",
+                          "tax_amount"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "taxable_income",
+                    "tax_due",
+                    "effective_tax_rate",
+                    "brackets"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

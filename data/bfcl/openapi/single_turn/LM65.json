@@ -1,0 +1,396 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM65",
+    "version": "1.0.0",
+    "description": "LM65 is an API collection for integrating ride booking, food delivery, and local weather into apps. It exposes endpoints to find suitable Uber rides by location, ride type, and maximum wait time; place Uber Eats orders with itemized quantities for a specified restaurant; and fetch current weather for a given location. Designed for conversational and app-driven workflows, LM65 favors simple parameters, quick synchronous responses, and clear error information to streamline trip planning and ordering."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM65"
+    }
+  ],
+  "paths": {
+    "/uber_ride": {
+      "post": {
+        "operationId": "uber_ride",
+        "summary": "Simulate selecting a suitable Uber ride",
+        "description": "Simulate choosing an available Uber ride given the user's location, requested ride type, and maximum wait time. Return a single selected ride option that meets the constraints or indicate no available option.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "loc": {
+                    "type": "string",
+                    "description": "The starting location for the Uber ride, in the format of 'Street Address, City, State'."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "The type of Uber ride the user is ordering.",
+                    "enum": [
+                      "plus",
+                      "comfort",
+                      "black"
+                    ]
+                  },
+                  "time": {
+                    "type": "integer",
+                    "description": "The maximum amount of time, in minutes, the customer is willing to wait for the ride."
+                  }
+                },
+                "required": [
+                  "loc",
+                  "type",
+                  "time"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Selected ride details returned on success",
+                  "properties": {
+                    "ride_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the selected or booked ride."
+                    },
+                    "driver": {
+                      "type": "object",
+                      "description": "Information about the assigned driver and vehicle.",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "Driver's display name."
+                        },
+                        "rating": {
+                          "type": "number",
+                          "description": "Driver rating on a 0.0–5.0 scale. Provide as a float (e.g., 4.5, not 4).",
+                          "format": "double"
+                        },
+                        "vehicle": {
+                          "type": "string",
+                          "description": "Vehicle make and model."
+                        },
+                        "license_plate": {
+                          "type": "string",
+                          "description": "Vehicle license plate (if available)."
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "rating",
+                        "vehicle"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "eta_minutes": {
+                      "type": "integer",
+                      "description": "Estimated time of arrival at the pickup location, in minutes."
+                    },
+                    "pickup_location": {
+                      "type": "string",
+                      "description": "Resolved pickup location string used for dispatch (may be normalized from the input)."
+                    },
+                    "price": {
+                      "type": "number",
+                      "description": "Estimated fare for the ride in the specified currency. Provide as a float (e.g., 12.50, not 12).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "ISO 4217 currency code for the price, e.g., USD."
+                    }
+                  },
+                  "required": [
+                    "ride_id",
+                    "driver",
+                    "eta_minutes",
+                    "pickup_location",
+                    "price",
+                    "currency"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/eat_order": {
+      "post": {
+        "operationId": "eat_order",
+        "summary": "Simulate placing an Uber Eats food order",
+        "description": "Simulate placing a food delivery order for a specified restaurant: validate the request, reserve items, compute prices and fees, and return an order confirmation including order_id and an estimated delivery time. This is a simulation; no external payment or delivery systems are actually called.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "restaurant_id": {
+                    "type": "string",
+                    "description": "The unique identifier of the chosen restaurant."
+                  },
+                  "items": {
+                    "type": "array",
+                    "description": "An array of items selected for the order, each with details such as item identifier and quantity.",
+                    "items": {
+                      "type": "object",
+                      "description": "An array of items selected for the order, each with details such as item identifier and quantity.",
+                      "properties": {
+                        "item_id": {
+                          "type": "string",
+                          "description": "The unique identifier of the selected item."
+                        },
+                        "quantity": {
+                          "type": "integer",
+                          "description": "The number of units of the item to order."
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "delivery_instructions": {
+                    "type": "string",
+                    "description": "Special instructions for the delivery person, such as gate codes or drop-off preferences.",
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "restaurant_id",
+                  "items"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Order confirmation returned when an order is successfully placed.",
+                  "properties": {
+                    "order_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the created order."
+                    },
+                    "restaurant_id": {
+                      "type": "string",
+                      "description": "The restaurant identifier for which the order was placed."
+                    },
+                    "items": {
+                      "type": "array",
+                      "description": "List of items included in the confirmed order.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "item_id": {
+                            "type": "string",
+                            "description": "The unique identifier of the selected item."
+                          },
+                          "quantity": {
+                            "type": "integer",
+                            "description": "The number of units of the item that were ordered."
+                          },
+                          "unit_price": {
+                            "type": "number",
+                            "description": "Price per unit. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          }
+                        },
+                        "required": [
+                          "item_id",
+                          "quantity",
+                          "unit_price"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "subtotal": {
+                      "type": "number",
+                      "description": "Sum of item prices before fees and taxes. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "fees": {
+                      "type": "number",
+                      "description": "Delivery and service fees applied to the order. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "tax": {
+                      "type": "number",
+                      "description": "Total tax amount applied to the order. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "total": {
+                      "type": "number",
+                      "description": "Total amount charged (subtotal + fees + tax). Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "ISO currency code for price fields (for example, USD)."
+                    },
+                    "estimated_delivery_minutes": {
+                      "type": "integer",
+                      "description": "Estimated delivery time in minutes."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Order status (e.g., confirmed, preparing, out_for_delivery). This is illustrative, not an exhaustive list."
+                    },
+                    "delivery_instructions": {
+                      "type": "string",
+                      "description": "Any delivery instructions provided in the request, echoed back if present."
+                    }
+                  },
+                  "required": [
+                    "order_id",
+                    "restaurant_id",
+                    "items",
+                    "subtotal",
+                    "total",
+                    "currency",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_current_weather": {
+      "post": {
+        "operationId": "get_current_weather",
+        "summary": "Get current weather",
+        "description": "Simulate retrieving current weather for the specified location. Respect the request's unit default when present and return a concise weather observation payload.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "The geographical location for the weather data, in the format of 'City, State', such as 'San Francisco, CA' or 'New York, NY'."
+                  },
+                  "unit": {
+                    "type": "string",
+                    "description": "The unit of temperature for the weather data.",
+                    "enum": [
+                      "celsius",
+                      "fahrenheit"
+                    ],
+                    "default": "fahrenheit"
+                  }
+                },
+                "required": [
+                  "location"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Current weather conditions for the requested location.",
+                  "properties": {
+                    "location": {
+                      "type": "string",
+                      "description": "Canonical name of the location (for example, 'San Francisco, CA')."
+                    },
+                    "conditions": {
+                      "type": "string",
+                      "description": "Short textual summary of current conditions (e.g., 'Partly cloudy')."
+                    },
+                    "temperature": {
+                      "type": "number",
+                      "description": "Current temperature expressed in the unit specified by the request. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "unit": {
+                      "type": "string",
+                      "description": "Unit used for temperature values.",
+                      "enum": [
+                        "celsius",
+                        "fahrenheit"
+                      ]
+                    },
+                    "humidity": {
+                      "type": "number",
+                      "description": "Relative humidity as a percentage (0-100). Provide as a float (e.g., 50.0).",
+                      "format": "double",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "wind": {
+                      "type": "object",
+                      "description": "Wind information.",
+                      "properties": {
+                        "speed": {
+                          "type": "number",
+                          "description": "Wind speed (units should be consistent with the requested measurement system). Provide as a float (e.g., 5.5).",
+                          "format": "double"
+                        },
+                        "direction": {
+                          "type": "string",
+                          "description": "Wind direction as an abbreviated compass direction or degrees (e.g., 'NW' or '270')."
+                        }
+                      },
+                      "required": [
+                        "speed",
+                        "direction"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "observed_at": {
+                      "type": "string",
+                      "description": "Timestamp when the observation was made in ISO 8601 format.",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "location",
+                    "temperature",
+                    "unit",
+                    "observed_at",
+                    "conditions"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

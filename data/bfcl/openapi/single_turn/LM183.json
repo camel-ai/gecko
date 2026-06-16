@@ -1,0 +1,342 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM183",
+    "version": "1.0.0",
+    "description": "LM183 is a compact translation-oriented API collection that orchestrates high-quality neural translations and user-driven clarifications. It exposes finish for NLLB-powered translations, get_translation_nllb and get_translation_baidu for external BAIDU translation calls, and ask_to_user to request user input when source text, target language, or intent are ambiguous. Use it programmatically to route requests by accuracy, latency, or fallback policies and to prompt users for disambiguation."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM183"
+    }
+  ],
+  "paths": {
+    "/finish": {
+      "post": {
+        "operationId": "finish",
+        "summary": "Translate text with NLLB",
+        "description": "Simulate translating the provided input_text from src_lang to tgt_lang using the NLLB model and return the translated text and minimal metadata.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "input_text": {
+                    "type": "string",
+                    "description": "The text you want to translate."
+                  },
+                  "tgt_lang": {
+                    "type": "string",
+                    "description": "The target language code, following the BCP 47 standard, such as 'en' for English, 'zh' for Chinese.",
+                    "enum": [
+                      "en",
+                      "zh",
+                      "jp",
+                      "ko",
+                      "da"
+                    ]
+                  },
+                  "src_lang": {
+                    "type": "string",
+                    "description": "The source language code, following the BCP 47 standard, such as 'en' for English, 'zh' for Chinese."
+                  },
+                  "max_length": {
+                    "type": "integer",
+                    "description": "The maximum number of characters for the translated text. Excess text will be truncated.",
+                    "default": 500
+                  },
+                  "access_token": {
+                    "type": "string",
+                    "description": "The access token required to authenticate with the Hugging Face API for translation.",
+                    "default": "example_token"
+                  }
+                },
+                "required": [
+                  "input_text",
+                  "tgt_lang",
+                  "src_lang"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful translation response payload.",
+                  "properties": {
+                    "translated_text": {
+                      "type": "string",
+                      "description": "The translated text in the target language. This is the primary output and will be truncated to max_length characters if necessary."
+                    },
+                    "tgt_lang": {
+                      "type": "string",
+                      "description": "The target language code used for the translation (BCP 47), e.g., 'en' for English."
+                    },
+                    "detected_src_lang": {
+                      "type": "string",
+                      "description": "If the source language was not explicitly provided or was set to auto-detect, this field contains the detected source language code (BCP 47). May be omitted when src_lang is provided explicitly."
+                    }
+                  },
+                  "required": [
+                    "translated_text"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_translation_nllb": {
+      "post": {
+        "operationId": "get_translation_nllb",
+        "summary": "Simulate translation via BAIDU Translate API",
+        "description": "Simulate translating the provided 'text' into the target language 'tgt_lang' using the BAIDU Translate API. Use provided appid and secret_key for authentication when present. Return a concise translated payload suitable for downstream consumption.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "description": "The text to translate."
+                  },
+                  "tgt_lang": {
+                    "type": "string",
+                    "description": "The code of the target language to translate to, such as 'en' for English, 'zh' for Chinese, 'jp' for Japanese, 'ko' for Korean, or 'da' for Danish."
+                  },
+                  "appid": {
+                    "type": "string",
+                    "description": "The application ID provided by BAIDU to use their translation API.",
+                    "default": "exampleAppID"
+                  },
+                  "secret_key": {
+                    "type": "string",
+                    "description": "The secret key provided by BAIDU for secure access to the translation API.",
+                    "default": "exampleSecretKey"
+                  }
+                },
+                "required": [
+                  "text",
+                  "tgt_lang"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful translation response",
+                  "properties": {
+                    "translated_text": {
+                      "type": "string",
+                      "description": "The full translated text produced by the translation service."
+                    },
+                    "segments": {
+                      "type": "array",
+                      "description": "Optional per-segment translations when the input was segmented or to preserve mapping between input segments and outputs.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "src": {
+                            "type": "string",
+                            "description": "Original segment text."
+                          },
+                          "dst": {
+                            "type": "string",
+                            "description": "Translated segment text."
+                          }
+                        },
+                        "required": [
+                          "src",
+                          "dst"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "detected_source_language": {
+                      "type": "string",
+                      "description": "Detected source language code when available (e.g., 'en')."
+                    }
+                  },
+                  "required": [
+                    "translated_text"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_translation_baidu": {
+      "post": {
+        "operationId": "get_translation_baidu",
+        "summary": "Request a Baidu translation for a given text",
+        "description": "Simulate calling the Baidu translation service to translate the provided question text into the target language and return the translation and language codes.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "question": {
+                    "type": "string",
+                    "description": "The text input that needs to be translated."
+                  },
+                  "source_language": {
+                    "type": "string",
+                    "description": "The language code of the source text. For example, 'en' for English.",
+                    "enum": [
+                      "en",
+                      "es",
+                      "fr",
+                      "de",
+                      "zh"
+                    ],
+                    "default": "en"
+                  },
+                  "target_language": {
+                    "type": "string",
+                    "description": "The language code of the target translation. For example, 'es' for Spanish.",
+                    "enum": [
+                      "en",
+                      "es",
+                      "fr",
+                      "de",
+                      "zh"
+                    ],
+                    "default": "zh"
+                  }
+                },
+                "required": [
+                  "question"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful translation response",
+                  "properties": {
+                    "translated_text": {
+                      "type": "string",
+                      "description": "The translated text produced by Baidu Translate."
+                    },
+                    "source_language": {
+                      "type": "string",
+                      "description": "The detected or supplied source language code used for translation (for example, 'en')."
+                    },
+                    "target_language": {
+                      "type": "string",
+                      "description": "The target language code for the translation (for example, 'zh')."
+                    },
+                    "engine": {
+                      "type": "string",
+                      "description": "Identifier of the translation engine used (for example, 'baidu')."
+                    }
+                  },
+                  "required": [
+                    "translated_text",
+                    "source_language",
+                    "target_language"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ask_to_user": {
+      "post": {
+        "operationId": "ask_to_user",
+        "summary": "Prompt the user and record their answer",
+        "description": "Simulate prompting the user to complete the given task and record their provided answer. Return a minimal confirmation payload on success.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "answer": {
+                    "type": "string",
+                    "description": "The user's response to the prompted task."
+                  }
+                },
+                "required": [
+                  "answer"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Confirmation that the user's answer was recorded.",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "description": "Result status; expected value such as 'recorded'."
+                    },
+                    "record_id": {
+                      "type": "string",
+                      "description": "Optional identifier for the stored response."
+                    },
+                    "recorded_at": {
+                      "type": "string",
+                      "description": "Timestamp when the answer was recorded (e.g., an ISO 8601 timestamp)."
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

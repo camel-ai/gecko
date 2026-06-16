@@ -1,0 +1,185 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM224",
+    "version": "1.0.0",
+    "description": "LM224 is a scheduling API collection designed to query and modify calendar events across time zones. Use list_events to retrieve ISO-8601-formatted events within a specified date/time range and reschedule to move a chosen event to a new timestamp with automatic time zone adjustments. The API favors clear, timezone-aware inputs and idempotent operations to integrate reliably into calendar workflows and automation pipelines."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM224"
+    }
+  ],
+  "paths": {
+    "/reschedule": {
+      "post": {
+        "operationId": "reschedule",
+        "summary": "Reschedule an event (simulation)",
+        "description": "Simulate moving a specified event to a new local date/time and return a confirmation. The service interprets the provided local date/time in the given Olson timezone (or UTC if omitted) and returns the scheduled time normalized to UTC.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "identifier": {
+                    "type": "string",
+                    "description": "A unique identifier for the event to be rescheduled."
+                  },
+                  "dateortime": {
+                    "type": "string",
+                    "description": "The new date and time for the event, in ISO-8601 format (YYYY-MM-DDTHH:MM:SS), without a timezone offset."
+                  },
+                  "timezone": {
+                    "type": "string",
+                    "description": "The Olson timezone identifier representing the timezone for the new event time, such as 'Asia/Tokyo'.",
+                    "enum": [
+                      "Asia/Tokyo",
+                      "America/New_York",
+                      "Europe/London",
+                      "UTC"
+                    ],
+                    "default": "UTC"
+                  }
+                },
+                "required": [
+                  "identifier",
+                  "dateortime"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Confirmation payload returned when the event has been successfully rescheduled.",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "description": "Result of the operation. Typical value: 'rescheduled'."
+                    },
+                    "scheduled_at_utc": {
+                      "type": "string",
+                      "description": "Final scheduled date and time in UTC, expressed in ISO-8601 with a 'Z' suffix (e.g., 2025-03-12T09:00:00Z)."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Optional human-readable confirmation message."
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "scheduled_at_utc"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/list_events": {
+      "post": {
+        "operationId": "list_events",
+        "summary": "List events within a time window",
+        "description": "Simulate returning events that occur between the provided start and end timestamps. Timestamps use ISO-8601.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "start": {
+                    "type": "string",
+                    "description": "The start date and time of the query window, in ISO-8601 format (e.g., '2023-01-01T00:00:00Z')."
+                  },
+                  "end": {
+                    "type": "string",
+                    "description": "The end date and time of the query window, in ISO-8601 format (e.g., '2023-01-02T00:00:00Z')."
+                  }
+                },
+                "required": [
+                  "start",
+                  "end"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "description": "Events that start on or after the request.start and end on or before the request.end.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the event."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Short human-readable title of the event."
+                          },
+                          "start": {
+                            "type": "string",
+                            "description": "Event start timestamp in ISO-8601 format (e.g., '2023-01-01T00:00:00Z').",
+                            "format": "date-time"
+                          },
+                          "end": {
+                            "type": "string",
+                            "description": "Event end timestamp in ISO-8601 format (e.g., '2023-01-01T01:00:00Z').",
+                            "format": "date-time"
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Optional longer description of the event."
+                          },
+                          "location": {
+                            "type": "string",
+                            "description": "Optional location or venue for the event."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "start",
+                          "end"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "events"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,729 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM15",
+    "version": "1.0.0",
+    "description": "LM15 is a compact API collection for integrated home and information tasks, combining current-weather queries, appliance control, web and news searches, and recipe lookup. Use clear, tool-specific calls: request OpenWeatherMap_get_current_weather for location-based weather; send ControlAppliance_execute with 'power on'/'start' for control or include '확인' to check status (not for creating/removing modes); use HNA_WQA_search and HNA_NEWS_search for timely web and news results, and cookbook_search_recipe for keyword-based recipes."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM15"
+    }
+  ],
+  "paths": {
+    "/OpenWeatherMap_get_current_weather": {
+      "post": {
+        "operationId": "OpenWeatherMap_get_current_weather",
+        "summary": "Simulate OpenWeatherMap current weather response",
+        "description": "Returns a simulated current-weather payload for a requested location, matching OpenWeatherMap-style fields (temperature, humidity, wind, etc.).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "The location for which current weather information is requested, specified in the format of 'City, Country' in English. For example: 'Seoul, South Korea'.",
+                    "enum": [
+                      "New York, USA",
+                      "London, UK",
+                      "Seoul, South Korea",
+                      "Sydney, Australia",
+                      "Tokyo, Japan"
+                    ]
+                  },
+                  "units": {
+                    "type": "string",
+                    "description": "The unit system used for the weather data. Can be 'metric' for Celsius, 'imperial' for Fahrenheit, or 'standard' for Kelvin.",
+                    "enum": [
+                      "metric",
+                      "imperial",
+                      "standard"
+                    ],
+                    "default": "metric"
+                  },
+                  "api_key": {
+                    "type": "string",
+                    "description": "The API key used to authenticate requests to the OpenWeatherMap API. This key should be kept secret.",
+                    "default": "YOUR_API_KEY_HERE"
+                  }
+                },
+                "required": [
+                  "location"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful current weather payload",
+                  "properties": {
+                    "location": {
+                      "type": "string",
+                      "description": "Resolved location name (e.g., \"Seoul, South Korea\")."
+                    },
+                    "timestamp": {
+                      "type": "integer",
+                      "description": "UNIX epoch seconds indicating when the weather data was calculated."
+                    },
+                    "weather": {
+                      "type": "array",
+                      "description": "List of weather condition objects.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "description": "Weather condition id."
+                          },
+                          "main": {
+                            "type": "string",
+                            "description": "Group of weather parameters (e.g., Rain, Snow, Clear)."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Weather condition within the group, in English (e.g., light rain)."
+                          },
+                          "icon": {
+                            "type": "string",
+                            "description": "Weather icon id."
+                          }
+                        },
+                        "required": [
+                          "main",
+                          "description"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "temperature": {
+                      "type": "object",
+                      "description": "Temperature details.",
+                      "properties": {
+                        "value": {
+                          "type": "number",
+                          "description": "Current temperature. Use float format (e.g., 1.0 not 1).",
+                          "format": "double"
+                        },
+                        "feels_like": {
+                          "type": "number",
+                          "description": "Human-perceived temperature. Use float format (e.g., 1.0 not 1).",
+                          "format": "double"
+                        },
+                        "min": {
+                          "type": "number",
+                          "description": "Minimum observed temperature at the location. Use float format (e.g., 1.0 not 1).",
+                          "format": "double"
+                        },
+                        "max": {
+                          "type": "number",
+                          "description": "Maximum observed temperature at the location. Use float format (e.g., 1.0 not 1).",
+                          "format": "double"
+                        },
+                        "unit": {
+                          "type": "string",
+                          "description": "Unit of temperature: 'metric' => Celsius, 'imperial' => Fahrenheit, 'standard' => Kelvin."
+                        }
+                      },
+                      "required": [
+                        "value",
+                        "unit"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "humidity": {
+                      "type": "integer",
+                      "description": "Humidity percentage (0-100)."
+                    },
+                    "pressure": {
+                      "type": "integer",
+                      "description": "Atmospheric pressure in hPa."
+                    },
+                    "wind": {
+                      "type": "object",
+                      "description": "Wind information.",
+                      "properties": {
+                        "speed": {
+                          "type": "number",
+                          "description": "Wind speed. Use float format (e.g., 1.0 not 1). Units depend on the requested 'units' parameter.",
+                          "format": "double"
+                        },
+                        "deg": {
+                          "type": "integer",
+                          "description": "Wind direction in degrees (meteorological)."
+                        },
+                        "gust": {
+                          "type": "number",
+                          "description": "Wind gust speed, if available. Use float format (e.g., 1.0 not 1).",
+                          "format": "double"
+                        }
+                      },
+                      "required": [
+                        "speed",
+                        "deg"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "clouds": {
+                      "type": "object",
+                      "description": "Cloudiness information.",
+                      "properties": {
+                        "all": {
+                          "type": "integer",
+                          "description": "Cloudiness percentage (0-100)."
+                        }
+                      },
+                      "required": [
+                        "all"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "visibility": {
+                      "type": "integer",
+                      "description": "Visibility in meters."
+                    },
+                    "sys": {
+                      "type": "object",
+                      "description": "System data (country, sunrise/sunset).",
+                      "properties": {
+                        "country": {
+                          "type": "string",
+                          "description": "Country code (ISO 3166-1 alpha-2)."
+                        },
+                        "sunrise": {
+                          "type": "integer",
+                          "description": "Sunrise time, UNIX epoch seconds."
+                        },
+                        "sunset": {
+                          "type": "integer",
+                          "description": "Sunset time, UNIX epoch seconds."
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "location",
+                    "timestamp",
+                    "weather",
+                    "temperature"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ControlAppliance_execute": {
+      "post": {
+        "operationId": "ControlAppliance_execute",
+        "summary": "ControlAppliance execution simulator",
+        "description": "Simulate executing or checking a home appliance command. For control commands require explicit 'power on'/'start' semantics (e.g., Korean '실행'); for status checks require the keyword '확인'. This tool does not create, delete, or remove modes or routines.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "description": "The command must be specified as a string in Korean, consisting of the room name, appliance name (or alias), and operation command, separated by commas. Examples: '거실, 에어컨, 실행' for turning on the air conditioner in the living room, ', 에어컨, 냉방 실행' for activating cooling without specifying the room, '다용도실, 통돌이, 중지' for stopping the washing machine (alias '통돌이') in the utility room.",
+                    "enum": [
+                      "거실, 에어컨, 실행",
+                      ", 에어컨, 냉방 실행",
+                      "다용도실, 통돌이, 중지"
+                    ]
+                  }
+                },
+                "required": [
+                  "command"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response for a control or status-check operation.",
+                  "properties": {
+                    "result": {
+                      "type": "string",
+                      "description": "High-level outcome of the request (e.g., success or failure)."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable summary of what was performed or observed."
+                    },
+                    "appliance_status": {
+                      "type": "object",
+                      "description": "Current state of the targeted appliance when applicable.",
+                      "properties": {
+                        "room": {
+                          "type": "string",
+                          "description": "Room name if identified (e.g., '거실')."
+                        },
+                        "appliance": {
+                          "type": "string",
+                          "description": "Appliance name or alias (e.g., '에어컨', '통돌이')."
+                        },
+                        "power": {
+                          "type": "string",
+                          "description": "Power state, for example 'on' or 'off'."
+                        },
+                        "mode": {
+                          "type": "string",
+                          "description": "Operational mode or action label when applicable (e.g., '냉방', '중지')."
+                        },
+                        "set_temperature": {
+                          "type": "number",
+                          "description": "Target temperature in Celsius when applicable. Use float format (e.g., 1.0 not 1)."
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "indoor": {
+                      "type": "object",
+                      "description": "Measured indoor environmental properties when available.",
+                      "properties": {
+                        "air_quality_index": {
+                          "type": "integer",
+                          "description": "Numeric air quality index if available."
+                        },
+                        "temperature_c": {
+                          "type": "number",
+                          "description": "Indoor temperature in Celsius. Provide as a float (e.g., 21.5, not 21)."
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "result"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/HNA_WQA_search": {
+      "post": {
+        "operationId": "HNA_WQA_search",
+        "summary": "Search the web for up-to-date information",
+        "description": "Simulate performing a live web search for the provided keyword and return structured search results honoring language and result_format preferences.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "keyword": {
+                    "type": "string",
+                    "description": "The search term used by the HNA WQA to find relevant information on the web."
+                  },
+                  "result_format": {
+                    "type": "string",
+                    "description": "The desired format of the search results.",
+                    "enum": [
+                      "text",
+                      "json",
+                      "xml"
+                    ],
+                    "default": "text"
+                  },
+                  "language": {
+                    "type": "string",
+                    "description": "The language preference for the search results.",
+                    "enum": [
+                      "EN",
+                      "ES",
+                      "FR",
+                      "DE"
+                    ],
+                    "default": "EN"
+                  },
+                  "max_results": {
+                    "type": "integer",
+                    "description": "Maximum number of search results to return.",
+                    "default": 10
+                  }
+                },
+                "required": [
+                  "keyword"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful search payload containing an ordered list of results and a total count.",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "description": "Search results ordered by relevance (up to the requested max_results).",
+                      "items": {
+                        "type": "object",
+                        "description": "A single search result item.",
+                        "properties": {
+                          "title": {
+                            "type": "string",
+                            "description": "Title of the found resource."
+                          },
+                          "snippet": {
+                            "type": "string",
+                            "description": "Short extract or summary of the resource content suitable for preview."
+                          },
+                          "url": {
+                            "type": "string",
+                            "description": "Permalink or URL of the resource."
+                          },
+                          "source": {
+                            "type": "string",
+                            "description": "Source or publisher name (e.g., website or organization)."
+                          },
+                          "published_at": {
+                            "type": "string",
+                            "description": "Publication date/time as returned by the source, if available."
+                          },
+                          "relevance_score": {
+                            "type": "number",
+                            "description": "Relevance score where higher means more relevant. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          }
+                        },
+                        "required": [
+                          "title",
+                          "url"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of results available for the query (may be greater than the number of returned items)."
+                    }
+                  },
+                  "required": [
+                    "results",
+                    "total_results"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/HNA_NEWS_search": {
+      "post": {
+        "operationId": "HNA_NEWS_search",
+        "summary": "Search recent news by keyword",
+        "description": "Simulate a news search that returns recent events and articles matching the provided keyword and optional filters.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "keyword": {
+                    "type": "string",
+                    "description": "The key term used to search for relevant news articles."
+                  },
+                  "category": {
+                    "type": "string",
+                    "description": "The category to filter news articles by.",
+                    "enum": [
+                      "General",
+                      "Politics",
+                      "Economy",
+                      "Sports",
+                      "Technology",
+                      "Entertainment"
+                    ],
+                    "default": "General"
+                  },
+                  "date_range": {
+                    "type": "string",
+                    "description": "The date range for the news search, formatted as 'YYYY-MM-DD to YYYY-MM-DD'.",
+                    "default": "null"
+                  },
+                  "sort_by": {
+                    "type": "string",
+                    "description": "The sorting order of the search results.",
+                    "enum": [
+                      "date",
+                      "relevance"
+                    ],
+                    "default": "date"
+                  },
+                  "language": {
+                    "type": "string",
+                    "description": "The language of the news articles to retrieve.",
+                    "enum": [
+                      "EN",
+                      "FR",
+                      "ES",
+                      "DE",
+                      "IT"
+                    ],
+                    "default": "EN"
+                  }
+                },
+                "required": [
+                  "keyword"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search results payload containing matching news articles.",
+                  "properties": {
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of articles matching the query."
+                    },
+                    "page": {
+                      "type": "integer",
+                      "description": "Current results page (1-based)."
+                    },
+                    "per_page": {
+                      "type": "integer",
+                      "description": "Number of articles returned on this page."
+                    },
+                    "articles": {
+                      "type": "array",
+                      "description": "Array of article objects ordered according to sort_by.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the article."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Article headline."
+                          },
+                          "summary": {
+                            "type": "string",
+                            "description": "Short summary or excerpt of the article."
+                          },
+                          "url": {
+                            "type": "string",
+                            "description": "Direct URL to the original article.",
+                            "format": "uri"
+                          },
+                          "published_at": {
+                            "type": "string",
+                            "description": "Publication timestamp in ISO 8601 format (e.g., 2023-07-21T14:30:00Z).",
+                            "format": "date-time"
+                          },
+                          "source": {
+                            "type": "string",
+                            "description": "Name of the source or publisher."
+                          },
+                          "category": {
+                            "type": "string",
+                            "description": "Category assigned to the article (e.g., General, Politics, Economy, Sports, Technology, Entertainment)."
+                          },
+                          "language": {
+                            "type": "string",
+                            "description": "Language code of the article (e.g., EN, FR, ES, DE, IT)."
+                          },
+                          "relevance_score": {
+                            "type": "number",
+                            "description": "Relevance score computed by the search engine (higher = more relevant)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "url",
+                          "published_at",
+                          "source"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "total_results",
+                    "articles"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cookbook_search_recipe": {
+      "post": {
+        "operationId": "cookbook_search_recipe",
+        "summary": "Search recipes by keyword",
+        "description": "Simulate searching recipes whose title or ingredient list contains the provided keyword. Returns an array of matching recipes ordered by relevance.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "keyword": {
+                    "type": "string",
+                    "description": "The keyword to search for in the recipe titles or ingredients."
+                  },
+                  "cuisine": {
+                    "type": "string",
+                    "description": "The cuisine type to narrow down the search results.",
+                    "enum": [
+                      "Italian",
+                      "Chinese",
+                      "Indian",
+                      "French",
+                      "Mexican"
+                    ],
+                    "default": "Italian"
+                  },
+                  "max_results": {
+                    "type": "integer",
+                    "description": "The maximum number of recipe results to return.",
+                    "default": 10
+                  }
+                },
+                "required": [
+                  "keyword"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing matching recipes.",
+                  "properties": {
+                    "recipes": {
+                      "type": "array",
+                      "description": "List of matching recipes. May be empty if no matches found.",
+                      "items": {
+                        "type": "object",
+                        "description": "A recipe entry.",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the recipe."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Recipe title."
+                          },
+                          "cuisine": {
+                            "type": "string",
+                            "description": "Cuisine type of the recipe.",
+                            "enum": [
+                              "Italian",
+                              "Chinese",
+                              "Indian",
+                              "French",
+                              "Mexican"
+                            ]
+                          },
+                          "ingredients": {
+                            "type": "array",
+                            "description": "List of ingredient lines or items required for the recipe.",
+                            "items": {
+                              "type": "string",
+                              "description": "Array item"
+                            }
+                          },
+                          "instructions": {
+                            "type": "string",
+                            "description": "Cooking instructions or preparation steps."
+                          },
+                          "prep_time_minutes": {
+                            "type": "integer",
+                            "description": "Preparation time in minutes."
+                          },
+                          "total_time_minutes": {
+                            "type": "integer",
+                            "description": "Total time (prep + cook) in minutes."
+                          },
+                          "servings": {
+                            "type": "integer",
+                            "description": "Number of servings the recipe yields."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "ingredients"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "recipes"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

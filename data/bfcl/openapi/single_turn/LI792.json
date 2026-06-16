@@ -1,0 +1,463 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI792",
+    "version": "1.0.0",
+    "description": "LI792 is a compact API collection that exposes four focused tools: data cleaning for preparing datasets, a food-ordering endpoint for placing Uber Eats orders, a mobile repair arranger to schedule handset repairs, and a summary-statistics explainer to interpret dataset metrics. Designed for straightforward integration into automated pipelines or interactive apps, each function accepts clear inputs, returns structured outputs, and supports idempotent, programmatic calls for preprocessing, service orchestration, and analytical reporting."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI792"
+    }
+  ],
+  "paths": {
+    "/clean": {
+      "post": {
+        "operationId": "clean",
+        "summary": "Clean dataset (simulate cleaning steps)",
+        "description": "Simulate data-cleaning operations on the provided dataset (remove duplicates, handle missing values, normalize). Return a cleaned dataset plus a small cleaning summary.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "df": {
+                    "description": "The dataset to be cleaned, typically a DataFrame object."
+                  },
+                  "remove_duplicates": {
+                    "type": "boolean",
+                    "description": "Specifies whether duplicate rows should be removed from the dataset.",
+                    "default": true
+                  },
+                  "normalize": {
+                    "type": "boolean",
+                    "description": "Indicates whether the dataset should be normalized. Normalization can include scaling numeric values to a standard range or applying other normalization techniques.",
+                    "default": false
+                  },
+                  "handle_missing_values": {
+                    "type": "string",
+                    "description": "Defines the strategy for handling missing values in the dataset. The strategy can be either 'drop' to remove rows with missing values or 'fill' to replace them with a specified value or a calculated statistic (mean, median, etc.).",
+                    "enum": [
+                      "drop",
+                      "fill"
+                    ],
+                    "default": "fill"
+                  },
+                  "fill_value": {
+                    "description": "The value used to fill missing values if 'handle_missing_values' is set to 'fill'. Can be a specific value or a statistic such as 'mean' or 'median'.",
+                    "default": null
+                  }
+                },
+                "required": [
+                  "df"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Result of the cleaning operation.",
+                  "properties": {
+                    "cleaned_df": {
+                      "type": "string",
+                      "description": "The cleaned dataset. Structure and type match the input 'df'. If the input was a tabular structure, this will be a comparable tabular structure.",
+                      "nullable": true
+                    },
+                    "removed_duplicates_count": {
+                      "type": "integer",
+                      "description": "Number of duplicate rows removed during cleaning."
+                    },
+                    "normalization_applied": {
+                      "type": "boolean",
+                      "description": "True if normalization was applied to numeric columns."
+                    },
+                    "missing_values": {
+                      "type": "object",
+                      "description": "Summary of how missing values were handled.",
+                      "properties": {
+                        "strategy": {
+                          "type": "string",
+                          "description": "Strategy applied for missing values (e.g., 'drop' or 'fill')."
+                        },
+                        "fill_value": {
+                          "type": "string",
+                          "description": "The value used to fill missing entries when a fill strategy was applied. May be a literal value (number/string) or a statistic indicator (e.g., 'mean', 'median').",
+                          "nullable": true
+                        },
+                        "per_column_imputed_counts": {
+                          "type": "object",
+                          "description": "Mapping of column names to the number of values imputed for that column.",
+                          "properties": {},
+                          "additionalProperties": {
+                            "type": "integer"
+                          }
+                        }
+                      },
+                      "required": [
+                        "strategy"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "stats": {
+                      "type": "object",
+                      "description": "Optional summary statistics computed during cleaning. Keys and values depend on the dataset and the operations performed (e.g., counts, means).",
+                      "properties": {},
+                      "additionalProperties": {
+                        "type": "number"
+                      }
+                    }
+                  },
+                  "required": [
+                    "cleaned_df"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/order_food": {
+      "post": {
+        "operationId": "order_food",
+        "summary": "Place a food order (simulation)",
+        "description": "Simulate placing an order for food by specifying restaurant, items, and their quantities. Returns a simulated order confirmation payload.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "restaurant": {
+                    "type": "string",
+                    "description": "The name of the restaurant from which to order food."
+                  },
+                  "items": {
+                    "type": "array",
+                    "description": "A list of names of selected items to order.",
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    },
+                    "minItems": 1
+                  },
+                  "quantities": {
+                    "type": "array",
+                    "description": "An array of integers representing the quantity for each selected item, corresponding by index to the 'items' array.",
+                    "items": {
+                      "type": "integer",
+                      "description": "Array item"
+                    },
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "restaurant",
+                  "items",
+                  "quantities"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful order confirmation payload",
+                  "properties": {
+                    "order_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the placed order."
+                    },
+                    "restaurant": {
+                      "type": "string",
+                      "description": "Name of the restaurant for this order."
+                    },
+                    "items": {
+                      "type": "array",
+                      "description": "List of ordered items with their quantities.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "description": "Name of the menu item."
+                          },
+                          "quantity": {
+                            "type": "integer",
+                            "description": "Quantity ordered for this item (integer, at least 1).",
+                            "minimum": 1
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "quantity"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_price": {
+                      "type": "number",
+                      "description": "Total price for the order. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "estimated_eta_minutes": {
+                      "type": "integer",
+                      "description": "Estimated delivery time in minutes (simulation)."
+                    }
+                  },
+                  "required": [
+                    "order_id",
+                    "restaurant",
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/repair_mobile": {
+      "post": {
+        "operationId": "repair_mobile",
+        "summary": "Simulate arranging a mobile-phone repair at a specified shop",
+        "description": "Simulate creating a repair order for a mobile phone taken to the requested repair shop and return the scheduled repair details.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "shop": {
+                    "type": "string",
+                    "description": "The name of the shop where the mobile phone will be repaired, such as 'QuickFix Mobiles'."
+                  }
+                },
+                "required": [
+                  "shop"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Details of the successfully created repair order",
+                  "properties": {
+                    "repair_id": {
+                      "type": "string",
+                      "description": "Opaque unique identifier for the repair order."
+                    },
+                    "shop": {
+                      "type": "string",
+                      "description": "The name of the shop where the mobile phone will be repaired, echoed from the request."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Current status of the repair order. Examples: \"scheduled\", \"in_progress\", \"completed\"."
+                    },
+                    "scheduled_at": {
+                      "type": "string",
+                      "description": "Scheduled date and time for drop-off or pickup, if available. Represent as a timestamp string (ISO 8601 recommended) when present."
+                    },
+                    "dropoff_instructions": {
+                      "type": "string",
+                      "description": "Any instructions provided by the shop for dropping off the device (e.g., entrance, required paperwork)."
+                    },
+                    "estimated_cost": {
+                      "type": "number",
+                      "description": "Estimated cost for the repair. Use float format (e.g., 1.0 not 1). This is an estimate and may be adjusted after diagnostics.",
+                      "format": "double"
+                    },
+                    "contact_phone": {
+                      "type": "string",
+                      "description": "Contact phone number for the shop, if available."
+                    },
+                    "notes": {
+                      "type": "string",
+                      "description": "Optional free-text notes about the repair order or any special considerations."
+                    }
+                  },
+                  "required": [
+                    "repair_id",
+                    "shop",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/summary_stat_explainer": {
+      "post": {
+        "operationId": "summary_stat_explainer",
+        "summary": "Explain summary statistics for a dataset",
+        "description": "Simulate producing plain-language explanations of summary statistics (mean, median, mode, variance, standard deviation), optional confidence intervals, and optional graphical summaries.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "file_path": {
+                    "type": "string",
+                    "description": "The file path to the summary statistics file. The file should be in CSV or JSON format."
+                  },
+                  "include_graphs": {
+                    "type": "boolean",
+                    "description": "Whether to include graphical representations of the summary statistics such as histograms and box plots.",
+                    "default": false
+                  },
+                  "confidence_level": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The confidence level to use when calculating confidence intervals for the summary statistics, expressed as a decimal between 0 and 1.. Use float format (e.g., 1.0 not 1).",
+                    "default": 0.95
+                  }
+                },
+                "required": [
+                  "file_path"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "statistics_explanation": {
+                      "type": "object",
+                      "description": "Mapping from statistic or variable name to a plain-language explanation of that statistic.",
+                      "properties": {},
+                      "additionalProperties": {
+                        "type": "string",
+                        "description": "Plain-language explanation for the named statistic or variable."
+                      }
+                    },
+                    "confidence_intervals": {
+                      "type": "object",
+                      "description": "Optional mapping from statistic or variable name to its confidence interval and point estimate.",
+                      "properties": {},
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "point_estimate",
+                          "lower",
+                          "upper"
+                        ],
+                        "properties": {
+                          "point_estimate": {
+                            "type": "number",
+                            "format": "double",
+                            "description": "Point estimate for the statistic. Use float format (e.g., 1.0 not 1)."
+                          },
+                          "lower": {
+                            "type": "number",
+                            "format": "double",
+                            "description": "Lower bound of the confidence interval. Use float format (e.g., 1.0 not 1)."
+                          },
+                          "upper": {
+                            "type": "number",
+                            "format": "double",
+                            "description": "Upper bound of the confidence interval. Use float format (e.g., 1.0 not 1)."
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "graphs": {
+                      "type": "array",
+                      "description": "Optional array of generated graphical summaries (encoded images or references). Each item describes one graph.",
+                      "maxItems": 20,
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "title": {
+                            "type": "string",
+                            "description": "Short title describing the graph (e.g., 'Histogram of age')."
+                          },
+                          "mime_type": {
+                            "type": "string",
+                            "description": "MIME type of the graph data (e.g., 'image/png')."
+                          },
+                          "data": {
+                            "type": "string",
+                            "description": "Graph content encoded as a data URL or base64 string."
+                          },
+                          "caption": {
+                            "type": "string",
+                            "description": "Short caption explaining what the graph shows and any notable patterns."
+                          }
+                        },
+                        "required": [
+                          "title",
+                          "mime_type",
+                          "data"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "recommendations": {
+                      "type": "array",
+                      "description": "Optional actionable recommendations or next steps based on the summary statistics.",
+                      "items": {
+                        "type": "string",
+                        "description": "Array item"
+                      }
+                    }
+                  },
+                  "required": [
+                    "statistics_explanation"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

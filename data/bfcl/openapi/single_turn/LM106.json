@@ -1,0 +1,881 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM106",
+    "version": "1.0.0",
+    "description": "LM106 is a compact API collection for managing data service endpoints and project lifecycles: register and rename MTNA RDS or PostgreSQL servers, verify and connect to servers, list servers or files, and open or close Data Artifex projects; a default placeholder function and a contextual help call simplify scripting and automation. It favors straightforward, idempotent commands suitable for CLI and programmatic workflows."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM106"
+    }
+  ],
+  "paths": {
+    "/default_function": {
+      "post": {
+        "operationId": "default_function",
+        "summary": "No-op placeholder that returns an acknowledgement",
+        "description": "Simulates the default placeholder function. Accepts an arbitrary JSON object (no required properties) and returns a simple acknowledgement payload confirming receipt. Intended for testing and simulation; does not perform side effects.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Acknowledgement response for the placeholder function.",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "description": "Indicates whether the simulated operation succeeded."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable acknowledgement message."
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "description": "Timestamp when the acknowledgement was generated (string)."
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/add_mtnards_server": {
+      "post": {
+        "operationId": "add_mtnards_server",
+        "summary": "Register an MTNA RDS server",
+        "description": "Simulate registering a new MTNA Rich Data Services (RDS) server with a nickname, host, and API key; returns a server identifier on success.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "nickname": {
+                    "type": "string",
+                    "description": "A unique nickname for the server, used as an identifier within the environment."
+                  },
+                  "host": {
+                    "type": "string",
+                    "description": "The server's hostname or IP address. Assumes 'localhost' if not specified.",
+                    "default": "localhost"
+                  },
+                  "api_key": {
+                    "type": "string",
+                    "description": "The API key for authenticating with the RDS server. This key should be kept confidential."
+                  }
+                },
+                "required": [
+                  "nickname",
+                  "api_key"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful registration response",
+                  "properties": {
+                    "server_id": {
+                      "type": "string",
+                      "description": "Opaque unique identifier for the newly registered server."
+                    },
+                    "nickname": {
+                      "type": "string",
+                      "description": "The nickname registered for the server."
+                    },
+                    "host": {
+                      "type": "string",
+                      "description": "The host associated with the registered server; 'localhost' if the default was applied."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp when the server was registered (informational; no format validation is enforced here)."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable summary of the operation result."
+                    }
+                  },
+                  "required": [
+                    "server_id",
+                    "nickname",
+                    "host"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/add_postgres_server": {
+      "post": {
+        "operationId": "add_postgres_server",
+        "summary": "Register PostgreSQL server",
+        "description": "Simulate registering a new PostgreSQL server in the environment. Validate required fields and connection parameters; do not expose the password in responses.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "nickname": {
+                    "type": "string",
+                    "description": "A unique identifier or alias for the server."
+                  },
+                  "host": {
+                    "type": "string",
+                    "description": "The server's hostname or IP address."
+                  },
+                  "port": {
+                    "type": "integer",
+                    "description": "The network port on which the PostgreSQL server is listening. The default PostgreSQL port is 5432 if not specified."
+                  },
+                  "database": {
+                    "type": "string",
+                    "description": "The default database to use on the server."
+                  },
+                  "username": {
+                    "type": "string",
+                    "description": "The username for authentication with the PostgreSQL server."
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "The password associated with the username for authentication. It should be kept secret."
+                  }
+                },
+                "required": [
+                  "nickname",
+                  "host",
+                  "port",
+                  "database",
+                  "username",
+                  "password"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Representation of the newly registered PostgreSQL server.",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Unique identifier for the server (e.g., UUID)."
+                    },
+                    "nickname": {
+                      "type": "string",
+                      "description": "A unique identifier or alias for the server."
+                    },
+                    "host": {
+                      "type": "string",
+                      "description": "The server's hostname or IP address."
+                    },
+                    "port": {
+                      "type": "integer",
+                      "description": "The network port on which the PostgreSQL server is listening."
+                    },
+                    "database": {
+                      "type": "string",
+                      "description": "The default database to use on the server."
+                    },
+                    "username": {
+                      "type": "string",
+                      "description": "The username used for authentication (password is not returned)."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp when the server was registered.",
+                      "format": "date-time"
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Registration or connectivity status for the server (e.g., 'registered', 'unreachable')."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "nickname",
+                    "host",
+                    "port",
+                    "database",
+                    "username",
+                    "created_at",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/connect_to_server": {
+      "post": {
+        "operationId": "connect_to_server",
+        "summary": "Simulate establishing or verifying a connection to a server",
+        "description": "Attempts to connect to the named server (or verifies reachability) using the provided port, SSL flag, and timeout. Returns a concise success payload describing the result.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "nickname": {
+                    "type": "string",
+                    "description": "A unique identifier or alias for the server to which a connection is being established."
+                  },
+                  "timeout": {
+                    "type": "integer",
+                    "description": "The maximum amount of time in seconds to wait for the connection to be established before timing out.",
+                    "default": 30
+                  },
+                  "use_ssl": {
+                    "type": "boolean",
+                    "description": "Specifies whether to use SSL encryption for the connection.",
+                    "default": true
+                  },
+                  "port": {
+                    "type": "integer",
+                    "description": "The port number on the server to connect to.",
+                    "default": 22
+                  }
+                },
+                "required": [
+                  "nickname"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Result returned when a connection attempt is processed successfully.",
+                  "properties": {
+                    "connection_established": {
+                      "type": "boolean",
+                      "description": "True when a connection was successfully established; false otherwise."
+                    },
+                    "connection_id": {
+                      "type": "string",
+                      "description": "An opaque identifier for the established connection (present only if connection_established is true)."
+                    },
+                    "latency_ms": {
+                      "type": "integer",
+                      "description": "Observed round-trip latency in milliseconds for establishing the connection.",
+                      "minimum": 0
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable status message summarizing the outcome."
+                    }
+                  },
+                  "required": [
+                    "connection_established"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rename_server": {
+      "post": {
+        "operationId": "rename_server",
+        "summary": "Simulate renaming a server identifier",
+        "description": "Simulates changing a server's identifier from _from to to. Validates basic rules (non-empty, different values, uniqueness) and returns a confirmation payload on success.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "_from": {
+                    "type": "string",
+                    "description": "The current server identifier, such as a hostname or IP address."
+                  },
+                  "to": {
+                    "type": "string",
+                    "description": "The new server identifier to which the server will be renamed. This should be unique and adhere to naming conventions."
+                  }
+                },
+                "required": [
+                  "_from",
+                  "to"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful rename result",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable confirmation message describing the result."
+                    },
+                    "server_id": {
+                      "type": "string",
+                      "description": "The new server identifier after the rename operation."
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "server_id"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/list_servers": {
+      "post": {
+        "operationId": "list_servers",
+        "summary": "Simulate listing servers by type",
+        "description": "Simulate the API response for listing servers filtered by the optional 'type' request parameter. If 'type' is omitted, treat it as 'all' and return servers of every type.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "description": "The type of server to filter the list by. If 'all' is specified or this parameter is omitted, servers of all types will be listed.",
+                    "enum": [
+                      "all",
+                      "graphql",
+                      "mtna",
+                      "openapi",
+                      "postgres",
+                      "rds",
+                      "sql"
+                    ],
+                    "default": "all"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload containing the matching servers",
+                  "properties": {
+                    "servers": {
+                      "type": "array",
+                      "description": "Array of servers matching the requested filter",
+                      "minItems": 0,
+                      "items": {
+                        "type": "object",
+                        "description": "A single server entry",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the server"
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Human-readable name for the server"
+                          },
+                          "type": {
+                            "type": "string",
+                            "description": "Type of the server. Examples include: all, graphql, mtna, openapi, postgres, rds, sql"
+                          },
+                          "host": {
+                            "type": "string",
+                            "description": "Hostname or IP address of the server"
+                          },
+                          "port": {
+                            "type": "integer",
+                            "description": "Network port the server is listening on"
+                          },
+                          "status": {
+                            "type": "string",
+                            "description": "Operational status of the server (e.g., 'running', 'stopped')"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "type"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "servers"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/list_files": {
+      "post": {
+        "operationId": "list_files",
+        "summary": "Simulate listing files by extension in the current project",
+        "description": "Return a list of filenames in the current project directory that match the requested file extension. Respects the include_hidden flag to include files starting with a dot.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "description": "The file extension type to filter the files in the project. For example, 'py' for Python files.",
+                    "enum": [
+                      "py",
+                      "txt",
+                      "md",
+                      "json"
+                    ],
+                    "default": "py"
+                  },
+                  "include_hidden": {
+                    "type": "boolean",
+                    "description": "A flag to determine if hidden files should be included in the list. Hidden files start with a dot ('.').",
+                    "default": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing matching filenames and a count.",
+                  "properties": {
+                    "files": {
+                      "type": "array",
+                      "description": "Array of filenames (including extension) that match the requested type. Hidden files (starting with '.') are included only when include_hidden is true.",
+                      "items": {
+                        "type": "string",
+                        "description": "A filename relative to the project root (e.g., 'src/main.py', 'README.md')."
+                      }
+                    },
+                    "count": {
+                      "type": "integer",
+                      "description": "Total number of filenames returned in the files array."
+                    }
+                  },
+                  "required": [
+                    "files",
+                    "count"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/open_project": {
+      "post": {
+        "operationId": "open_project",
+        "summary": "Open or initialize a Data Artifex project",
+        "description": "Simulate opening an existing project or initializing a new Data Artifex project at the specified filesystem path.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "description": "The filesystem path to the directory where the project files are located or will be created. The path should be absolute or relative to the current working directory."
+                  },
+                  "create_new": {
+                    "type": "boolean",
+                    "description": "A flag indicating whether to create a new project if one does not exist at the specified path.",
+                    "default": false
+                  },
+                  "access_mode": {
+                    "type": "string",
+                    "description": "The mode in which to open the project. For example, 'read-only' or 'edit'.",
+                    "enum": [
+                      "read-only",
+                      "edit"
+                    ],
+                    "default": "edit"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful project open/initialization result",
+                  "properties": {
+                    "project_id": {
+                      "type": "string",
+                      "description": "A stable, unique identifier for the opened or newly created project."
+                    },
+                    "created": {
+                      "type": "boolean",
+                      "description": "True if a new project was created as a result of this request; false if an existing project was opened."
+                    },
+                    "opened": {
+                      "type": "boolean",
+                      "description": "True when the project is currently open and accessible."
+                    },
+                    "access_mode": {
+                      "type": "string",
+                      "description": "The access mode in which the project was opened. Allowed values mirror the request and may be 'read-only' or 'edit'.",
+                      "enum": [
+                        "read-only",
+                        "edit"
+                      ]
+                    },
+                    "opened_at": {
+                      "type": "string",
+                      "description": "Timestamp (RFC 3339 / ISO 8601) when the project was successfully opened.",
+                      "format": "date-time"
+                    },
+                    "files_count": {
+                      "type": "integer",
+                      "description": "Number of project files discovered at open time."
+                    },
+                    "manifest_version": {
+                      "type": "string",
+                      "description": "Version identifier from the project's manifest (if present)."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable summary of the operation outcome."
+                    }
+                  },
+                  "required": [
+                    "project_id",
+                    "created",
+                    "opened",
+                    "access_mode",
+                    "opened_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/close_project": {
+      "post": {
+        "operationId": "close_project",
+        "summary": "Simulate closing the active Data Artifex project",
+        "description": "Simulates closing the currently active data artifex project: releases resources, optionally saves state, and waits up to timeout seconds for orderly shutdown.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "save_state": {
+                    "type": "boolean",
+                    "description": "Determines whether the current state of the project should be saved before closing.",
+                    "default": true
+                  },
+                  "confirmation": {
+                    "type": "string",
+                    "description": "A confirmation message to ensure accidental closure is prevented. Expected format: 'CONFIRM' to proceed with closure.",
+                    "enum": [
+                      "CONFIRM"
+                    ],
+                    "default": "CONFIRM"
+                  },
+                  "timeout": {
+                    "type": "integer",
+                    "description": "The maximum number of seconds to wait for closure before timing out. A value of 0 means immediate closure.",
+                    "default": 30
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Result of the close operation",
+                  "properties": {
+                    "closed": {
+                      "type": "boolean",
+                      "description": "True if the project was closed successfully."
+                    },
+                    "saved": {
+                      "type": "boolean",
+                      "description": "True if the project state was saved before closing."
+                    },
+                    "timeout_used": {
+                      "type": "integer",
+                      "description": "Number of seconds actually waited for closure. A value of 0 indicates immediate closure."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable summary of what occurred during close (e.g., 'closed and saved', 'closed without saving', 'timeout reached')."
+                    }
+                  },
+                  "required": [
+                    "closed"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dartfx_help": {
+      "post": {
+        "operationId": "dartfx_help",
+        "summary": "Provide simulated help content for a requested topic",
+        "description": "Returns structured help information for a requested topic. The response simulates what a help system would return (title, sections, resources, and related topics) without echoing request inputs.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "topic": {
+                    "type": "string",
+                    "description": "The specific topic for which help is requested. It should be a recognizable keyword or phrase."
+                  },
+                  "search_deep": {
+                    "type": "boolean",
+                    "description": "Specifies whether to perform a deep search in the help database. A deep search may take longer but yields comprehensive results.",
+                    "default": false
+                  },
+                  "language": {
+                    "type": "string",
+                    "description": "The language in which to provide the help information.",
+                    "enum": [
+                      "English",
+                      "Spanish",
+                      "French",
+                      "German",
+                      "Mandarin"
+                    ],
+                    "default": "English"
+                  },
+                  "format": {
+                    "type": "string",
+                    "description": "The format in which the help information should be presented to the user.",
+                    "enum": [
+                      "text",
+                      "audio",
+                      "video"
+                    ],
+                    "default": "text"
+                  }
+                },
+                "required": [
+                  "topic"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful help response payload",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "description": "Short, human-readable title summarizing the help topic."
+                    },
+                    "content": {
+                      "type": "string",
+                      "description": "Main help content. Free-text formatted help details appropriate to the requested format (plain text transcription for audio/video, or textual content for text)."
+                    },
+                    "sections": {
+                      "type": "array",
+                      "description": "Optional ordered sections breaking the content into titled parts.",
+                      "maxItems": 50,
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "heading": {
+                            "type": "string",
+                            "description": "Section heading."
+                          },
+                          "body": {
+                            "type": "string",
+                            "description": "Section body text with guidance or steps. Free-text allowed."
+                          }
+                        },
+                        "required": [
+                          "heading",
+                          "body"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "resources": {
+                      "type": "array",
+                      "description": "Optional list of external resources (links) relevant to the topic.",
+                      "maxItems": 20,
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "label": {
+                            "type": "string",
+                            "description": "Display label for the resource."
+                          },
+                          "url": {
+                            "type": "string",
+                            "description": "URL to the external resource."
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "url"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "related_topics": {
+                      "type": "array",
+                      "description": "Optional short list of related topic keywords that the user may find useful.",
+                      "maxItems": 10,
+                      "items": {
+                        "type": "string",
+                        "description": "Array item"
+                      }
+                    },
+                    "estimated_read_time_seconds": {
+                      "type": "integer",
+                      "description": "Estimated time in seconds to read or consume the returned help content. This is an estimate intended for UI hints."
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "content"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

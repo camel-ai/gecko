@@ -1,0 +1,174 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LS2",
+    "version": "1.0.0",
+    "description": "LS2 is an API collection for locating and booking Uber rides by matching customer location, preferred ride type, and maximum acceptable wait time. Clients send simple requests with coordinates, service level, and wait thresholds to receive ranked ride options including ETA, estimated fare, vehicle details, and booking tokens. Designed for quick synchronous lookups and minimal integration overhead, LS2 supports filtering, basic retry logic, and clear success/error responses for in-app ride selection workflows."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LS2"
+    }
+  ],
+  "paths": {
+    "/uber_ride": {
+      "post": {
+        "operationId": "uber_ride",
+        "summary": "Find a suitable Uber ride (simulation)",
+        "description": "Simulate finding an appropriate Uber ride given a pickup location, requested ride type, and maximum wait time. The simulation should respect the requested ride type, prefer the nearest available driver, and only return a match if the estimated arrival is within the customer's maximum wait time.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "loc": {
+                    "type": "string",
+                    "description": "The starting location for the Uber ride, in the format of 'Street Address, City, State (abbr), Country'."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "The type of Uber ride the user is requesting.",
+                    "enum": [
+                      "plus",
+                      "comfort",
+                      "black"
+                    ]
+                  },
+                  "time": {
+                    "type": "integer",
+                    "description": "The maximum amount of time the customer is willing to wait for the ride, specified in seconds."
+                  }
+                },
+                "required": [
+                  "loc",
+                  "type",
+                  "time"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Details about whether a suitable ride was found and the matched ride information when available.",
+                  "properties": {
+                    "available": {
+                      "type": "boolean",
+                      "description": "Whether a suitable ride was found within the customer's maximum wait time."
+                    },
+                    "ride": {
+                      "type": "object",
+                      "description": "Details of the matched ride. Present only when available is true.",
+                      "properties": {
+                        "ride_id": {
+                          "type": "string",
+                          "description": "Unique identifier for the matched ride."
+                        },
+                        "eta_seconds": {
+                          "type": "integer",
+                          "description": "Estimated time of arrival in seconds."
+                        },
+                        "driver": {
+                          "type": "object",
+                          "description": "Information about the assigned driver.",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "description": "Driver's full name."
+                            },
+                            "rating": {
+                              "type": "number",
+                              "description": "Driver rating (typical 0.0–5.0). Provide as a float (e.g., 4.5, not 4).",
+                              "format": "double"
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "vehicle": {
+                          "type": "object",
+                          "description": "Assigned vehicle details.",
+                          "properties": {
+                            "make": {
+                              "type": "string",
+                              "description": "Vehicle make (manufacturer)."
+                            },
+                            "model": {
+                              "type": "string",
+                              "description": "Vehicle model."
+                            },
+                            "license_plate": {
+                              "type": "string",
+                              "description": "Vehicle license plate identifier."
+                            }
+                          },
+                          "required": [
+                            "make",
+                            "model"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "distance_miles": {
+                          "type": "number",
+                          "description": "Distance from the pickup location to the driver in miles. Provide as a float (e.g., 1.2, not 1).",
+                          "format": "double"
+                        },
+                        "price": {
+                          "type": "object",
+                          "description": "Estimated pricing for the trip.",
+                          "properties": {
+                            "amount": {
+                              "type": "number",
+                              "description": "Estimated price amount. Provide as a float (e.g., 12.50, not 12).",
+                              "format": "double"
+                            },
+                            "currency": {
+                              "type": "string",
+                              "description": "ISO 4217 currency code for the amount (e.g., USD)."
+                            }
+                          },
+                          "required": [
+                            "amount",
+                            "currency"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "ride_id",
+                        "eta_seconds",
+                        "driver",
+                        "vehicle",
+                        "price"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "unavailable_reason": {
+                      "type": "string",
+                      "description": "If available is false, a short explanation (for example: 'no drivers available within requested wait time')."
+                    }
+                  },
+                  "required": [
+                    "available"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

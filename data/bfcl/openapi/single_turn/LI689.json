@@ -1,0 +1,308 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI689",
+    "version": "1.0.0",
+    "description": "The LI689 API collection provides search and booking endpoints for regional train travel, letting clients discover available services to a destination on a chosen date and then reserve seats for a specified journey and time. Use the find endpoint to filter by date, fare class, and adult passengers; use the reservation endpoint to confirm tickets, select class, and optionally add trip protection in a single transactional request."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI689"
+    }
+  ],
+  "paths": {
+    "/Trains_1_GetTrainTickets": {
+      "post": {
+        "operationId": "Trains_1_GetTrainTickets",
+        "summary": "Simulate reserving train tickets for a specified journey",
+        "description": "Simulate creating a train reservation for a given departure, destination, date and start time. Supports fare class selection and optional trip protection.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "_from": {
+                    "type": "string",
+                    "description": "The departure city for the train journey, such as 'New York, NY'."
+                  },
+                  "to": {
+                    "type": "string",
+                    "description": "The destination city for the train journey, such as 'Los Angeles, CA'."
+                  },
+                  "date_of_journey": {
+                    "type": "string",
+                    "description": "The date of the train journey, in the format 'MM/DD/YYYY'."
+                  },
+                  "journey_start_time": {
+                    "type": "string",
+                    "description": "The departure time of the train, in 24-hour format 'HH:MM'."
+                  },
+                  "number_of_adults": {
+                    "type": "integer",
+                    "description": "The number of adult passengers to reserve train tickets for.",
+                    "default": 1
+                  },
+                  "trip_protection": {
+                    "type": "boolean",
+                    "description": "Indicates whether to add trip protection to the reservation, which incurs an additional fee.",
+                    "default": false
+                  },
+                  "_class": {
+                    "type": "string",
+                    "description": "The fare class for the train reservation.",
+                    "enum": [
+                      "Value",
+                      "Flexible",
+                      "Business"
+                    ],
+                    "default": "Value"
+                  }
+                },
+                "required": [
+                  "_from",
+                  "to",
+                  "date_of_journey",
+                  "journey_start_time"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful reservation payload",
+                  "properties": {
+                    "reservation_id": {
+                      "type": "string",
+                      "description": "System-generated unique identifier for the reservation."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Final booking status for the reservation.",
+                      "enum": [
+                        "confirmed",
+                        "pending",
+                        "failed"
+                      ]
+                    },
+                    "tickets": {
+                      "type": "array",
+                      "description": "List of issued tickets for this reservation.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "ticket_id": {
+                            "type": "string",
+                            "description": "Unique identifier for the issued ticket."
+                          },
+                          "coach": {
+                            "type": "string",
+                            "description": "Coach or carriage identifier (if assigned)."
+                          },
+                          "seat": {
+                            "type": "string",
+                            "description": "Seat identifier (if assigned)."
+                          },
+                          "fare_class": {
+                            "type": "string",
+                            "description": "Fare class applied to this ticket (matches request fare class)."
+                          },
+                          "price": {
+                            "type": "number",
+                            "description": "Price for this ticket. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          }
+                        },
+                        "required": [
+                          "ticket_id",
+                          "fare_class",
+                          "price"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_amount": {
+                      "type": "number",
+                      "description": "Total amount charged for the reservation. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Currency code used for the amounts (ISO 4217 code, e.g., \"USD\")."
+                    }
+                  },
+                  "required": [
+                    "reservation_id",
+                    "status",
+                    "tickets",
+                    "total_amount",
+                    "currency"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Trains_1_FindTrains": {
+      "post": {
+        "operationId": "Trains_1_FindTrains",
+        "summary": "Find available trains for a destination and date",
+        "description": "Simulate returning available train services to the requested destination on the specified date, honoring fare class preference and passenger count when possible.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "_from": {
+                    "type": "string",
+                    "description": "Starting city for the train journey, in the format of 'City, State', such as 'San Francisco, CA'."
+                  },
+                  "to": {
+                    "type": "string",
+                    "description": "Destination city for the train journey, in the format of 'City, State', such as 'Los Angeles, CA'."
+                  },
+                  "date_of_journey": {
+                    "type": "string",
+                    "description": "Date of the train journey, in the format 'YYYY-MM-DD', such as '2023-04-15'."
+                  },
+                  "_class": {
+                    "type": "string",
+                    "description": "Fare class for the train reservation.",
+                    "enum": [
+                      "Value",
+                      "Flexible",
+                      "Business"
+                    ],
+                    "default": "Value"
+                  },
+                  "number_of_adults": {
+                    "type": "integer",
+                    "description": "Number of adult passengers to reserve train tickets for.",
+                    "default": 1
+                  }
+                },
+                "required": [
+                  "_from",
+                  "to",
+                  "date_of_journey"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing matching train options.",
+                  "properties": {
+                    "trains": {
+                      "type": "array",
+                      "description": "List of available train options that match the request criteria.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "train_id": {
+                            "type": "string",
+                            "description": "Unique identifier for the train service."
+                          },
+                          "operator": {
+                            "type": "string",
+                            "description": "Name of the train operator or carrier."
+                          },
+                          "departure_time": {
+                            "type": "string",
+                            "description": "Scheduled departure time at the origin station (local time), e.g., '14:30'."
+                          },
+                          "arrival_time": {
+                            "type": "string",
+                            "description": "Scheduled arrival time at the destination station (local time), e.g., '18:45'."
+                          },
+                          "duration": {
+                            "type": "string",
+                            "description": "Estimated journey duration as a human-readable string, e.g., '4h 15m'."
+                          },
+                          "class_options": {
+                            "type": "array",
+                            "description": "Available fare classes for this train, with price and seat availability.",
+                            "items": {
+                              "type": "object",
+                              "description": "Array item",
+                              "properties": {
+                                "class": {
+                                  "type": "string",
+                                  "description": "Fare class name (for example: Value, Flexible, Business)."
+                                },
+                                "price": {
+                                  "type": "number",
+                                  "description": "Price per adult passenger for this fare class. Use float format (e.g., 1.0 not 1).",
+                                  "format": "double"
+                                },
+                                "currency": {
+                                  "type": "string",
+                                  "description": "ISO 4217 currency code for the price, e.g., 'USD'."
+                                },
+                                "available_seats": {
+                                  "type": "integer",
+                                  "description": "Number of seats currently available for this fare class.",
+                                  "minimum": 0
+                                }
+                              },
+                              "required": [
+                                "class",
+                                "price",
+                                "available_seats"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "notes": {
+                            "type": "string",
+                            "description": "Optional free-text notes about this service (e.g., onboard amenities or delay notices)."
+                          }
+                        },
+                        "required": [
+                          "train_id",
+                          "departure_time",
+                          "arrival_time",
+                          "duration",
+                          "class_options"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "trains"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,391 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI518",
+    "version": "1.0.0",
+    "description": "LI518 is a compact API collection combining mobility, vision, and filesystem utilities: use uber_ride to locate optimal rides by passenger location, vehicle type, and wait-time constraints; segment_all_objects to detect and return object boundaries within images for analysis or annotation; and list_directory_contents to inspect filesystem structures. Designed for programmatic, request/response integration, it supports composing these endpoints into pipelines for user-facing apps, automated processing, and rapid prototyping."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI518"
+    }
+  ],
+  "paths": {
+    "/uber_ride": {
+      "post": {
+        "operationId": "uber_ride",
+        "summary": "Simulate matching an Uber ride given location, ride type, and max wait time",
+        "description": "Return a simulated matched ride that meets the customer's requested ride type and does not exceed the requested maximum wait time.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "loc": {
+                    "type": "string",
+                    "description": "The starting location for the Uber ride in the format of 'Street, City, State'. For example, '50 Memorial Drive, Cambridge, MA'."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "The type of Uber ride the user is ordering.",
+                    "enum": [
+                      "plus",
+                      "comfort",
+                      "black"
+                    ]
+                  },
+                  "time": {
+                    "type": "integer",
+                    "description": "The maximum amount of time the customer is willing to wait for the ride, in minutes."
+                  }
+                },
+                "required": [
+                  "loc",
+                  "type",
+                  "time"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful ride match response",
+                  "properties": {
+                    "ride_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the matched ride."
+                    },
+                    "ride_type": {
+                      "type": "string",
+                      "description": "The matched ride type (corresponds to the requested 'type')."
+                    },
+                    "estimated_wait_minutes": {
+                      "type": "integer",
+                      "description": "Estimated wait time for the driver to arrive, in minutes."
+                    },
+                    "estimated_arrival_time": {
+                      "type": "string",
+                      "description": "Estimated arrival timestamp in ISO 8601 format.",
+                      "format": "date-time"
+                    },
+                    "fare": {
+                      "type": "number",
+                      "description": "Estimated fare for the ride. Provide as a float (e.g., 12.5, not 12).",
+                      "format": "double"
+                    },
+                    "driver": {
+                      "type": "object",
+                      "description": "Assigned driver details",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "Driver's display name."
+                        },
+                        "rating": {
+                          "type": "number",
+                          "description": "Driver's rating. Provide as a float (e.g., 4.9, not 5).",
+                          "format": "double"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "rating"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "vehicle": {
+                      "type": "object",
+                      "description": "Assigned vehicle details",
+                      "properties": {
+                        "make": {
+                          "type": "string",
+                          "description": "Vehicle make (manufacturer)."
+                        },
+                        "model": {
+                          "type": "string",
+                          "description": "Vehicle model."
+                        },
+                        "plate": {
+                          "type": "string",
+                          "description": "License plate identifier."
+                        }
+                      },
+                      "required": [
+                        "make",
+                        "model",
+                        "plate"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "notes": {
+                      "type": "string",
+                      "description": "Optional human-readable notes about the match (e.g., surge, shared-ride info)."
+                    }
+                  },
+                  "required": [
+                    "ride_id",
+                    "ride_type",
+                    "estimated_wait_minutes",
+                    "driver",
+                    "vehicle",
+                    "fare"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/segment_all_objects": {
+      "post": {
+        "operationId": "segment_all_objects",
+        "summary": "Segment all identifiable objects in an image",
+        "description": "Simulate segmentation of all identifiable objects in the provided image and return their boundaries and related metadata.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "img_path": {
+                    "type": "string",
+                    "description": "The file system path to the image that will be processed for object segmentation. The path should be absolute or relative to the execution directory."
+                  }
+                },
+                "required": [
+                  "img_path"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Segmentation results for the provided image.",
+                  "properties": {
+                    "segments": {
+                      "type": "array",
+                      "description": "Array of detected segments. Each entry describes one object instance and its boundaries.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Opaque unique identifier for this segment."
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "Human-readable label for the object if available (may be empty or omitted if unknown)."
+                          },
+                          "confidence": {
+                            "type": "number",
+                            "description": "Confidence score for this segment. Use float format (e.g., 1.0 not 1). Higher numbers indicate greater confidence.",
+                            "format": "double"
+                          },
+                          "bbox": {
+                            "type": "object",
+                            "description": "Axis-aligned bounding box that minimally contains the segment.",
+                            "properties": {
+                              "x_min": {
+                                "type": "number",
+                                "description": "Minimum x coordinate of the bounding box (left). Use float format (e.g., 1.0 not 1).",
+                                "format": "double"
+                              },
+                              "y_min": {
+                                "type": "number",
+                                "description": "Minimum y coordinate of the bounding box (top). Use float format (e.g., 1.0 not 1).",
+                                "format": "double"
+                              },
+                              "x_max": {
+                                "type": "number",
+                                "description": "Maximum x coordinate of the bounding box (right). Use float format (e.g., 1.0 not 1).",
+                                "format": "double"
+                              },
+                              "y_max": {
+                                "type": "number",
+                                "description": "Maximum y coordinate of the bounding box (bottom). Use float format (e.g., 1.0 not 1).",
+                                "format": "double"
+                              }
+                            },
+                            "required": [
+                              "x_min",
+                              "y_min",
+                              "x_max",
+                              "y_max"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "polygon": {
+                            "type": "array",
+                            "description": "Array of polygon rings describing the segment boundary. Each ring is an array of coordinate pairs [x, y]. The first ring is the exterior boundary; subsequent rings (if any) represent holes.",
+                            "items": {
+                              "type": "array",
+                              "description": "A ring represented as an array of coordinate pairs [x, y].",
+                              "minItems": 1,
+                              "items": {
+                                "type": "array",
+                                "description": "Array item",
+                                "minItems": 2,
+                                "maxItems": 2,
+                                "items": {
+                                  "type": "number",
+                                  "description": "Coordinate value. Use float format (e.g., 1.0 not 1). The pair ordering is [x, y].",
+                                  "format": "double"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "polygon"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "segments"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/list_directory_contents": {
+      "post": {
+        "operationId": "list_directory_contents",
+        "summary": "List directory contents",
+        "description": "Simulate listing the files and directories at the given path, honoring include_hidden and sort_order.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "dir_path": {
+                    "type": "string",
+                    "description": "The file system path to the directory whose contents are to be listed. The path should be absolute or relative to the current working directory."
+                  },
+                  "include_hidden": {
+                    "type": "boolean",
+                    "description": "A flag to determine whether hidden files and directories should be included in the list.",
+                    "default": false
+                  },
+                  "sort_order": {
+                    "type": "string",
+                    "description": "The order in which the directory contents are listed. Ascending or descending by name.",
+                    "enum": [
+                      "asc",
+                      "desc"
+                    ],
+                    "default": "asc"
+                  }
+                },
+                "required": [
+                  "dir_path"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful directory listing payload",
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "description": "The directory path that was listed. Matches the requested dir_path when available."
+                    },
+                    "entries": {
+                      "type": "array",
+                      "description": "Array of directory entries returned for the directory.",
+                      "minItems": 0,
+                      "items": {
+                        "type": "object",
+                        "description": "A single directory entry",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "description": "The entry name (file, directory, or other) as shown in the directory."
+                          },
+                          "type": {
+                            "type": "string",
+                            "description": "High-level entry type.",
+                            "enum": [
+                              "file",
+                              "directory",
+                              "symlink",
+                              "other"
+                            ]
+                          },
+                          "size": {
+                            "type": "integer",
+                            "description": "Size associated with the entry when applicable. Not all types (for example directories or some special files) will include a meaningful size."
+                          },
+                          "last_modified": {
+                            "type": "string",
+                            "description": "Last modification timestamp, when available (commonly represented as an ISO 8601 string)."
+                          },
+                          "mode": {
+                            "type": "string",
+                            "description": "Optional human-readable permission/mode string if available (implementation-specific)."
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "type"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_count": {
+                      "type": "integer",
+                      "description": "Total number of entries returned in the 'entries' array."
+                    }
+                  },
+                  "required": [
+                    "entries"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

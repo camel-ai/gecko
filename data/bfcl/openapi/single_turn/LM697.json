@@ -1,0 +1,402 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM697",
+    "version": "1.0.0",
+    "description": "LM697 is a compact entertainment discovery and booking API collection enabling developers to search cultural events by city and date, purchase event tickets, and retrieve movies tailored to user preferences. Designed for simple REST-style calls, it emphasizes concise query parameters (city, date, filters), reliable availability checks, and transactional ticketing flows. Use lightweight authentication, idempotent purchase operations, and clear error responses for smooth integration into event or movie apps."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM697"
+    }
+  ],
+  "paths": {
+    "/Events_3_FindEvents": {
+      "post": {
+        "operationId": "Events_3_FindEvents",
+        "summary": "Find cultural events in a city on a given date",
+        "description": "Simulate searching for cultural events (e.g., concerts, plays) in the provided city and optional date. If date is 'dontcare' or omitted, return upcoming events across dates.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "event_type": {
+                    "type": "string",
+                    "description": "The type of cultural event to find.",
+                    "enum": [
+                      "Music",
+                      "Theater"
+                    ]
+                  },
+                  "city": {
+                    "type": "string",
+                    "description": "The city in which to search for events, in the format of 'City, State', such as 'Berkeley, CA' and 'New York, NY'."
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "Concrete event date in 'YYYY-MM-DD'. Use this field only when the user gives a concrete calendar date in that format or a directly mappable calendar date. If the user does not provide a concrete calendar date, leave this parameter unset or at its schema default instead of inventing a current date. Relative requests like 'today', 'tonight', or 'this weekend' should use the tool's default/open-date behavior unless a concrete date is explicitly provided.",
+                    "default": "dontcare"
+                  }
+                },
+                "required": [
+                  "event_type",
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing a list of matching events",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "description": "Array of event objects that match the query",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique event identifier (GUID/UUID or other stable id)"
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Event title"
+                          },
+                          "event_type": {
+                            "type": "string",
+                            "description": "Type of event (e.g., Music, Theater)"
+                          },
+                          "date": {
+                            "type": "string",
+                            "description": "Event date, represented as 'MM/DD/YYYY'"
+                          },
+                          "start_time": {
+                            "type": "string",
+                            "description": "Local start time (human-readable, e.g., '7:30 PM')"
+                          },
+                          "end_time": {
+                            "type": "string",
+                            "description": "Local end time (if known)"
+                          },
+                          "venue": {
+                            "type": "string",
+                            "description": "Name of the venue"
+                          },
+                          "address": {
+                            "type": "string",
+                            "description": "Street address for the venue; include city and state when available"
+                          },
+                          "city": {
+                            "type": "string",
+                            "description": "City and state for the event (e.g., 'Berkeley, CA')"
+                          },
+                          "latitude": {
+                            "type": "number",
+                            "description": "Latitude of the venue. Provide as a float (e.g., 1.0, not 1)",
+                            "format": "double"
+                          },
+                          "longitude": {
+                            "type": "number",
+                            "description": "Longitude of the venue. Provide as a float (e.g., 1.0, not 1)",
+                            "format": "double"
+                          },
+                          "ticket_price": {
+                            "type": "number",
+                            "description": "Ticket price in the local currency. Use float format (e.g., 1.0 not 1). Use 0.0 for free events when applicable.",
+                            "format": "double"
+                          },
+                          "currency": {
+                            "type": "string",
+                            "description": "Currency code for ticket_price (ISO 4217 code, e.g., 'USD')"
+                          },
+                          "tickets_url": {
+                            "type": "string",
+                            "description": "URL where tickets or event details can be purchased or viewed"
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Short human-readable description of the event"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "event_type",
+                          "date",
+                          "venue",
+                          "city"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "Total number of events returned in this response"
+                    }
+                  },
+                  "required": [
+                    "events",
+                    "total"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Events_3_BuyEventTickets": {
+      "post": {
+        "operationId": "Events_3_BuyEventTickets",
+        "summary": "Simulate purchasing event tickets",
+        "description": "Simulate a purchase of tickets for a cultural event on a specified date and city and return a purchase confirmation payload.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "event_name": {
+                    "type": "string",
+                    "description": "The name of the artist, play, or cultural event."
+                  },
+                  "number_of_tickets": {
+                    "type": "integer",
+                    "description": "The quantity of tickets to purchase. Must be a positive integer and typically ranges from 1 to 8."
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "The specific date of the event, in the format 'YYYY-MM-DD'."
+                  },
+                  "city": {
+                    "type": "string",
+                    "description": "The city where the event will take place, formatted as 'City, State' or 'City, Country' if the city does not locate in the United States, such as 'New York, NY' or 'London, UK'."
+                  }
+                },
+                "required": [
+                  "event_name",
+                  "number_of_tickets",
+                  "date",
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Confirmation of a successful ticket purchase.",
+                  "properties": {
+                    "confirmation_id": {
+                      "type": "string",
+                      "description": "A unique identifier for this purchase transaction."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Outcome status of the purchase (e.g., confirmed, pending)."
+                    },
+                    "tickets": {
+                      "type": "array",
+                      "description": "List of issued tickets for this purchase.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "ticket_id": {
+                            "type": "string",
+                            "description": "Unique identifier for the issued ticket."
+                          },
+                          "seat": {
+                            "type": "string",
+                            "description": "Assigned seat or section info if applicable. Optional when general admission."
+                          },
+                          "price": {
+                            "type": "number",
+                            "description": "Price for this individual ticket. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "currency": {
+                            "type": "string",
+                            "description": "Currency code for the price (e.g., USD)."
+                          }
+                        },
+                        "required": [
+                          "ticket_id",
+                          "price",
+                          "currency"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_price": {
+                      "type": "number",
+                      "description": "Sum charged for the purchase (including fees). Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Currency code used for the total_price."
+                    },
+                    "purchased_at": {
+                      "type": "string",
+                      "description": "Timestamp when the purchase was completed in ISO 8601 format.",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "confirmation_id",
+                    "status",
+                    "tickets",
+                    "total_price",
+                    "currency",
+                    "purchased_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Movies_3_FindMovies": {
+      "post": {
+        "operationId": "Movies_3_FindMovies",
+        "summary": "Find movies matching user criteria",
+        "description": "Simulate retrieving movies that match the provided director, genre, and cast filters. The literal string \"dontcare\" is treated as a wildcard (no filter) for that field.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "directed_by": {
+                    "type": "string",
+                    "description": "The first and last name of the director of the movies to filter by. Use 'dontcare' if the director is not a filtering criterion.",
+                    "default": "dontcare"
+                  },
+                  "genre": {
+                    "type": "string",
+                    "description": "The genre of the movies to filter by. Select 'dontcare' to include all genres.",
+                    "enum": [
+                      "Offbeat",
+                      "Fantasy",
+                      "World",
+                      "Mystery",
+                      "Thriller",
+                      "Comedy",
+                      "Comedy-drama",
+                      "Horror",
+                      "Animation",
+                      "Sci-fi",
+                      "Cult",
+                      "Drama",
+                      "Anime",
+                      "Family",
+                      "Action"
+                    ]
+                  },
+                  "cast": {
+                    "type": "string",
+                    "description": "First and last names of lead actors or actresses in the movies to filter by. Use 'dontcare' if the cast is not a filtering criterion.",
+                    "default": "dontcare"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "description": "A list of movies matching the requested criteria.",
+                  "items": {
+                    "type": "object",
+                    "description": "Array item",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "Unique identifier for the movie."
+                      },
+                      "title": {
+                        "type": "string",
+                        "description": "Movie title."
+                      },
+                      "year": {
+                        "type": "integer",
+                        "description": "Year the movie was released (Gregorian calendar year)."
+                      },
+                      "genre": {
+                        "type": "string",
+                        "description": "Primary genre of the movie."
+                      },
+                      "director": {
+                        "type": "string",
+                        "description": "Director's full name."
+                      },
+                      "cast": {
+                        "type": "array",
+                        "description": "List of principal cast members (full names).",
+                        "items": {
+                          "type": "string",
+                          "description": "Array item"
+                        }
+                      },
+                      "average_rating": {
+                        "type": "number",
+                        "description": "Average user rating as a decimal number (Provide as a float (e.g., 1.0, not 1)).",
+                        "format": "double"
+                      },
+                      "runtime_minutes": {
+                        "type": "integer",
+                        "description": "Runtime of the movie in minutes."
+                      },
+                      "summary": {
+                        "type": "string",
+                        "description": "Short synopsis of the movie."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "title"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

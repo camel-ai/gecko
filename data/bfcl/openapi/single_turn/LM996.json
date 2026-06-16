@@ -1,0 +1,353 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM996",
+    "version": "1.0.0",
+    "description": "LM996 provides a compact API collection for programmatically managing application service configurations—adding new service parameters, retrieving all stored configurations including database and external integration details, and reordering services to change runtime priority. Designed for declarative, transactional updates within deployment pipelines, it supports consistent configuration syncing, environment-specific feature flags, and automation-friendly idempotent operations for reliable service orchestration."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM996"
+    }
+  ],
+  "paths": {
+    "/add_service_config": {
+      "post": {
+        "operationId": "add_service_config",
+        "summary": "Simulate adding a new service configuration",
+        "description": "Simulates adding a service configuration to application settings. Validates configuration numeric bounds and basic inter-field dependencies but does not alter the original request shape.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "service_name": {
+                    "type": "string",
+                    "description": "The unique name of the service for which the configuration is being added."
+                  },
+                  "configurations": {
+                    "type": "object",
+                    "description": "A dictionary of key-value pairs representing the configuration settings for the service.",
+                    "properties": {
+                      "timeout": {
+                        "type": "integer",
+                        "description": "The time in seconds before a service request times out. Must be a positive integer.",
+                        "minimum": 1
+                      },
+                      "retry_count": {
+                        "type": "integer",
+                        "description": "The number of times a failed service call will be retried before giving up. Must be a non-negative integer.",
+                        "default": 3,
+                        "minimum": 0
+                      },
+                      "endpoint": {
+                        "type": "string",
+                        "description": "The URL endpoint through which the service can be accessed."
+                      },
+                      "auth_required": {
+                        "type": "boolean",
+                        "description": "Indicates whether the service requires authentication.",
+                        "default": true
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "service_name",
+                  "configurations"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "service_id": {
+                      "type": "string",
+                      "description": "Unique identifier assigned to the created service configuration."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp when the configuration was created (ISO 8601).",
+                      "format": "date-time"
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Result status for the operation, e.g., \"created\"."
+                    }
+                  },
+                  "required": [
+                    "service_id",
+                    "created_at",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ApplicationSettingsApi_get_service_configs": {
+      "post": {
+        "operationId": "ApplicationSettingsApi_get_service_configs",
+        "summary": "Get service configurations",
+        "description": "Simulate retrieval of all service configurations for a given environment. The include_sensitive flag controls whether secrets (passwords, API keys) are returned.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "environment": {
+                    "type": "string",
+                    "description": "The deployment environment for which the service configurations are requested, such as 'development', 'staging', or 'production'.",
+                    "enum": [
+                      "development",
+                      "staging",
+                      "production"
+                    ],
+                    "default": "production"
+                  },
+                  "include_sensitive": {
+                    "type": "boolean",
+                    "description": "A flag to determine whether sensitive information like passwords and API keys should be included in the configurations.",
+                    "default": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "environment": {
+                      "type": "string",
+                      "description": "The deployment environment for which these configurations apply.",
+                      "enum": [
+                        "development",
+                        "staging",
+                        "production"
+                      ]
+                    },
+                    "service_configs": {
+                      "type": "object",
+                      "description": "Top-level container for different categories of service configuration.",
+                      "properties": {
+                        "databases": {
+                          "type": "array",
+                          "description": "List of database configurations used by the application.",
+                          "items": {
+                            "type": "object",
+                            "description": "Array item",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "description": "Logical name for this database configuration."
+                              },
+                              "engine": {
+                                "type": "string",
+                                "description": "Database engine identifier (for example: postgresql, mysql)."
+                              },
+                              "host": {
+                                "type": "string",
+                                "description": "Hostname or IP address of the database server."
+                              },
+                              "port": {
+                                "type": "integer",
+                                "description": "TCP port on which the database is listening."
+                              },
+                              "username": {
+                                "type": "string",
+                                "description": "Username used to connect to the database; may be omitted or null when include_sensitive is false."
+                              },
+                              "password": {
+                                "type": "string",
+                                "description": "Password for the database user. Omitted or null unless include_sensitive=true."
+                              },
+                              "pool": {
+                                "type": "object",
+                                "description": "Connection pool configuration for this database.",
+                                "properties": {
+                                  "max_connections": {
+                                    "type": "integer",
+                                    "description": "Maximum number of connections in the pool."
+                                  },
+                                  "min_connections": {
+                                    "type": "integer",
+                                    "description": "Minimum number of connections in the pool."
+                                  },
+                                  "connection_timeout": {
+                                    "type": "number",
+                                    "description": "Connection timeout in seconds. Use float format (e.g., 1.0 not 1).",
+                                    "format": "double"
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "engine",
+                              "host",
+                              "port"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "external_services": {
+                          "type": "array",
+                          "description": "Configurations for external integrations (APIs, message brokers, etc.).",
+                          "items": {
+                            "type": "object",
+                            "description": "Array item",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "description": "Logical name of the external service."
+                              },
+                              "type": {
+                                "type": "string",
+                                "description": "Category or purpose of the external service."
+                              },
+                              "endpoint": {
+                                "type": "string",
+                                "description": "Service endpoint (URL or address)."
+                              },
+                              "api_key": {
+                                "type": "string",
+                                "description": "API key or token for the external service. Omitted or null unless include_sensitive=true."
+                              },
+                              "metadata": {
+                                "type": "object",
+                                "description": "Arbitrary service-specific metadata.",
+                                "properties": {},
+                                "additionalProperties": true
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "endpoint"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "feature_flags": {
+                          "type": "object",
+                          "description": "Map of feature flag keys to boolean values indicating whether each feature is enabled.",
+                          "properties": {},
+                          "additionalProperties": {
+                            "type": "boolean"
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "environment",
+                    "service_configs"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ApplicationSettingsApi_order_service_config": {
+      "post": {
+        "operationId": "ApplicationSettingsApi_order_service_config",
+        "summary": "Simulate configuring application service ordering",
+        "description": "Simulate applying an ordered list of service identifiers for an application according to the provided preferences.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "service_order": {
+                    "type": "array",
+                    "description": "An ordered list of service identifiers that define the sequence in which services should be arranged.",
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    },
+                    "minItems": 1
+                  },
+                  "user_id": {
+                    "type": "integer",
+                    "description": "The unique identifier of the user for whom the service order is being configured.",
+                    "default": null
+                  },
+                  "preserve_existing": {
+                    "type": "boolean",
+                    "description": "A flag indicating whether to preserve the existing service order if one exists. If set to 'false', the existing order will be overwritten.",
+                    "default": true
+                  }
+                },
+                "required": [
+                  "service_order"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Outcome of applying the service order configuration.",
+                  "properties": {
+                    "applied": {
+                      "type": "boolean",
+                      "description": "True if the requested configuration was applied."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable status or confirmation message."
+                    }
+                  },
+                  "required": [
+                    "applied"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

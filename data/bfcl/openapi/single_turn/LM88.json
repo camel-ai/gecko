@@ -1,0 +1,423 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM88",
+    "version": "1.0.0",
+    "description": "LM88 is a compact management API for configuring and querying infrastructure and helper tools. It provides idempotent configuration helpers (default_add_default_value), endpoints to add MTN RDS and PostgreSQL servers (add_mtnards_server, add_postgres_server), server enumeration (list_servers), and contextual application assistance (dartfx_help). Designed for programmatic automation and safe updates, LM88 emphasizes non-destructive defaults, environment-scoped server management, and lightweight operational queries for integration into deployment and orchestration workflows."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM88"
+    }
+  ],
+  "paths": {
+    "/default_add_default_value": {
+      "post": {
+        "operationId": "default_add_default_value",
+        "summary": "Add default value to a dictionary if key is missing",
+        "description": "Simulate adding a default_value to dict for the given key only when the key does not already exist; do not overwrite existing entries.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "dict": {
+                    "type": "object",
+                    "description": "The dictionary to which the default value should be added.",
+                    "properties": {}
+                  },
+                  "key": {
+                    "type": "string",
+                    "description": "The key for which the default value is to be set."
+                  },
+                  "default_value": {
+                    "description": "The value to set for the key if it does not exist in the dictionary. The type of this value can be any valid Python data type."
+                  }
+                },
+                "required": [
+                  "dict",
+                  "key",
+                  "default_value"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "The resulting dictionary after ensuring the default was set for the specified key. Keys are the dictionary keys; values may be any valid JSON value.",
+                  "properties": {},
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/add_mtnards_server": {
+      "post": {
+        "operationId": "add_mtnards_server",
+        "summary": "Simulate adding an MTNA RDS server",
+        "description": "Simulates adding a new MTNA Rich Data Services (RDS) server to the environment. Use this to validate inputs and return the created server record (does not echo secrets).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "nickname": {
+                    "type": "string",
+                    "description": "A user-friendly name to identify the server. For example, 'primary_db_server'.",
+                    "default": "local_rds_server"
+                  },
+                  "host": {
+                    "type": "string",
+                    "description": "The hostname or IP address of the RDS server. Defaults to 'localhost' if not specified.",
+                    "default": "localhost"
+                  },
+                  "api_key": {
+                    "type": "string",
+                    "description": "A unique API key for authenticating requests to the RDS server. This key should be kept secret."
+                  }
+                },
+                "required": [
+                  "api_key"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Representation of the newly created RDS server (successful response). Does not include secret values such as api_key.",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Server identifier assigned by the system."
+                    },
+                    "nickname": {
+                      "type": "string",
+                      "description": "A user-friendly name to identify the server. Mirrors the provided nickname when supplied, otherwise the system default name."
+                    },
+                    "host": {
+                      "type": "string",
+                      "description": "The hostname or IP address of the RDS server."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp when the server was created. ISO 8601 format is recommended (e.g., 2023-01-01T12:00:00Z)."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Processing status for the new server record (examples: created, pending, failed). These examples are illustrative and not an exhaustive enum."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "nickname",
+                    "host",
+                    "created_at",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/add_postgres_server": {
+      "post": {
+        "operationId": "add_postgres_server",
+        "summary": "Add PostgreSQL server configuration",
+        "description": "Simulate adding a PostgreSQL server configuration to the environment and return a record identifier without echoing sensitive inputs.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "nickname": {
+                    "type": "string",
+                    "description": "A unique and recognizable name to identify the PostgreSQL server."
+                  },
+                  "host": {
+                    "type": "string",
+                    "description": "The network address or domain of the PostgreSQL server."
+                  },
+                  "port": {
+                    "type": "integer",
+                    "description": "The network port that the PostgreSQL server is listening on.",
+                    "minimum": 1,
+                    "maximum": 65535
+                  },
+                  "database": {
+                    "type": "string",
+                    "description": "The name of the default database to connect to."
+                  },
+                  "username": {
+                    "type": "string",
+                    "description": "The username used to authenticate with the PostgreSQL server."
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "The password used to authenticate with the PostgreSQL server. Must be provided for security reasons."
+                  }
+                },
+                "required": [
+                  "nickname",
+                  "host",
+                  "port",
+                  "database",
+                  "username",
+                  "password"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Information about the created PostgreSQL server configuration.",
+                  "properties": {
+                    "server_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the created server configuration."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Result status of the create operation (e.g., success)."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message describing the outcome."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp (UTC) when the server configuration was created.",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "server_id",
+                    "status",
+                    "created_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dartfx_help": {
+      "post": {
+        "operationId": "dartfx_help",
+        "summary": "Generate DartFX help content",
+        "description": "Produce focused help guidance for a given DartFX topic and language. include_examples toggles whether practical examples are included.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "topic": {
+                    "type": "string",
+                    "description": "The topic for which help is requested, such as 'installation', 'configuration', 'usage'.",
+                    "enum": [
+                      "installation",
+                      "configuration",
+                      "usage",
+                      "troubleshooting"
+                    ]
+                  },
+                  "language": {
+                    "type": "string",
+                    "description": "The language in which the help content is to be provided. Defaults to English.",
+                    "enum": [
+                      "English",
+                      "Spanish",
+                      "French",
+                      "German"
+                    ],
+                    "default": "English"
+                  },
+                  "include_examples": {
+                    "type": "boolean",
+                    "description": "Flag to indicate if practical examples should be included in the help content.",
+                    "default": true
+                  }
+                },
+                "required": [
+                  "topic"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful help response payload.",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "description": "Concise title for the help content."
+                    },
+                    "content": {
+                      "type": "string",
+                      "description": "Detailed help content containing steps, explanations, and recommendations."
+                    }
+                  },
+                  "required": [
+                    "content"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/list_servers": {
+      "post": {
+        "operationId": "list_servers",
+        "summary": "List servers (simulate filtered results)",
+        "description": "Simulate returning a list of servers from the requested environment. If request.type is omitted or 'all', the response includes servers of every type; if a specific type is provided, the response includes only servers of that type.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "description": "Specifies the type of server to filter the list. If omitted or if some other type not in the possible types is mentioned by the user, servers of all types are listed.",
+                    "enum": [
+                      "all",
+                      "postgres",
+                      "openapi",
+                      "graphql"
+                    ],
+                    "default": "all"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "A successful response containing the matching servers.",
+                  "properties": {
+                    "servers": {
+                      "type": "array",
+                      "description": "Array of server records matching the filter.",
+                      "items": {
+                        "type": "object",
+                        "description": "A server record.",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the server."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Human-readable name of the server."
+                          },
+                          "type": {
+                            "type": "string",
+                            "description": "Type/category of the server (e.g., postgres, openapi, graphql)."
+                          },
+                          "host": {
+                            "type": "string",
+                            "description": "Hostname or IP address of the server."
+                          },
+                          "port": {
+                            "type": "integer",
+                            "description": "Port number the server listens on."
+                          },
+                          "status": {
+                            "type": "string",
+                            "description": "Operational status of the server (for example: 'running', 'stopped', 'maintenance')."
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "description": "Arbitrary, implementation-specific metadata for the server.",
+                            "properties": {},
+                            "additionalProperties": true
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "description": "Timestamp when the server record was created (string). No specific format enforced in this schema."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "type",
+                          "host",
+                          "port",
+                          "status"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "servers"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

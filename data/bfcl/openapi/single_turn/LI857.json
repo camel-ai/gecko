@@ -1,0 +1,177 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI857",
+    "version": "1.0.0",
+    "description": "LI857 is a compact API collection centered on income tax computation, exposing a calculate_tax tool that evaluates applicable tax for given income by applying progressive brackets and rates. Designed for simple integration, it accepts numeric income inputs, returns structured tax breakdowns, and supports synchronous calls for on-the-fly estimates or batch processing in server-side workflows. Use it to embed consistent, auditable tax calculations into financial apps and reporting pipelines."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI857"
+    }
+  ],
+  "paths": {
+    "/calculate_tax": {
+      "post": {
+        "operationId": "calculate_tax",
+        "summary": "Simulate tax calculation for given income and filing status",
+        "description": "Simulates applying tax brackets to compute tax owed for a given income. The simulation applies deductions to compute taxable income, applies bracketed rates, then subtracts credits to produce the final tax liability. Results include a per-bracket breakdown, taxable income, credits applied, total tax, and the effective tax rate.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "income": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The total income for which the tax needs to be calculated, in dollars.. Use float format (e.g., 1.0 not 1)."
+                  },
+                  "filing_status": {
+                    "type": "string",
+                    "description": "The filing status of the taxpayer, which affects the tax brackets.",
+                    "enum": [
+                      "single",
+                      "married_filing_jointly",
+                      "married_filing_separately",
+                      "head_of_household"
+                    ],
+                    "default": "single"
+                  },
+                  "tax_year": {
+                    "type": "integer",
+                    "description": "The tax year for which the calculation is being done. The year format should be YYYY, such as 2022.",
+                    "default": 2022
+                  },
+                  "deductions": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The total amount of deductions claimed, in dollars.. Use float format (e.g., 1.0 not 1).",
+                    "default": 0.0
+                  },
+                  "credits": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The total amount of tax credits claimed to reduce the amount of tax owed, in dollars.. Use float format (e.g., 1.0 not 1).",
+                    "default": 0.0
+                  }
+                },
+                "required": [
+                  "income"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful tax calculation result",
+                  "properties": {
+                    "total_tax": {
+                      "type": "number",
+                      "description": "Total tax owed after applying tax brackets and subtracting credits. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "taxable_income": {
+                      "type": "number",
+                      "description": "Income remaining after subtracting deductions; used to compute tax. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "credits_applied": {
+                      "type": "number",
+                      "description": "Total tax credits applied against tax liability. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "effective_tax_rate": {
+                      "type": "number",
+                      "description": "Effective tax rate expressed as a decimal fraction of taxable income (e.g., 0.22 for 22%). Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "bracket_breakdown": {
+                      "type": "array",
+                      "description": "Breakdown of tax computed per bracket, ordered from lowest to highest bracket applied.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "rate": {
+                            "type": "number",
+                            "description": "Tax rate applied to this bracket. Provide as a float (e.g., 0.22 for 22%).",
+                            "format": "double"
+                          },
+                          "taxable_amount": {
+                            "type": "number",
+                            "description": "Amount of income taxed at this bracket. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "tax_amount": {
+                            "type": "number",
+                            "description": "Tax computed for this bracket (rate * taxable_amount). Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "lower_bound": {
+                            "type": "object",
+                            "description": "Inclusive lower bound of this bracket (null if not applicable). Provide numeric bounds as decimal numbers when present.",
+                            "oneOf": [
+                              {
+                                "type": "number",
+                                "description": "Parameter lower_bound option 1",
+                                "format": "double"
+                              },
+                              {
+                                "type": "null",
+                                "description": "Parameter lower_bound option 2"
+                              }
+                            ],
+                            "properties": {}
+                          },
+                          "upper_bound": {
+                            "type": "object",
+                            "description": "Exclusive upper bound of this bracket (null if no upper bound). Provide numeric bounds as decimal numbers when present.",
+                            "oneOf": [
+                              {
+                                "type": "number",
+                                "description": "Parameter upper_bound option 1",
+                                "format": "double"
+                              },
+                              {
+                                "type": "null",
+                                "description": "Parameter upper_bound option 2"
+                              }
+                            ],
+                            "properties": {}
+                          }
+                        },
+                        "required": [
+                          "rate",
+                          "taxable_amount",
+                          "tax_amount"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "total_tax",
+                    "taxable_income",
+                    "effective_tax_rate",
+                    "bracket_breakdown"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

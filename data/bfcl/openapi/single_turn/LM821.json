@@ -1,0 +1,596 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM821",
+    "version": "1.0.0",
+    "description": "LM821 is a compact travel-and-entertainment API suite for discovering and booking intercity bus trips and cultural events. Use Buses_3_FindBus to search itineraries by origin, destination and date, then Buses_3_BuyBusTicket to reserve seats with passenger and luggage options. Events_3_FindEvents locates concerts and performances by city and date, and Events_3_BuyEventTickets completes ticket purchases. Calls are designed for straightforward discovery-to-purchase flows with simple query parameters and booking payloads."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM821"
+    }
+  ],
+  "paths": {
+    "/Buses_3_FindBus": {
+      "post": {
+        "operationId": "Buses_3_FindBus",
+        "summary": "Simulate searching bus itineraries between two cities for a given date.",
+        "description": "Given departure city, destination city, and departure date, return matching bus itineraries (multiple segments possible) with pricing, availability, and timing details.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "from_city": {
+                    "type": "string",
+                    "description": "The city of departure, in the format of 'City, State', such as 'Berkeley, CA'."
+                  },
+                  "to_city": {
+                    "type": "string",
+                    "description": "The destination city of the trip, in the format of 'City, State', such as 'Los Angeles, CA'."
+                  },
+                  "departure_date": {
+                    "type": "string",
+                    "description": "The date of departure in the format of 'YYYY-MM-DD', such as '2023-04-15'."
+                  },
+                  "num_passengers": {
+                    "type": "integer",
+                    "description": "The number of passengers for the trip.",
+                    "enum": [
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ],
+                    "default": 1
+                  },
+                  "category": {
+                    "type": "string",
+                    "description": "The category of the trip based on the number of stops.",
+                    "enum": [
+                      "direct",
+                      "one-stop"
+                    ],
+                    "default": "direct"
+                  }
+                },
+                "required": [
+                  "from_city",
+                  "to_city",
+                  "departure_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search results containing matching bus itineraries.",
+                  "properties": {
+                    "itineraries": {
+                      "type": "array",
+                      "description": "List of matching itineraries (may be limited by pagination).",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "itinerary_id": {
+                            "type": "string",
+                            "description": "Unique identifier for this itinerary result."
+                          },
+                          "operator": {
+                            "type": "string",
+                            "description": "Name of the bus operator."
+                          },
+                          "total_price": {
+                            "type": "object",
+                            "description": "Total price for the itinerary.",
+                            "properties": {
+                              "amount": {
+                                "type": "number",
+                                "description": "Monetary amount. Use float format (e.g., 1.0 not 1).",
+                                "format": "double"
+                              },
+                              "currency": {
+                                "type": "string",
+                                "description": "ISO 4217 currency code (e.g., USD)."
+                              }
+                            },
+                            "required": [
+                              "amount",
+                              "currency"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "departure_datetime": {
+                            "type": "string",
+                            "description": "Departure date and time for the first segment (if available)."
+                          },
+                          "arrival_datetime": {
+                            "type": "string",
+                            "description": "Arrival date and time for the last segment (if available)."
+                          },
+                          "duration_minutes": {
+                            "type": "integer",
+                            "description": "Total trip duration in minutes."
+                          },
+                          "num_stops": {
+                            "type": "integer",
+                            "description": "Number of intermediate stops (0 indicates a direct trip)."
+                          },
+                          "seats_available": {
+                            "type": "integer",
+                            "description": "Number of seats currently available for this itinerary."
+                          },
+                          "segments": {
+                            "type": "array",
+                            "description": "Ordered list of trip segments composing the itinerary.",
+                            "items": {
+                              "type": "object",
+                              "description": "Array item",
+                              "properties": {
+                                "from_city": {
+                                  "type": "string",
+                                  "description": "Segment departure city (same format as request)."
+                                },
+                                "to_city": {
+                                  "type": "string",
+                                  "description": "Segment arrival city (same format as request)."
+                                },
+                                "departure_datetime": {
+                                  "type": "string",
+                                  "description": "Segment departure date and time (if available)."
+                                },
+                                "arrival_datetime": {
+                                  "type": "string",
+                                  "description": "Segment arrival date and time (if available)."
+                                },
+                                "operator": {
+                                  "type": "string",
+                                  "description": "Operator for this segment (may differ across segments)."
+                                },
+                                "seat_type": {
+                                  "type": "string",
+                                  "description": "Optional seat/class type for the segment (e.g., 'standard', 'premium')."
+                                }
+                              },
+                              "required": [
+                                "from_city",
+                                "to_city",
+                                "departure_datetime",
+                                "arrival_datetime"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "itinerary_id",
+                          "operator",
+                          "total_price",
+                          "departure_datetime",
+                          "arrival_datetime",
+                          "duration_minutes",
+                          "num_stops",
+                          "seats_available",
+                          "segments"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of matching itineraries (may be greater than the length of 'itineraries' if results are paginated)."
+                    }
+                  },
+                  "required": [
+                    "itineraries",
+                    "total_results"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Buses_3_BuyBusTicket": {
+      "post": {
+        "operationId": "Buses_3_BuyBusTicket",
+        "summary": "Simulate purchasing bus tickets for a route/date/time",
+        "description": "Create a simulated booking for bus tickets given route, departure date/time, passenger count, and luggage option. Validate basic business rules (dates, distinct cities, seat availability) and return a booking confirmation payload.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "from_city": {
+                    "type": "string",
+                    "description": "The city to depart from, such as 'New York, NY'."
+                  },
+                  "to_city": {
+                    "type": "string",
+                    "description": "The destination city of the trip, such as 'Boston, MA'."
+                  },
+                  "departure_date": {
+                    "type": "string",
+                    "description": "The date of departure, in the format of 'YYYY-MM-DD'."
+                  },
+                  "departure_time": {
+                    "type": "string",
+                    "description": "The time of departure, in 24-hour format 'HH:MM'."
+                  },
+                  "num_passengers": {
+                    "type": "integer",
+                    "description": "The number of tickets for the trip.",
+                    "enum": [
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ],
+                    "default": 1
+                  },
+                  "additional_luggage": {
+                    "type": "boolean",
+                    "description": "An option to carry excess baggage in the bus.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "from_city",
+                  "to_city",
+                  "departure_date",
+                  "departure_time"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful booking payload",
+                  "properties": {
+                    "booking_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the completed booking."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Resulting booking status.",
+                      "enum": [
+                        "confirmed",
+                        "pending",
+                        "failed"
+                      ]
+                    },
+                    "num_tickets": {
+                      "type": "integer",
+                      "description": "Number of tickets actually issued for the booking."
+                    },
+                    "total_price": {
+                      "type": "number",
+                      "description": "Total amount charged for the booking. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "ISO 4217 currency code for total_price."
+                    },
+                    "luggage_fee": {
+                      "type": "number",
+                      "description": "Additional luggage fee applied for the booking, if any. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "seat_assignments": {
+                      "type": "array",
+                      "description": "Assigned seat identifiers for the issued tickets, if seat assignment is available.",
+                      "items": {
+                        "type": "string",
+                        "description": "Array item"
+                      }
+                    },
+                    "issued_at": {
+                      "type": "string",
+                      "description": "Timestamp when the booking was issued (ISO 8601, UTC)."
+                    }
+                  },
+                  "required": [
+                    "booking_id",
+                    "status",
+                    "num_tickets",
+                    "total_price",
+                    "currency"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Events_3_FindEvents": {
+      "post": {
+        "operationId": "Events_3_FindEvents",
+        "summary": "Simulate finding cultural events by city and optional date",
+        "description": "Given an event_type and city (and optional date), return a list of matching cultural events (concerts, plays). When date is omitted, return events across a reasonable upcoming range.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "event_type": {
+                    "type": "string",
+                    "description": "The type of cultural event to find. Possible values are 'Music' for concerts and 'Theater' for plays.",
+                    "enum": [
+                      "Music",
+                      "Theater"
+                    ]
+                  },
+                  "city": {
+                    "type": "string",
+                    "description": "The city where the event is taking place, in the format of 'City, State', with state using the abbreviated name (e.g., 'New York, NY')."
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "Concrete event date in 'YYYY-MM-DD'. Use this field only when the user gives a concrete calendar date in that format or a directly mappable calendar date. If the user does not provide a concrete calendar date, leave this parameter unset or at its schema default instead of inventing a current date. Relative requests like 'today', 'tonight', or 'this weekend' should use the tool's default/open-date behavior unless a concrete date is explicitly provided.",
+                    "default": null
+                  }
+                },
+                "required": [
+                  "event_type",
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "description": "List of matching events. Order by relevance and date (soonest first).",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique event identifier."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Human-friendly event title."
+                          },
+                          "event_type": {
+                            "type": "string",
+                            "description": "Type of event. Mirrors request event_type (e.g., 'Music' or 'Theater').",
+                            "enum": [
+                              "Music",
+                              "Theater"
+                            ]
+                          },
+                          "city": {
+                            "type": "string",
+                            "description": "City where the event takes place (e.g., 'New York, NY')."
+                          },
+                          "date": {
+                            "type": "string",
+                            "description": "Date of the event in 'YYYY-MM-DD' format."
+                          },
+                          "venue": {
+                            "type": "string",
+                            "description": "Name of the venue or location."
+                          },
+                          "start_time": {
+                            "type": "string",
+                            "description": "Local start time (human-readable, e.g., '19:30' or '7:30 PM')."
+                          },
+                          "price": {
+                            "type": "number",
+                            "description": "Lowest ticket price available for the event. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "currency": {
+                            "type": "string",
+                            "description": "Currency code for the price (ISO 4217, e.g., 'USD')."
+                          },
+                          "tickets_url": {
+                            "type": "string",
+                            "description": "URL where tickets or more event info can be found.",
+                            "format": "uri"
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Short description or summary of the event."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "event_type",
+                          "city",
+                          "date"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "source": {
+                      "type": "string",
+                      "description": "Optional: primary data source used to compile results (e.g., promoter, venue, third-party aggregator)."
+                    },
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of matching events available (may exceed the returned array length)."
+                    }
+                  },
+                  "required": [
+                    "events"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Events_3_BuyEventTickets": {
+      "post": {
+        "operationId": "Events_3_BuyEventTickets",
+        "summary": "Simulate purchasing event tickets",
+        "description": "Simulates creating a ticket purchase for a cultural event on a given date and (optionally) city. Returns a confirmation with issued ticket details and totals.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "event_name": {
+                    "type": "string",
+                    "description": "The name of the artist or the title of the play for which tickets are being purchased. Do not include the 'concert' or 'play' suffix in the event name."
+                  },
+                  "number_of_tickets": {
+                    "type": "integer",
+                    "description": "The quantity of tickets to be reserved for the event."
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "The scheduled date of the event, in the format 'YYYY-MM-DD'."
+                  },
+                  "city": {
+                    "type": "string",
+                    "description": "The city where the event is located, in the format of 'City, State', such as 'Berkeley, CA' and 'New York, NY'.",
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "event_name",
+                  "number_of_tickets",
+                  "date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful ticket purchase confirmation",
+                  "properties": {
+                    "confirmation_id": {
+                      "type": "string",
+                      "description": "Unique identifier for this purchase confirmation."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Resulting status of the purchase (e.g., confirmed)."
+                    },
+                    "tickets": {
+                      "type": "array",
+                      "description": "List of issued tickets for this purchase.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "ticket_id": {
+                            "type": "string",
+                            "description": "Unique identifier for the issued ticket."
+                          },
+                          "seat": {
+                            "type": "string",
+                            "description": "Seat assignment or section (if applicable)."
+                          },
+                          "price": {
+                            "type": "number",
+                            "description": "Price charged for this ticket. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "currency": {
+                            "type": "string",
+                            "description": "Currency code for the ticket price (ISO 4217 recommended)."
+                          }
+                        },
+                        "required": [
+                          "ticket_id",
+                          "price",
+                          "currency"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_amount": {
+                      "type": "number",
+                      "description": "Total amount charged for this purchase. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Currency code for the total amount (ISO 4217 recommended)."
+                    },
+                    "purchase_timestamp": {
+                      "type": "string",
+                      "description": "Timestamp when the purchase was completed (server time)."
+                    },
+                    "info_url": {
+                      "type": "string",
+                      "description": "Optional URL where the purchaser can view or manage the order."
+                    }
+                  },
+                  "required": [
+                    "confirmation_id",
+                    "status",
+                    "tickets",
+                    "total_amount",
+                    "currency"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

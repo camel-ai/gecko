@@ -1,0 +1,969 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM185",
+    "version": "1.0.0",
+    "description": "LM185 exposes concise endpoints to discover and filter activities by participants, price, accessibility, type or unique key, plus randomized selection. Price and accessibility are normalized between 0.0 and 1.0 and support inclusive range queries; some endpoints return single randomized matches while others list all matching activities. Clients should issue parameter-driven, lightweight calls and only invoke ask_to_user sparingly when additional user input is required."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM185"
+    }
+  ],
+  "paths": {
+    "/get_activity_by_participants": {
+      "post": {
+        "operationId": "get_activity_by_participants",
+        "summary": "Return a random activity matching participant count and optional filters",
+        "description": "Simulate fetching a single activity suitable for the requested number of participants, optionally filtered by type, maximum price, and accessibility.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "participant_count": {
+                    "type": "integer",
+                    "description": "The number of participants for the activity.",
+                    "minimum": 1
+                  },
+                  "activity_type": {
+                    "type": "string",
+                    "description": "The type of the activity to filter by.",
+                    "enum": [
+                      "education",
+                      "recreational",
+                      "social",
+                      "diy",
+                      "charity",
+                      "cooking",
+                      "relaxation",
+                      "music",
+                      "busywork"
+                    ],
+                    "default": "recreational"
+                  },
+                  "price": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The maximum budget for the activity, where 0.0 means free and 1.0 represents no budget limit.. Use float format (e.g., 1.0 not 1).",
+                    "default": 0.0,
+                    "minimum": 0.0,
+                    "maximum": 1.0
+                  },
+                  "accessibility": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "Accessibility rating of the activity, from 0.0 (easily accessible) to 1.0 (less accessible).. Use float format (e.g., 1.0 not 1).",
+                    "default": 0.0,
+                    "minimum": 0.0,
+                    "maximum": 1.0
+                  }
+                },
+                "required": [
+                  "participant_count"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "A suggested activity that satisfies the request constraints.",
+                  "properties": {
+                    "activity": {
+                      "type": "string",
+                      "description": "A short human-readable description of the activity."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Category of the activity.",
+                      "enum": [
+                        "education",
+                        "recreational",
+                        "social",
+                        "diy",
+                        "charity",
+                        "cooking",
+                        "relaxation",
+                        "music",
+                        "busywork"
+                      ]
+                    },
+                    "participants": {
+                      "type": "integer",
+                      "description": "Number of participants this activity is suitable for.",
+                      "minimum": 1
+                    },
+                    "price": {
+                      "type": "number",
+                      "description": "Price rating between 0.0 (free) and 1.0 (no budget limit). Use float format (e.g., 1.0 not 1).",
+                      "format": "double",
+                      "minimum": 0.0,
+                      "maximum": 1.0
+                    },
+                    "accessibility": {
+                      "type": "number",
+                      "description": "Accessibility rating between 0.0 (easily accessible) and 1.0 (less accessible). Use float format (e.g., 1.0 not 1).",
+                      "format": "double",
+                      "minimum": 0.0,
+                      "maximum": 1.0
+                    },
+                    "link": {
+                      "type": "string",
+                      "description": "Optional URL or reference with more information about the activity."
+                    },
+                    "key": {
+                      "type": "string",
+                      "description": "Optional identifier for the suggested activity."
+                    }
+                  },
+                  "required": [
+                    "activity",
+                    "type",
+                    "participants"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_activity_by_price": {
+      "post": {
+        "operationId": "get_activity_by_price",
+        "summary": "Retrieve activities matching a price range",
+        "description": "Simulate finding activities that fall within the provided price range and return matching activity details.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "price": {
+                    "type": "object",
+                    "description": "The price range to find activities within. Both min_price and max_price are in USD.",
+                    "properties": {
+                      "min_price": {
+                        "type": "number",
+                        "format": "double",
+                        "description": "The minimum price of the activity in USD.. Use float format (e.g., 1.0 not 1)."
+                      },
+                      "max_price": {
+                        "type": "number",
+                        "format": "double",
+                        "description": "The maximum price of the activity in USD.. Use float format (e.g., 1.0 not 1)."
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "sort_order": {
+                    "type": "string",
+                    "description": "The order in which results should be sorted, based on price.",
+                    "enum": [
+                      "asc",
+                      "desc"
+                    ],
+                    "default": "asc"
+                  }
+                },
+                "required": [
+                  "price"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "A list of activities that match the requested price range.",
+                  "properties": {
+                    "activities": {
+                      "type": "array",
+                      "description": "Matching activities, ordered according to sort_order.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the activity."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Short title of the activity."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Longer description of the activity."
+                          },
+                          "price": {
+                            "type": "number",
+                            "description": "Price of the activity in USD. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "currency": {
+                            "type": "string",
+                            "description": "Currency code for the price (e.g., USD)."
+                          },
+                          "rating": {
+                            "type": "number",
+                            "description": "Average user rating for the activity, if available."
+                          },
+                          "location": {
+                            "type": "object",
+                            "description": "Location information associated with the activity, when applicable.",
+                            "properties": {
+                              "city": {
+                                "type": "string",
+                                "description": "City where the activity takes place."
+                              },
+                              "country": {
+                                "type": "string",
+                                "description": "Country where the activity takes place."
+                              }
+                            },
+                            "additionalProperties": true
+                          },
+                          "url": {
+                            "type": "string",
+                            "description": "Optional URL with more details or booking information."
+                          }
+                        },
+                        "additionalProperties": true
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "Total number of activities matching the filters (may be an estimate).",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "activities"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_random_event": {
+      "post": {
+        "operationId": "get_random_event",
+        "summary": "Select a random activity by type",
+        "description": "Simulate selecting a single random activity that matches the requested activity_type.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "activity_type": {
+                    "type": "string",
+                    "description": "The category of the activity to find.",
+                    "enum": [
+                      "education",
+                      "recreational",
+                      "social",
+                      "diy",
+                      "charity",
+                      "cooking",
+                      "relaxation",
+                      "music",
+                      "busywork"
+                    ]
+                  }
+                },
+                "required": [
+                  "activity_type"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "A single randomly selected activity matching the requested activity_type.",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Unique identifier for the activity."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Short title of the activity."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "Detailed description or instructions for the activity."
+                    },
+                    "activity_type": {
+                      "type": "string",
+                      "description": "Category of the activity.",
+                      "enum": [
+                        "education",
+                        "recreational",
+                        "social",
+                        "diy",
+                        "charity",
+                        "cooking",
+                        "relaxation",
+                        "music",
+                        "busywork"
+                      ]
+                    },
+                    "participants": {
+                      "type": "integer",
+                      "description": "Recommended number of participants.",
+                      "minimum": 1
+                    },
+                    "price": {
+                      "type": "number",
+                      "description": "Estimated cost or price indicator. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "duration_minutes": {
+                      "type": "integer",
+                      "description": "Approximate duration in minutes.",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "activity_type"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_activity_by_accessibility": {
+      "post": {
+        "operationId": "get_activity_by_accessibility",
+        "summary": "Simulate retrieval of a random accessible activity",
+        "description": "Simulate returning a single random activity suitable for the requested number of participants and accessibility constraints.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "participants": {
+                    "type": "integer",
+                    "description": "The number of people that this activity could involve, ranging from 1 to any positive number.",
+                    "minimum": 1
+                  },
+                  "accessibility": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The accessibility rating required for the activity, ranging from 0.0 (least accessible) to 1.0 (most accessible).. Use float format (e.g., 1.0 not 1).",
+                    "default": 1.0,
+                    "minimum": 0.0,
+                    "maximum": 1.0
+                  }
+                },
+                "required": [
+                  "participants"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "A randomly selected activity that meets the requested participants and accessibility constraints.",
+                  "properties": {
+                    "activity": {
+                      "type": "string",
+                      "description": "A brief description of the activity."
+                    },
+                    "participants": {
+                      "type": "integer",
+                      "description": "Number of people the activity is suitable for.",
+                      "minimum": 1
+                    },
+                    "accessibility": {
+                      "type": "number",
+                      "description": "Accessibility rating from 0.0 (least accessible) to 1.0 (most accessible). Use float format (e.g., 1.0 not 1).",
+                      "format": "double",
+                      "minimum": 0.0,
+                      "maximum": 1.0
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Category or type of the activity."
+                    }
+                  },
+                  "required": [
+                    "activity",
+                    "participants",
+                    "accessibility"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/finish": {
+      "post": {
+        "operationId": "finish",
+        "summary": "Select an activity matching a normalized price factor",
+        "description": "Simulate finding a single activity whose normalized price factor matches the requested price (0.0–1.0).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "price": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "A normalized factor representing the cost of the activity, ranging from 0.0 (free) to 1.0 (most expensive).. Use float format (e.g., 1.0 not 1)."
+                  }
+                },
+                "required": [
+                  "price"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "A recommended activity that matches the requested normalized price.",
+                  "properties": {
+                    "activity": {
+                      "type": "string",
+                      "description": "Short title or name of the recommended activity."
+                    },
+                    "details": {
+                      "type": "string",
+                      "description": "A more detailed description or instructions for the activity."
+                    },
+                    "price": {
+                      "type": "number",
+                      "description": "Normalized price factor for the returned activity, 0.0 (free) to 1.0 (most expensive). Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "participants": {
+                      "type": "integer",
+                      "description": "Suggested number of participants for this activity."
+                    },
+                    "estimated_duration_minutes": {
+                      "type": "integer",
+                      "description": "Estimated duration of the activity in minutes."
+                    }
+                  },
+                  "required": [
+                    "activity",
+                    "price"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_activity_by_price_range": {
+      "post": {
+        "operationId": "get_activity_by_price_range",
+        "summary": "Find activities by inclusive price-factor range",
+        "description": "Simulate retrieval of activities whose price factor falls inclusively between minprice and maxprice. A price factor of 0.0 means free and 1.0 means full price.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "minprice": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The minimum price factor for the event, ranging from 0.0 (free) to 1.0 (full price).. Use float format (e.g., 1.0 not 1)."
+                  },
+                  "maxprice": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The maximum price factor for the event, ranging from 0.0 (free) to 1.0 (full price).. Use float format (e.g., 1.0 not 1)."
+                  }
+                },
+                "required": [
+                  "minprice",
+                  "maxprice"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "description": "A list of activities that match the requested price-factor range.",
+                  "items": {
+                    "type": "object",
+                    "description": "Array item",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "Unique identifier for the activity."
+                      },
+                      "title": {
+                        "type": "string",
+                        "description": "Short title or name of the activity."
+                      },
+                      "description": {
+                        "type": "string",
+                        "description": "Detailed description of the activity (free text)."
+                      },
+                      "price": {
+                        "type": "number",
+                        "description": "Price factor for the activity, from 0.0 (free) to 1.0 (full price), inclusive. Use float format (e.g., 1.0 not 1).",
+                        "format": "double"
+                      },
+                      "metadata": {
+                        "type": "object",
+                        "description": "Optional additional metadata about the activity. Contents are implementation-defined.",
+                        "properties": {},
+                        "additionalProperties": true
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "title",
+                      "price"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_activity_by_accessibility_range": {
+      "post": {
+        "operationId": "get_activity_by_accessibility_range",
+        "summary": "Simulate retrieving an event matching a provided accessibility score",
+        "description": "Return a single activity whose accessibility falls within the allowed 0.0–1.0 range. Use the provided accessibility score as the target; prefer exact matches and otherwise return a nearest-match activity.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "accessibility": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "A numerical factor between 0.0 and 1.0 describing the event's accessibility, with 0.0 being the most accessible and 1.0 being the least accessible.. Use float format (e.g., 1.0 not 1).",
+                    "minimum": 0.0,
+                    "maximum": 1.0
+                  }
+                },
+                "required": [
+                  "accessibility"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "An activity that matches the requested accessibility criteria.",
+                  "properties": {
+                    "activityId": {
+                      "type": "string",
+                      "description": "Unique identifier for the activity."
+                    },
+                    "title": {
+                      "type": "string",
+                      "description": "Short title for the activity."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "Detailed description of the activity."
+                    },
+                    "accessibility": {
+                      "type": "number",
+                      "description": "A numerical factor between 0.0 and 1.0 describing the activity's accessibility, with 0.0 being the most accessible and 1.0 being the least accessible. Use float format (e.g., 1.0 not 1).",
+                      "format": "double",
+                      "minimum": 0.0,
+                      "maximum": 1.0
+                    },
+                    "participants": {
+                      "type": "integer",
+                      "description": "Recommended number of participants for the activity."
+                    },
+                    "price": {
+                      "type": "number",
+                      "description": "Estimated cost represented as a decimal between 0.0 (free) and 1.0 (most costly). Use float format (e.g., 1.0 not 1).",
+                      "format": "double",
+                      "minimum": 0.0,
+                      "maximum": 1.0
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Category of the activity (for example: education, recreational, social)."
+                    }
+                  },
+                  "required": [
+                    "activityId",
+                    "title",
+                    "accessibility"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_activity_by_type": {
+      "post": {
+        "operationId": "get_activity_by_type",
+        "summary": "Simulate retrieving an activity by accessibility range and type",
+        "description": "Simulate selecting a single event whose accessibility falls within the inclusive range [min_accessibility, max_accessibility]. If event_type is provided, filter by that type; otherwise use the event_type default from the request schema. Accessibility is a decimal between 0.0 (most accessible) and 1.0 (least accessible).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "min_accessibility": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The minimum accessibility value for the event, ranging from 0.0 (most accessible) to 1.0 (least accessible).. Use float format (e.g., 1.0 not 1).",
+                    "minimum": 0.0,
+                    "maximum": 1.0
+                  },
+                  "max_accessibility": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The maximum accessibility value for the event, ranging from 0.0 (most accessible) to 1.0 (least accessible).. Use float format (e.g., 1.0 not 1).",
+                    "minimum": 0.0,
+                    "maximum": 1.0
+                  },
+                  "event_type": {
+                    "type": "string",
+                    "description": "The type of event to filter by.",
+                    "enum": [
+                      "sport",
+                      "music",
+                      "theater",
+                      "workshop"
+                    ],
+                    "default": "sport"
+                  }
+                },
+                "required": [
+                  "min_accessibility",
+                  "max_accessibility"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "A single event matching the requested accessibility range and optional type.",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Unique identifier for the event."
+                    },
+                    "title": {
+                      "type": "string",
+                      "description": "Short human-readable title of the event."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "Longer description of the event."
+                    },
+                    "accessibility": {
+                      "type": "number",
+                      "description": "Accessibility value for this event, between 0.0 (most accessible) and 1.0 (least accessible). Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "description": "Type/category of the event.",
+                      "enum": [
+                        "sport",
+                        "music",
+                        "theater",
+                        "workshop"
+                      ]
+                    },
+                    "participants": {
+                      "type": "integer",
+                      "description": "Suggested number of participants for the event."
+                    },
+                    "price": {
+                      "type": "number",
+                      "description": "Relative price indicator for the event. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "location": {
+                      "type": "string",
+                      "description": "Optional human-readable location or venue for the event."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "accessibility",
+                    "event_type"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ask_to_user": {
+      "post": {
+        "operationId": "ask_to_user",
+        "summary": "Simulate prompting the user for additional input",
+        "description": "Pose a focused question to the user and await a response; used sparingly when extra guidance is required.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "question": {
+                    "type": "string",
+                    "description": "The specific question to present to the user."
+                  },
+                  "default_response": {
+                    "type": "string",
+                    "description": "The suggested default response to the question, which the user can accept or override.",
+                    "default": "No response provided"
+                  },
+                  "timeout": {
+                    "type": "integer",
+                    "description": "The time in seconds to wait for the user to respond before timing out. A timeout returns the default response.",
+                    "default": 30
+                  },
+                  "allow_multiple_choices": {
+                    "type": "boolean",
+                    "description": "A flag indicating whether the user can select multiple choices as a response.",
+                    "default": false
+                  },
+                  "choices": {
+                    "type": "array",
+                    "description": "A list of possible choices for the user to select from, if applicable.",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  }
+                },
+                "required": [
+                  "question"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload when the user prompt completes (either user reply or timeout fallback).",
+                  "properties": {
+                    "response": {
+                      "type": "string",
+                      "description": "The user's textual response. If choices were provided and one or more were selected, this will be a joined representation or the primary selected item."
+                    },
+                    "selected_choices": {
+                      "type": "array",
+                      "description": "If choices were provided, this contains the choice(s) selected by the user. If no choices were provided or the user replied with free text, this may be an empty array.",
+                      "default": [],
+                      "items": {
+                        "type": "string",
+                        "description": "A selected choice label."
+                      }
+                    },
+                    "timed_out": {
+                      "type": "boolean",
+                      "description": "True if the prompt timed out and the default_response was used."
+                    }
+                  },
+                  "required": [
+                    "response",
+                    "timed_out"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_activity_by_key": {
+      "post": {
+        "operationId": "get_activity_by_key",
+        "summary": "Retrieve activity by key",
+        "description": "Simulate retrieving an activity resource by its unique identifier key. Returns the activity object when found.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "description": "The unique identifier key for the activity to be retrieved."
+                  }
+                },
+                "required": [
+                  "key"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Activity resource returned on successful retrieval.",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "description": "The unique identifier key for the activity."
+                    },
+                    "title": {
+                      "type": "string",
+                      "description": "Short human-readable title for the activity."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "Detailed description or body of the activity."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Current lifecycle status of the activity (for example: active, inactive)."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp when the activity was created. ISO 8601 is recommended but not enforced."
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "description": "Timestamp of the last update to the activity. ISO 8601 is recommended but not enforced."
+                    },
+                    "metadata": {
+                      "type": "object",
+                      "description": "Optional free-form metadata associated with the activity.",
+                      "properties": {},
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "key"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,160 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI842",
+    "version": "1.0.0",
+    "description": "LI842 provides a transactional API for executing financial transfers between accounts; clients call the process_transaction endpoint with source and destination identifiers, amount, currency, and optional metadata. The service calculates and applies configurable fees, enforces validation and balance checks, and atomically updates account balances with predictable error codes for failures. Use idempotency keys for safe retries, monitor asynchronous status for long-running operations, and authenticate requests to ensure secure accounting and auditability."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI842"
+    }
+  ],
+  "paths": {
+    "/process_transaction": {
+      "post": {
+        "operationId": "process_transaction",
+        "summary": "Simulate processing a financial transaction",
+        "description": "Simulates executing a financial transaction between two accounts, applying the specified transaction fee (or a default fee if omitted), and producing the resulting transaction details.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "source_account": {
+                    "type": "string",
+                    "description": "The unique identifier of the account from which funds are being transferred."
+                  },
+                  "destination_account": {
+                    "type": "string",
+                    "description": "The unique identifier of the account to which funds are being transferred."
+                  },
+                  "amount": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The amount of money to be transferred in dollars.. Use float format (e.g., 1.0 not 1)."
+                  },
+                  "currency": {
+                    "type": "string",
+                    "description": "The currency in which the transaction will be processed.",
+                    "enum": [
+                      "USD",
+                      "EUR",
+                      "GBP",
+                      "JPY"
+                    ],
+                    "default": "USD"
+                  },
+                  "transaction_fee": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The transaction fee in dollars that will be applied. If not specified, a default fee is applied based on the amount.. Use float format (e.g., 1.0 not 1).",
+                    "default": 2.5
+                  },
+                  "apply_fee_to_recipient": {
+                    "type": "boolean",
+                    "description": "Indicates whether the transaction fee should be deducted from the recipient's amount instead of the sender's.",
+                    "default": false
+                  },
+                  "transaction_date": {
+                    "type": "string",
+                    "description": "The date when the transaction is to be executed, in the format 'MM/DD/YYYY'. If not specified, the transaction will be executed immediately.",
+                    "default": null
+                  },
+                  "notification_preference": {
+                    "type": "string",
+                    "description": "The preferred method of notification for transaction completion.",
+                    "enum": [
+                      "email",
+                      "sms",
+                      "none"
+                    ],
+                    "default": "email"
+                  }
+                },
+                "required": [
+                  "source_account",
+                  "destination_account",
+                  "amount"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Details of the completed transaction.",
+                  "properties": {
+                    "transaction_id": {
+                      "type": "string",
+                      "description": "A server-generated unique identifier for the processed transaction."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The outcome of the transaction processing (e.g., completed, pending)."
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Currency used for the transaction.",
+                      "enum": [
+                        "USD",
+                        "EUR",
+                        "GBP",
+                        "JPY"
+                      ]
+                    },
+                    "gross_amount": {
+                      "type": "number",
+                      "description": "Original transfer amount before fees. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "fee": {
+                      "type": "number",
+                      "description": "Transaction fee that was applied. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "net_amount": {
+                      "type": "number",
+                      "description": "Amount that the recipient receives after fee application. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "fee_applied_to_recipient": {
+                      "type": "boolean",
+                      "description": "True if the fee was deducted from the recipient's amount; false if deducted from the sender."
+                    },
+                    "executed_at": {
+                      "type": "string",
+                      "description": "Timestamp when the transaction was executed (string)."
+                    },
+                    "note": {
+                      "type": "string",
+                      "description": "Optional human-readable note about the processing result."
+                    }
+                  },
+                  "required": [
+                    "transaction_id",
+                    "status",
+                    "currency",
+                    "gross_amount",
+                    "fee",
+                    "net_amount"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

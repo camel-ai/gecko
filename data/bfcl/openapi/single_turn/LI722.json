@@ -1,0 +1,319 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI722",
+    "version": "1.0.0",
+    "description": "LI722 provides simple imperative endpoints to manage audio playback and timed notifications: adjust global audio level with set_volume (0–100), schedule alarms via flexible time formats with set_alarm, start duration-based timers using set_countdown, and search and play tracks on Spotify with play_spotify_song. Designed for concise programmatic control in automation flows and user interfaces, it prioritizes clear, human-friendly time expressions and immediate playback commands."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI722"
+    }
+  ],
+  "paths": {
+    "/set_volume": {
+      "post": {
+        "operationId": "set_volume",
+        "summary": "Set global audio volume",
+        "description": "Simulate setting the global volume level (0 = mute, 100 = maximum).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "volume": {
+                    "type": "integer",
+                    "description": "The volume level to be set. Acceptable values range from 0 (mute) to 100 (maximum volume).",
+                    "minimum": 0,
+                    "maximum": 100
+                  }
+                },
+                "required": [
+                  "volume"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Acknowledgement payload indicating the request succeeded.",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "True when the volume was successfully applied."
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/set_alarm": {
+      "post": {
+        "operationId": "set_alarm",
+        "summary": "Set alarm",
+        "description": "Simulate creating an alarm entry from a provided time string (supports formats like 'YYYY-MM-DD HH:MM:SS', 'HH:MM:SS', 'HH:MM', 'HH:MM AM/PM'). Returns the created alarm record with a normalized scheduled time.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "alarm_time": {
+                    "type": "string",
+                    "description": "The alarm time in a recognized format, such as 'YYYY-MM-DD HH:MM:SS', 'HH:MM:SS', 'HH:MM', or 'HH:MM AM/PM'."
+                  },
+                  "purpose": {
+                    "type": "string",
+                    "description": "The purpose of the alarm, such as 'wake up' or 'meeting'.",
+                    "default": "General reminder"
+                  }
+                },
+                "required": [
+                  "alarm_time"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Created alarm record returned on success.",
+                  "properties": {
+                    "alarm_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the created alarm."
+                    },
+                    "scheduled_time": {
+                      "type": "string",
+                      "description": "Normalized scheduled time for the alarm, returned as an ISO 8601 timestamp (e.g., '2023-06-01T09:30:00')."
+                    },
+                    "purpose": {
+                      "type": "string",
+                      "description": "Purpose of the alarm, copied from the request or set to the default if not provided."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp when the alarm was created, returned as an ISO 8601 timestamp."
+                    }
+                  },
+                  "required": [
+                    "alarm_id",
+                    "scheduled_time",
+                    "purpose",
+                    "created_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/set_countdown": {
+      "post": {
+        "operationId": "set_countdown",
+        "summary": "Set a countdown timer",
+        "description": "Simulate setting a countdown timer based on a human-readable duration string (e.g., '1h 30m', '45m', '2h'). Returns timer metadata including identifiers and scheduled endpoints.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "duration": {
+                    "type": "string",
+                    "description": "The countdown duration in the format of 'Nh Nm', where 'N' can be any integer representing the number of hours (h) or minutes (m). For example, '1h 30m', '45m', '2h'."
+                  },
+                  "purpose": {
+                    "type": "string",
+                    "description": "The purpose of the countdown timer. This is an optional parameter.",
+                    "default": "General reminder"
+                  }
+                },
+                "required": [
+                  "duration"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Payload returned when a countdown timer is successfully scheduled.",
+                  "properties": {
+                    "timer_id": {
+                      "type": "string",
+                      "description": "A stable identifier for the scheduled countdown timer."
+                    },
+                    "started_at": {
+                      "type": "string",
+                      "description": "Timestamp when the countdown was started (RFC 3339 / ISO 8601).",
+                      "format": "date-time"
+                    },
+                    "ends_at": {
+                      "type": "string",
+                      "description": "Timestamp when the countdown will complete (RFC 3339 / ISO 8601).",
+                      "format": "date-time"
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Current state of the timer (for example: running, completed)."
+                    }
+                  },
+                  "required": [
+                    "timer_id",
+                    "started_at",
+                    "ends_at",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/play_spotify_song": {
+      "post": {
+        "operationId": "play_spotify_song",
+        "summary": "Play a Spotify song matching a search query",
+        "description": "Simulate searching Spotify using the provided query and start playback according to autoplay and volume. Useful for testing selection and playback behavior.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "description": "The search query for the song. It can be in the format 'track:Song Name artist:Artist Name', or just the song name if the artist is unknown. Example: 'track:Shape of You artist:Ed Sheeran'."
+                  },
+                  "autoplay": {
+                    "type": "boolean",
+                    "description": "Determines whether the song should start playing automatically. Set to true to autoplay the song.",
+                    "default": false
+                  },
+                  "volume": {
+                    "type": "integer",
+                    "description": "Sets the volume at which the song should play. The value must be between 0 (mute) and 100 (maximum volume).",
+                    "default": 50
+                  }
+                },
+                "required": [
+                  "query"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful playback response",
+                  "properties": {
+                    "playback_id": {
+                      "type": "string",
+                      "description": "Server-assigned identifier for this playback session."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Playback status returned by the server (for example: playing, queued)."
+                    },
+                    "track": {
+                      "type": "object",
+                      "description": "Information about the track selected for playback.",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "Provider-specific track identifier."
+                        },
+                        "title": {
+                          "type": "string",
+                          "description": "Track title."
+                        },
+                        "artist": {
+                          "type": "string",
+                          "description": "Track artist name(s)."
+                        },
+                        "album": {
+                          "type": "string",
+                          "description": "Album name, if available."
+                        },
+                        "uri": {
+                          "type": "string",
+                          "description": "Provider URI for the track, if available."
+                        },
+                        "duration": {
+                          "type": "integer",
+                          "description": "Track duration as an integer value as reported by the provider."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "title",
+                        "artist"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "volume": {
+                      "type": "integer",
+                      "description": "Effective playback volume. Matches the requested value when applicable."
+                    }
+                  },
+                  "required": [
+                    "playback_id",
+                    "status",
+                    "track"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

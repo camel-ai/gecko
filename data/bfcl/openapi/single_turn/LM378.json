@@ -1,0 +1,243 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM378",
+    "version": "1.0.0",
+    "description": "LM378 is an appointment and discovery API that lets applications find and schedule mental health providers. Use Services_4_FindProvider to discover therapists by condition, specialty, and user preferences within a specified city, then call Services_4_BookAppointment to reserve a therapist at a chosen date and time. The API is designed for straightforward integration with predictable request/response patterns, idempotent booking, status codes, and clear error messages for robust client workflows."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM378"
+    }
+  ],
+  "paths": {
+    "/Services_4_BookAppointment": {
+      "post": {
+        "operationId": "Services_4_BookAppointment",
+        "summary": "Book therapist appointment",
+        "description": "Simulates booking an appointment with a specified therapist; validates date/time and returns booking details on success.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "therapist_name": {
+                    "type": "string",
+                    "description": "The full name of the therapist with whom the appointment is to be booked."
+                  },
+                  "appointment_time": {
+                    "type": "string",
+                    "description": "The time of the appointment in 24-hour format (HH:MM)."
+                  },
+                  "appointment_date": {
+                    "type": "string",
+                    "description": "The date of the appointment in the format YYYY-MM-DD."
+                  }
+                },
+                "required": [
+                  "therapist_name",
+                  "appointment_time",
+                  "appointment_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful appointment booking payload",
+                  "properties": {
+                    "appointment_id": {
+                      "type": "string",
+                      "description": "A unique identifier for the booked appointment (opaque string)."
+                    },
+                    "therapist_name": {
+                      "type": "string",
+                      "description": "The full name of the therapist with whom the appointment was booked."
+                    },
+                    "appointment_date": {
+                      "type": "string",
+                      "description": "The date of the appointment in the format YYYY-MM-DD."
+                    },
+                    "appointment_time": {
+                      "type": "string",
+                      "description": "The time of the appointment in 24-hour format (HH:MM)."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The booking status for the appointment."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp when the booking was created (ISO 8601 recommended)."
+                    }
+                  },
+                  "required": [
+                    "appointment_id",
+                    "therapist_name",
+                    "appointment_date",
+                    "appointment_time",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Services_4_FindProvider": {
+      "post": {
+        "operationId": "Services_4_FindProvider",
+        "summary": "Find therapists by city and therapist type",
+        "description": "Simulate discovering therapists matching the requested city and therapist type; returns a ranked list of provider records.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "city": {
+                    "type": "string",
+                    "description": "The city in which the user is searching for a therapist, in the format of 'City, State', such as 'Berkeley, CA' or 'New York, NY'. State names must be abbreviated with two letters."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "The specific type of therapist the user is looking for.",
+                    "enum": [
+                      "Psychologist",
+                      "Family Counselor",
+                      "Psychiatrist"
+                    ]
+                  }
+                },
+                "required": [
+                  "city",
+                  "type"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing matching providers",
+                  "properties": {
+                    "providers": {
+                      "type": "array",
+                      "description": "List of matching providers (ordered by relevance: match on type, specialties, rating, and proximity).",
+                      "maxItems": 50,
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique provider identifier."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Full provider name."
+                          },
+                          "type": {
+                            "type": "string",
+                            "description": "Provider's professional type (e.g., Psychologist, Family Counselor, Psychiatrist)."
+                          },
+                          "specialties": {
+                            "type": "array",
+                            "description": "Primary treatment areas or specialties for the provider.",
+                            "items": {
+                              "type": "string",
+                              "description": "Array item"
+                            }
+                          },
+                          "city": {
+                            "type": "string",
+                            "description": "Provider's city (same format as request: 'City, ST')."
+                          },
+                          "distance_miles": {
+                            "type": "number",
+                            "description": "Approximate distance from the requested city center in miles. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "rating": {
+                            "type": "number",
+                            "description": "Average user rating (e.g., 4.5). Provide as a float (e.g., 4.0, not 4).",
+                            "format": "double"
+                          },
+                          "review_count": {
+                            "type": "integer",
+                            "description": "Number of user reviews."
+                          },
+                          "accepts_insurance": {
+                            "type": "boolean",
+                            "description": "Whether the provider accepts insurance."
+                          },
+                          "telehealth": {
+                            "type": "boolean",
+                            "description": "Whether the provider offers telehealth/remote sessions."
+                          },
+                          "price_per_session": {
+                            "type": "number",
+                            "description": "Typical price per session in local currency. Provide as a float (e.g., 120.0, not 120).",
+                            "format": "double"
+                          },
+                          "languages": {
+                            "type": "array",
+                            "description": "Languages the provider can deliver services in.",
+                            "items": {
+                              "type": "string",
+                              "description": "Array item"
+                            }
+                          },
+                          "next_available": {
+                            "type": "string",
+                            "description": "A human-readable next available appointment (no enforced format)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "type",
+                          "city"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of matching providers (may be larger than the returned list)."
+                    }
+                  },
+                  "required": [
+                    "providers",
+                    "total_results"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

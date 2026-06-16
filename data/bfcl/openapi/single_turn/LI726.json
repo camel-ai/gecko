@@ -1,0 +1,205 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI726",
+    "version": "1.0.0",
+    "description": "LI726 is a compact, user-friendly API for scheduling alarms and playing music. It exposes set_alarm, accepting flexible time formats (YYYY-MM-DD HH:MM:SS, HH:MM:SS, HH:MM, or 12-hour like 9:30 AM) for one-off or time-only alarms, and play_song, which locates and plays tracks from a search query. Use straightforward calls to quickly integrate alarm scheduling and song playback into applications."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI726"
+    }
+  ],
+  "paths": {
+    "/set_alarm": {
+      "post": {
+        "operationId": "set_alarm",
+        "summary": "Set an alarm for a specified time",
+        "description": "Simulate scheduling an alarm. Accepts multiple common time formats (for example 'YYYY-MM-DD HH:MM:SS', 'HH:MM:SS', 'HH:MM', or 'HH:MM AM/PM') and returns a confirmation with a scheduled time and an alarm identifier.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "alarm_time": {
+                    "type": "string",
+                    "description": "The alarm time in a recognized format such as 'YYYY-MM-DD HH:MM:SS', 'HH:MM:SS', 'HH:MM', or 'HH:MM AM/PM'."
+                  },
+                  "purpose": {
+                    "type": "string",
+                    "description": "The purpose of the alarm, such as 'wake up' or 'meeting'.",
+                    "default": "General reminder"
+                  }
+                },
+                "required": [
+                  "alarm_time"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Confirmation payload returned when an alarm is successfully scheduled.",
+                  "properties": {
+                    "alarm_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the created alarm."
+                    },
+                    "scheduled_time": {
+                      "type": "string",
+                      "description": "Resolved scheduled time in ISO 8601 format (for example '2023-06-01T09:30:00Z' or with an offset)."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Outcome status of the request (for example 'scheduled')."
+                    }
+                  },
+                  "required": [
+                    "alarm_id",
+                    "scheduled_time",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/play_song": {
+      "post": {
+        "operationId": "play_song",
+        "summary": "Play a song matching a user search query",
+        "description": "Simulate selecting and starting playback of a track that best matches the provided search query. Respects shuffle, repeat, and volume settings when deciding what to play.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "description": "The search query for the song, which may include title, artist, or album name."
+                  },
+                  "shuffle": {
+                    "type": "boolean",
+                    "description": "Determines if the song playback should be shuffled. If true, plays songs in random order.",
+                    "default": false
+                  },
+                  "repeat": {
+                    "type": "boolean",
+                    "description": "Determines if the song should be repeated after it finishes playing.",
+                    "default": false
+                  },
+                  "volume": {
+                    "type": "integer",
+                    "description": "The volume level to play the song at, ranging from 0 (mute) to 100 (maximum volume).",
+                    "default": 70,
+                    "minimum": 0,
+                    "maximum": 100
+                  }
+                },
+                "required": [
+                  "query"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Response returned when playback is successfully started or when no matching track is found.",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "description": "High-level result of the operation, e.g. 'playing', 'queued', or 'not_found'."
+                    },
+                    "track": {
+                      "type": "object",
+                      "description": "Parameter track",
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "description": "Details for the track that was started or queued.",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "description": "Unique identifier for the track in the catalog."
+                            },
+                            "title": {
+                              "type": "string",
+                              "description": "Track title."
+                            },
+                            "artist": {
+                              "type": "string",
+                              "description": "Primary artist name."
+                            },
+                            "album": {
+                              "type": "string",
+                              "description": "Album name if available."
+                            },
+                            "duration_seconds": {
+                              "type": "integer",
+                              "description": "Total duration of the track in seconds."
+                            },
+                            "start_position_seconds": {
+                              "type": "integer",
+                              "description": "Playback start position in seconds (typically 0)."
+                            },
+                            "uri": {
+                              "type": "string",
+                              "description": "Optional playback URI or resource locator for the track."
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "title",
+                            "duration_seconds"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null",
+                          "description": "Parameter track option 2"
+                        }
+                      ],
+                      "properties": {}
+                    },
+                    "queue_position": {
+                      "type": "integer",
+                      "description": "If the track was queued instead of played immediately, its 0-based position in the play queue. Omitted when not applicable."
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "track"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

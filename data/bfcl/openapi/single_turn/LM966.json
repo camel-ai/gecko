@@ -1,0 +1,322 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM966",
+    "version": "1.0.0",
+    "description": "LM966 is a lightweight customer support and parcel-tracking API designed for conversational flows that combine automated responses with agent handoff. Use GET_PARCEL_STATE to fetch parcel status by tracking ID, use answer_question to flag unresolved queries, and call handover_to_agent to initiate a human transfer when automation cannot satisfy user intent. Integrate the endpoints into chatbots to maintain smooth escalation and transparent state-aware interactions."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM966"
+    }
+  ],
+  "paths": {
+    "/answer_question": {
+      "post": {
+        "operationId": "answer_question",
+        "summary": "Transfer chat to a human agent",
+        "description": "Simulate transferring the conversation to a human agent using the provided statement, urgency_level, and language. The system should route and prioritize the transfer but must not alter the provided request parameter definitions.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "statement": {
+                    "type": "string",
+                    "description": "The specific question posed by the user that needs to be addressed by a human agent."
+                  },
+                  "urgency_level": {
+                    "type": "string",
+                    "description": "The urgency level of the user's query.",
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high"
+                    ],
+                    "default": "low"
+                  },
+                  "language": {
+                    "type": "string",
+                    "description": "The language in which the question is asked.",
+                    "enum": [
+                      "English",
+                      "Spanish",
+                      "French",
+                      "German",
+                      "Chinese"
+                    ],
+                    "default": "English"
+                  }
+                },
+                "required": [
+                  "statement"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful transfer result payload.",
+                  "properties": {
+                    "transfer_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the transfer session."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Outcome status of the transfer.",
+                      "enum": [
+                        "queued",
+                        "assigned",
+                        "failed"
+                      ]
+                    },
+                    "assigned_agent": {
+                      "type": "string",
+                      "description": "Information about the assigned human agent, or null if not yet assigned."
+                    },
+                    "queue_position": {
+                      "type": "integer",
+                      "description": "Current position in the agent queue (0 means immediate assignment).",
+                      "minimum": 0
+                    },
+                    "estimated_wait_seconds": {
+                      "type": "integer",
+                      "description": "Estimated wait time in seconds until an agent is available.",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "transfer_id",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/handover_to_agent": {
+      "post": {
+        "operationId": "handover_to_agent",
+        "summary": "Initiate chat handover to a human agent",
+        "description": "Simulate initiating a transfer of the current chat session to a human agent. Input includes the user's statement, urgency, language, and optional context. Returns routing and queue metadata for the initiated handover.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "statement": {
+                    "type": "string",
+                    "description": "The initial query or statement made by the user that prompts the transfer to a human agent."
+                  },
+                  "urgency": {
+                    "type": "string",
+                    "description": "Indicates the level of urgency for the handover to a human agent.",
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high"
+                    ],
+                    "default": "low"
+                  },
+                  "language": {
+                    "type": "string",
+                    "description": "The language of the user's statement, represented as an ISO 639-1 two-letter language code, such as 'en' for English or 'es' for Spanish.",
+                    "default": "en"
+                  },
+                  "context": {
+                    "type": "string",
+                    "description": "Additional context or information about the conversation that may assist the human agent.",
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "statement"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful handover payload returned when the transfer to a human agent is initiated.",
+                  "properties": {
+                    "transfer_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the initiated handover/transfer session."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Current state of the transfer process.",
+                      "enum": [
+                        "queued",
+                        "connected",
+                        "failed",
+                        "cancelled"
+                      ]
+                    },
+                    "agent_id": {
+                      "type": "string",
+                      "description": "Identifier of the agent who accepted the handover; null if not yet assigned or if queued."
+                    },
+                    "estimated_wait_seconds": {
+                      "type": "integer",
+                      "description": "Estimated wait time in seconds until an agent is available; may be 0 if already connected.",
+                      "minimum": 0
+                    },
+                    "queue_position": {
+                      "type": "integer",
+                      "description": "Estimated position in the agent queue; 1 means next in line.",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "transfer_id",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/GET_PARCEL_STATE": {
+      "post": {
+        "operationId": "GET_PARCEL_STATE",
+        "summary": "Retrieve current parcel state by tracking ID",
+        "description": "Simulate retrieving the current state of a parcel identified by parcelTrackingId. Return the latest status, location, timestamps, and recent tracking events.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "parcelTrackingId": {
+                    "type": "string",
+                    "description": "The unique identifier for tracking the parcel."
+                  }
+                },
+                "required": [
+                  "parcelTrackingId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Current state of the parcel returned on success.",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "description": "Human-readable current status of the parcel (for example: Delivered, In Transit, Out for Delivery, Exception)."
+                    },
+                    "lastUpdated": {
+                      "type": "string",
+                      "description": "Timestamp of the last state update. Use an ISO-8601-like timestamp string (e.g., 2023-03-15T13:45:30Z)."
+                    },
+                    "currentLocation": {
+                      "type": "object",
+                      "description": "Most recent known location details for the parcel, if available.",
+                      "properties": {
+                        "city": {
+                          "type": "string",
+                          "description": "City name of the most recent location."
+                        },
+                        "region": {
+                          "type": "string",
+                          "description": "Region/state of the most recent location."
+                        },
+                        "postalCode": {
+                          "type": "string",
+                          "description": "Postal code of the most recent location."
+                        },
+                        "country": {
+                          "type": "string",
+                          "description": "Country of the most recent location (ISO country name or code)."
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "estimatedDelivery": {
+                      "type": "string",
+                      "description": "Estimated delivery date/time if available."
+                    },
+                    "events": {
+                      "type": "array",
+                      "description": "Recent chronological tracking events (most recent first).",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "code": {
+                            "type": "string",
+                            "description": "Short event code or tag representing the event type."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Human-readable description of the event."
+                          },
+                          "timestamp": {
+                            "type": "string",
+                            "description": "Timestamp for when the event occurred."
+                          },
+                          "location": {
+                            "type": "string",
+                            "description": "Optional free-text location associated with the event."
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "timestamp"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "lastUpdated"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

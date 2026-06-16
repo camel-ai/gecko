@@ -1,0 +1,156 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LS103",
+    "version": "1.0.0",
+    "description": "LS103 is a compact transactional API collection for computing sales tax and returning tax-inclusive totals. Designed for simple, programmatic integration, it exposes a calculate_tax operation that accepts amount and jurisdiction parameters and returns the total amount with tax applied. Use it in payment flows, checkout validation, or invoicing to standardize tax computation, supporting synchronous requests and straightforward JSON input/output."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LS103"
+    }
+  ],
+  "paths": {
+    "/calculate_tax": {
+      "post": {
+        "operationId": "calculate_tax",
+        "summary": "Simulate sales tax calculation",
+        "description": "Calculates sales tax for a purchase given jurisdiction and returns subtotal, tax breakdown, and total. Discounts are applied before tax; tax-exempt purchases bypass tax; local (county/city) rates are used only when provided.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "purchase_amount": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The total purchase amount in dollars.. Use float format (e.g., 1.0 not 1)."
+                  },
+                  "state": {
+                    "type": "string",
+                    "description": "The U.S. state abbreviation where the purchase is made, such as 'CA' for California or 'NY' for New York."
+                  },
+                  "county": {
+                    "type": "string",
+                    "description": "The county within the state where the purchase is made. This is optional and used to calculate local tax rates.",
+                    "default": null
+                  },
+                  "city": {
+                    "type": "string",
+                    "description": "The city within the county for local tax rates. Optional and only used if the county is provided.",
+                    "default": null
+                  },
+                  "tax_exempt": {
+                    "type": "boolean",
+                    "description": "Indicates whether the purchase is tax-exempt.",
+                    "default": false
+                  },
+                  "discount_rate": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The discount rate as a percentage if applicable. Optional.. Use float format (e.g., 1.0 not 1).",
+                    "default": 0.0
+                  },
+                  "apply_special_tax": {
+                    "type": "boolean",
+                    "description": "A flag to apply special tax rules based on item type or promotions. Optional.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "purchase_amount",
+                  "state"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful tax calculation result",
+                  "properties": {
+                    "total_amount": {
+                      "type": "number",
+                      "description": "Total amount due after discounts and tax, in dollars. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "subtotal": {
+                      "type": "number",
+                      "description": "Purchase amount after applying any discounts but before tax, in dollars. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "tax_amount": {
+                      "type": "number",
+                      "description": "Total tax applied in dollars. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "effective_tax_rate": {
+                      "type": "number",
+                      "description": "Effective tax rate applied to the subtotal, expressed as a percentage (e.g., 8.25). Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "breakdown": {
+                      "type": "array",
+                      "description": "List of tax components applied (by jurisdiction or rule). Each entry shows the component label, rate, and amount.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "label": {
+                            "type": "string",
+                            "description": "Human-readable label for the tax component (e.g., 'state', 'county', 'special')."
+                          },
+                          "rate": {
+                            "type": "number",
+                            "description": "Rate applied for this component, expressed as a percentage (e.g., 2.5). Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "amount": {
+                            "type": "number",
+                            "description": "Dollar amount contributed by this tax component. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "rate",
+                          "amount"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "discounts_applied": {
+                      "type": "number",
+                      "description": "Total discount amount subtracted from the original purchase_amount, in dollars. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "applied_special_tax": {
+                      "type": "boolean",
+                      "description": "Whether any special tax rules were applied during calculation."
+                    }
+                  },
+                  "required": [
+                    "total_amount",
+                    "subtotal",
+                    "tax_amount",
+                    "effective_tax_rate"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

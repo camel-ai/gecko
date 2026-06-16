@@ -1,0 +1,173 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI791",
+    "version": "1.0.0",
+    "description": "LI791 is a compact API collection offering two complementary services: repair_mobile to initiate and track sending a mobile device to a selected repair shop for diagnosis and fixing, and clean to perform automated dataset sanitization—removing nulls and duplicates and applying normalization. Designed for straightforward REST integration, it supports clear request/response patterns, idempotent operations, and minimal payloads for quick orchestration within device-management or data-preparation pipelines."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI791"
+    }
+  ],
+  "paths": {
+    "/repair_mobile": {
+      "post": {
+        "operationId": "repair_mobile",
+        "summary": "Send mobile device to repair shop",
+        "description": "Simulate dispatching a mobile device to the chosen repair shop, produce a repair ticket, and return an estimated turnaround. Apply request defaults when fields are omitted.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "shop": {
+                    "type": "string",
+                    "description": "The name of the repair shop where the phone will be taken for repair. Example: 'TechFix Center'."
+                  },
+                  "issue_description": {
+                    "type": "string",
+                    "description": "A brief description of the issues with the phone.",
+                    "default": "General servicing"
+                  },
+                  "urgent": {
+                    "type": "boolean",
+                    "description": "Whether the repair needs to be done urgently. Defaults to false.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "shop"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Response returned when the device has been accepted for repair",
+                  "properties": {
+                    "repair_id": {
+                      "type": "string",
+                      "description": "A unique identifier assigned to the repair job."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Current status of the repair job (for example: scheduled, in_progress, completed)."
+                    },
+                    "estimated_completion_days": {
+                      "type": "integer",
+                      "description": "Estimated number of days until repair completion. Zero indicates same-day completion.",
+                      "minimum": 0
+                    },
+                    "repair_shop_contact": {
+                      "type": "string",
+                      "description": "Optional contact information for the repair shop (phone number or email) if available."
+                    }
+                  },
+                  "required": [
+                    "repair_id",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/clean": {
+      "post": {
+        "operationId": "clean",
+        "summary": "Simulate cleaning of a dataset (remove nulls/duplicates, normalize).",
+        "description": "Simulate performing data-cleaning operations on the provided dataset: removing rows with nulls, dropping duplicate rows, and normalizing numerical columns when requested. Returns the cleaned dataset and summary metrics.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "df": {
+                    "description": "The dataset in the form of a dataframe to be cleaned."
+                  },
+                  "remove_nulls": {
+                    "type": "boolean",
+                    "description": "Flag to determine whether to remove rows with null values.",
+                    "default": true
+                  },
+                  "remove_duplicates": {
+                    "type": "boolean",
+                    "description": "Flag to determine whether to remove duplicate rows.",
+                    "default": true
+                  },
+                  "normalize_columns": {
+                    "type": "boolean",
+                    "description": "Flag to determine whether to normalize numerical columns.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "df"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful cleaning result.",
+                  "properties": {
+                    "cleaned_df": {
+                      "type": "object",
+                      "description": "Cleaned dataset in a dataframe-like structure. The exact shape depends on the client's dataframe representation (e.g., list of row objects or column-keyed arrays).",
+                      "properties": {},
+                      "additionalProperties": true
+                    },
+                    "rows_removed": {
+                      "type": "integer",
+                      "description": "Number of rows removed due to nulls or other filtering. Non-negative."
+                    },
+                    "duplicates_removed": {
+                      "type": "integer",
+                      "description": "Number of duplicate rows removed. Non-negative."
+                    },
+                    "normalized_columns": {
+                      "type": "array",
+                      "description": "List of numerical column names that were normalized.",
+                      "items": {
+                        "type": "string",
+                        "description": "Array item"
+                      }
+                    }
+                  },
+                  "required": [
+                    "cleaned_df"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

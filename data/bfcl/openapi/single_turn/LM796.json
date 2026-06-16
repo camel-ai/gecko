@@ -1,0 +1,703 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM796",
+    "version": "1.0.0",
+    "description": "LM796 is a compact multi-domain API for residential search, visit scheduling, car rental discovery and reservations, and retrieving weather data. Clients use straightforward request parameters to filter homes by amenities and schedule visits, query available rental cars and make reservations with pickup/return and insurance options, and fetch current or historical weather for planning. Designed for simple integrations with predictable inputs and single-call operations for each task."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM796"
+    }
+  ],
+  "paths": {
+    "/Homes_2_FindHomeByArea": {
+      "post": {
+        "operationId": "Homes_2_FindHomeByArea",
+        "summary": "Find homes in a city with basic filters (beds, baths, garage, laundry)",
+        "description": "Simulate searching properties to rent or buy in a specified city, filtering by number of bedrooms, bathrooms, garage availability, and in-unit laundry.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "area": {
+                    "type": "string",
+                    "description": "The city where the property is located, in the format of 'City, State' (e.g., 'San Francisco, CA')."
+                  },
+                  "intent": {
+                    "type": "string",
+                    "description": "The intent for the property search, indicating whether the user wants to rent or buy.",
+                    "enum": [
+                      "rent",
+                      "buy"
+                    ]
+                  },
+                  "number_of_beds": {
+                    "type": "integer",
+                    "description": "The number of bedrooms desired in the property."
+                  },
+                  "number_of_baths": {
+                    "type": "integer",
+                    "description": "The number of bathrooms desired in the property."
+                  },
+                  "has_garage": {
+                    "type": "string",
+                    "description": "The preference for a garage with the property, with 'dontcare' indicating no preference.",
+                    "enum": [
+                      "True",
+                      "False"
+                    ]
+                  },
+                  "in_unit_laundry": {
+                    "type": "string",
+                    "description": "The preference for in-unit laundry facilities, with 'dontcare' indicating no preference.",
+                    "enum": [
+                      "True",
+                      "False"
+                    ]
+                  }
+                },
+                "required": [
+                  "area",
+                  "intent",
+                  "number_of_beds",
+                  "number_of_baths"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful search result payload containing matching listings and totals.",
+                  "properties": {
+                    "listings": {
+                      "type": "array",
+                      "description": "Array of matching property listings (may be empty).",
+                      "items": {
+                        "type": "object",
+                        "description": "A single property listing.",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the listing."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Short, human-friendly title for the listing."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Full textual description of the property."
+                          },
+                          "address": {
+                            "type": "object",
+                            "description": "Structured address for the property.",
+                            "properties": {
+                              "street": {
+                                "type": "string",
+                                "description": "Street address line (if available)."
+                              },
+                              "city": {
+                                "type": "string",
+                                "description": "City name."
+                              },
+                              "state": {
+                                "type": "string",
+                                "description": "State or region abbreviation or name."
+                              },
+                              "postal_code": {
+                                "type": "string",
+                                "description": "Postal code / ZIP code."
+                              }
+                            },
+                            "required": [
+                              "city",
+                              "state"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "price": {
+                            "type": "number",
+                            "description": "Listing price. Provide as a float (e.g., 1234.50, not 1234).",
+                            "format": "double"
+                          },
+                          "currency": {
+                            "type": "string",
+                            "description": "Currency code for the price (ISO 4217), e.g., 'USD'."
+                          },
+                          "number_of_beds": {
+                            "type": "integer",
+                            "description": "Number of bedrooms."
+                          },
+                          "number_of_baths": {
+                            "type": "integer",
+                            "description": "Number of bathrooms."
+                          },
+                          "has_garage": {
+                            "type": "string",
+                            "description": "Garage availability: 'True', 'False', or 'dontcare'."
+                          },
+                          "in_unit_laundry": {
+                            "type": "string",
+                            "description": "In-unit laundry availability: 'True', 'False', or 'dontcare'."
+                          },
+                          "listing_url": {
+                            "type": "string",
+                            "description": "URL to view the full listing."
+                          },
+                          "photos": {
+                            "type": "array",
+                            "description": "List of photo URLs for the listing (may be empty).",
+                            "items": {
+                              "type": "string",
+                              "description": "Array item",
+                              "format": "uri"
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "address",
+                          "price"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of matching listings available (may be greater than the number returned in 'listings')."
+                    }
+                  },
+                  "required": [
+                    "listings",
+                    "total_results"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Homes_2_ScheduleVisit": {
+      "post": {
+        "operationId": "Homes_2_ScheduleVisit",
+        "summary": "Simulate scheduling a property visit",
+        "description": "Simulate creating an appointment to visit a property on a requested date. The simulation should validate basic input rules and produce a confirmed booking payload.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "property_name": {
+                    "type": "string",
+                    "description": "The official name of the property or apartment complex to be visited."
+                  },
+                  "visit_date": {
+                    "type": "string",
+                    "description": "The desired date for the property visit, in the format of 'YYYY-MM-DD', such as '2023-04-15'."
+                  },
+                  "visitor_count": {
+                    "type": "integer",
+                    "description": "The number of people that will be attending the visit.",
+                    "default": 1
+                  },
+                  "accessibility_requirements": {
+                    "type": "boolean",
+                    "description": "Indicates whether the visitor requires any special accessibility accommodations.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "property_name",
+                  "visit_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful scheduling response payload",
+                  "properties": {
+                    "confirmation_id": {
+                      "type": "string",
+                      "description": "A server-generated unique identifier for the scheduled visit."
+                    },
+                    "scheduled_date": {
+                      "type": "string",
+                      "description": "The confirmed visit date in 'YYYY-MM-DD' (e.g., '2023-04-15')."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Booking status; this field describes the outcome (for example, 'confirmed' or 'pending'). Do not treat this description as an exhaustive set of values."
+                    },
+                    "instructions": {
+                      "type": "string",
+                      "description": "Optional instructions for the visitor (e.g., meeting point, gate code, or items to bring)."
+                    },
+                    "contact_phone": {
+                      "type": "string",
+                      "description": "Optional contact phone number for the on-site representative or scheduling team."
+                    }
+                  },
+                  "required": [
+                    "confirmation_id",
+                    "scheduled_date",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/RentalCars_3_GetCarsAvailable": {
+      "post": {
+        "operationId": "RentalCars_3_GetCarsAvailable",
+        "summary": "Search available rental cars for a city and date/time range",
+        "description": "Simulate a search for rental cars available in a given city for a specified start/end date and pickup time. Returns a list of matching car options with pricing and availability details.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "city": {
+                    "type": "string",
+                    "description": "City where the rental car is required, in the format of 'City, State', such as 'Los Angeles, CA'."
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "description": "The start date for the car rental in the format 'YYYY-MM-DD', such as '2023-06-01'."
+                  },
+                  "pickup_time": {
+                    "type": "string",
+                    "description": "The time of day when the car will be picked up, in 24-hour format 'HH:MM', such as '15:00'."
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "description": "The end date for the car rental in the format 'YYYY-MM-DD', such as '2023-06-07'."
+                  },
+                  "car_type": {
+                    "type": "string",
+                    "description": "Preferred type of car for the rental.",
+                    "enum": [
+                      "Hatchback",
+                      "Sedan",
+                      "SUV"
+                    ]
+                  }
+                },
+                "required": [
+                  "city",
+                  "start_date",
+                  "pickup_time",
+                  "end_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing available rental car options",
+                  "properties": {
+                    "available_cars": {
+                      "type": "array",
+                      "description": "List of car options available for the requested period and location.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "car_id": {
+                            "type": "string",
+                            "description": "Unique identifier for this car option."
+                          },
+                          "vendor": {
+                            "type": "string",
+                            "description": "Rental company offering this car."
+                          },
+                          "make": {
+                            "type": "string",
+                            "description": "Manufacturer name, e.g., 'Toyota'."
+                          },
+                          "model": {
+                            "type": "string",
+                            "description": "Model name, e.g., 'Camry'."
+                          },
+                          "year": {
+                            "type": "integer",
+                            "description": "Vehicle model year."
+                          },
+                          "car_type": {
+                            "type": "string",
+                            "description": "Vehicle category (for example: Sedan, SUV)."
+                          },
+                          "transmission": {
+                            "type": "string",
+                            "description": "Transmission type, e.g., 'Automatic' or 'Manual'."
+                          },
+                          "seats": {
+                            "type": "integer",
+                            "description": "Number of passenger seats."
+                          },
+                          "daily_rate": {
+                            "type": "number",
+                            "description": "Daily rental rate. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "currency": {
+                            "type": "string",
+                            "description": "ISO 4217 currency code for the rates, e.g., 'USD'."
+                          },
+                          "total_estimated_price": {
+                            "type": "number",
+                            "description": "Estimated total price for the requested rental period (may exclude optional fees). Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "pickup_location": {
+                            "type": "string",
+                            "description": "Pickup location or branch name for this option."
+                          },
+                          "availability": {
+                            "type": "boolean",
+                            "description": "Whether this specific option is currently available for the requested period."
+                          }
+                        },
+                        "required": [
+                          "car_id",
+                          "vendor",
+                          "make",
+                          "model",
+                          "year",
+                          "car_type",
+                          "daily_rate",
+                          "currency",
+                          "availability"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of matching car options found for this search."
+                    },
+                    "next_page_token": {
+                      "type": "string",
+                      "description": "Opaque token to retrieve the next page of results, if any."
+                    }
+                  },
+                  "required": [
+                    "available_cars"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/RentalCars_3_ReserveCar": {
+      "post": {
+        "operationId": "RentalCars_3_ReserveCar",
+        "summary": "Simulate creating a rental car reservation",
+        "description": "Create a reservation for a rental car including pick-up location, rental period, car type, and insurance selection. This simulation returns a confirmed reservation object with pricing and identifiers.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "pickup_location": {
+                    "type": "string",
+                    "description": "The location where the car will be picked up, in the format of 'City, State', such as 'Berkeley, CA' or 'New York, NY'."
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "description": "The start date of the car rental period, in the format 'YYYY-MM-DD'."
+                  },
+                  "pickup_time": {
+                    "type": "string",
+                    "description": "The pick-up time on the start date, in 24-hour format 'HH:MM'."
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "description": "The end date of the car rental period, in the format 'YYYY-MM-DD'."
+                  },
+                  "car_type": {
+                    "type": "string",
+                    "description": "The type of car to reserve.",
+                    "enum": [
+                      "Hatchback",
+                      "Sedan",
+                      "SUV"
+                    ]
+                  },
+                  "add_insurance": {
+                    "type": "boolean",
+                    "description": "Indicates whether to purchase additional insurance coverage for the rental period."
+                  }
+                },
+                "required": [
+                  "pickup_location",
+                  "start_date",
+                  "pickup_time",
+                  "end_date",
+                  "car_type",
+                  "add_insurance"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Reservation confirmation returned when a car rental is successfully reserved.",
+                  "properties": {
+                    "reservation_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the reservation."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Reservation state.",
+                      "enum": [
+                        "confirmed",
+                        "pending",
+                        "failed"
+                      ]
+                    },
+                    "pickup_location": {
+                      "type": "string",
+                      "description": "The location where the car will be picked up (same format as request: 'City, State')."
+                    },
+                    "start_date": {
+                      "type": "string",
+                      "description": "Start date of the rental period in 'YYYY-MM-DD' format."
+                    },
+                    "pickup_time": {
+                      "type": "string",
+                      "description": "Pick-up time on the start date in 24-hour 'HH:MM' format."
+                    },
+                    "end_date": {
+                      "type": "string",
+                      "description": "End date of the rental period in 'YYYY-MM-DD' format."
+                    },
+                    "car_type": {
+                      "type": "string",
+                      "description": "The type of car reserved.",
+                      "enum": [
+                        "Hatchback",
+                        "Sedan",
+                        "SUV"
+                      ]
+                    },
+                    "add_insurance": {
+                      "type": "boolean",
+                      "description": "Whether additional insurance coverage was purchased for the rental period."
+                    },
+                    "total_price": {
+                      "type": "number",
+                      "description": "Total price charged for the reservation. Use float format (e.g., 1.0 not 1).",
+                      "format": "double",
+                      "minimum": 0
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Currency for the total_price (ISO 4217 code, e.g., 'USD')."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp when the reservation was created (ISO 8601 recommended, e.g., 2023-05-01T15:30:00Z)."
+                    },
+                    "notes": {
+                      "type": "string",
+                      "description": "Optional human-readable notes about the reservation (e.g., pickup instructions)."
+                    }
+                  },
+                  "required": [
+                    "reservation_id",
+                    "status",
+                    "pickup_location",
+                    "start_date",
+                    "pickup_time",
+                    "end_date",
+                    "car_type",
+                    "add_insurance",
+                    "total_price",
+                    "currency",
+                    "created_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Weather_1_GetWeather": {
+      "post": {
+        "operationId": "Weather_1_GetWeather",
+        "summary": "Simulate current or historical weather for a city",
+        "description": "Return a synthetic weather observation (current or historical) for the requested city and date. If date is omitted, simulate current conditions.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "city": {
+                    "type": "string",
+                    "description": "The name of the city for which to retrieve weather data, in the format of 'City, State' or 'City, Country' if the city does not locate in the United States. Examples: 'San Francisco, CA' or 'Paris, FR'."
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "The specific date for the weather query, in the format 'YYYY-MM-DD'. If omitted, defaults to the current date.",
+                    "default": "2019-03-01"
+                  }
+                },
+                "required": [
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful weather payload (synthetic observation).",
+                  "properties": {
+                    "summary": {
+                      "type": "string",
+                      "description": "Short human-readable summary of conditions (e.g., 'Partly cloudy')."
+                    },
+                    "temperature": {
+                      "type": "object",
+                      "description": "Temperature measurement.",
+                      "properties": {
+                        "value": {
+                          "type": "number",
+                          "description": "Numeric temperature value. Use float format (e.g., 1.0 not 1)."
+                        },
+                        "unit": {
+                          "type": "string",
+                          "description": "Unit for temperature, for example 'C' or 'F'."
+                        }
+                      },
+                      "required": [
+                        "value",
+                        "unit"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "humidity": {
+                      "type": "integer",
+                      "description": "Relative humidity as a percentage.",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "wind": {
+                      "type": "object",
+                      "description": "Wind conditions.",
+                      "properties": {
+                        "speed": {
+                          "type": "number",
+                          "description": "Wind speed value. Use float format (e.g., 1.0 not 1)."
+                        },
+                        "unit": {
+                          "type": "string",
+                          "description": "Unit for wind speed, for example 'km/h' or 'mph'."
+                        },
+                        "direction": {
+                          "type": "string",
+                          "description": "Wind direction as a compass heading or cardinal abbreviation (e.g., 'NW', '270°')."
+                        }
+                      },
+                      "required": [
+                        "speed"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "precipitation": {
+                      "type": "object",
+                      "description": "Precipitation details when applicable.",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "description": "Precipitation type (e.g., 'rain', 'snow', 'sleet')."
+                        },
+                        "probability": {
+                          "type": "number",
+                          "description": "Probability of precipitation as a decimal between 0.0 and 1.0. Provide as a float (e.g., 0.25).",
+                          "minimum": 0,
+                          "maximum": 1
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "summary",
+                    "temperature"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,246 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI735",
+    "version": "1.0.0",
+    "description": "The LI735 collection provides partner-facing endpoints to retrieve mandate records for users and partners: user_mandates returns mandates for a given username filtered by status, while partner_mandates returns mandates for a partner optionally filtered by status (defaults to all). Designed for straightforward querying of client mandate data, the APIs support status-based filtering, predictable request/response patterns, and integration into partner workflows for reconciliation and reporting."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI735"
+    }
+  ],
+  "paths": {
+    "/user_mandates": {
+      "post": {
+        "operationId": "user_mandates",
+        "summary": "Fetch mandates for a partner's client (simulation)",
+        "description": "Simulate returning the mandates associated with a partner's client. The request includes a required client name and an optional status filter; when status is omitted, results should reflect all statuses (default behavior: active). The simulated response returns a list of mandate objects matching the query.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "The full name of the partner's client for whom to fetch mandates."
+                  },
+                  "status": {
+                    "type": "string",
+                    "description": "The status of the mandates to be fetched. If omitted, mandates of all statuses will be retrieved.",
+                    "enum": [
+                      "active",
+                      "pending",
+                      "inactive"
+                    ],
+                    "default": "active"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing mandates that match the query.",
+                  "properties": {
+                    "mandates": {
+                      "type": "array",
+                      "description": "Array of mandate objects matching the request filters. May be empty if no mandates match.",
+                      "items": {
+                        "type": "object",
+                        "description": "A single mandate record.",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the mandate."
+                          },
+                          "status": {
+                            "type": "string",
+                            "description": "Status of the mandate.",
+                            "enum": [
+                              "active",
+                              "pending",
+                              "inactive"
+                            ]
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "description": "Timestamp when the mandate was created. Use an ISO 8601 style string if available (no enforced format in schema)."
+                          },
+                          "partner_reference": {
+                            "type": "string",
+                            "description": "Opaque reference supplied by the partner for their client, if available."
+                          },
+                          "beneficiaries": {
+                            "type": "array",
+                            "description": "Optional list of beneficiaries associated with the mandate.",
+                            "items": {
+                              "type": "object",
+                              "description": "Array item",
+                              "properties": {
+                                "name": {
+                                  "type": "string",
+                                  "description": "Beneficiary name."
+                                },
+                                "account": {
+                                  "type": "string",
+                                  "description": "Beneficiary account identifier/reference."
+                                }
+                              },
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "status"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_count": {
+                      "type": "integer",
+                      "description": "Total number of mandates matching the query (useful for UI pagination)."
+                    },
+                    "next_page_token": {
+                      "type": "string",
+                      "description": "Opaque token for fetching the next page of results, if pagination is supported. Omitted or null when there are no further pages."
+                    }
+                  },
+                  "required": [
+                    "mandates"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/partner_mandates": {
+      "post": {
+        "operationId": "partner_mandates",
+        "summary": "Fetch partner mandates by status",
+        "description": "Simulate fetching mandates associated with a partner. If status is omitted or set to the default, mandates with any status are returned.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "description": "The status of the mandates to be fetched. If left empty, mandates with any status will be retrieved.",
+                    "enum": [
+                      "active",
+                      "pending",
+                      "inactive"
+                    ],
+                    "default": "all"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing mandates that match the requested status filter.",
+                  "properties": {
+                    "mandates": {
+                      "type": "array",
+                      "description": "List of mandate objects matching the filter.",
+                      "items": {
+                        "type": "object",
+                        "description": "A single mandate record.",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique mandate identifier."
+                          },
+                          "partner_id": {
+                            "type": "string",
+                            "description": "Identifier of the partner that owns the mandate."
+                          },
+                          "status": {
+                            "type": "string",
+                            "description": "Current status of the mandate.",
+                            "enum": [
+                              "active",
+                              "pending",
+                              "inactive"
+                            ]
+                          },
+                          "start_date": {
+                            "type": "string",
+                            "description": "Start date/time of the mandate (string)."
+                          },
+                          "end_date": {
+                            "type": "string",
+                            "description": "End date/time of the mandate, if applicable (string)."
+                          },
+                          "amount": {
+                            "type": "number",
+                            "description": "Monetary amount associated with the mandate, if applicable."
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "description": "Arbitrary additional key/value data supplied for the mandate.",
+                            "properties": {},
+                            "additionalProperties": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "partner_id",
+                          "status"
+                        ],
+                        "additionalProperties": true
+                      }
+                    },
+                    "total_count": {
+                      "type": "integer",
+                      "description": "Total number of mandates matching the filter (useful for pagination)."
+                    },
+                    "returned_count": {
+                      "type": "integer",
+                      "description": "Number of mandates included in this response."
+                    }
+                  },
+                  "required": [
+                    "mandates"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

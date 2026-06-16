@@ -1,0 +1,401 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM48",
+    "version": "1.0.0",
+    "description": "LM48 is a lightweight retail API collection providing inventory_management, product_search, and order_status_check endpoints to programmatically verify stock levels, query products by category/color/size, and track order status by order ID and product name; use concise request parameters (product ID, size, color, quantity) to receive real-time availability, size/color breakdowns, bulk-order validation, and current order state in a simple request-response style."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM48"
+    }
+  ],
+  "paths": {
+    "/inventory_management": {
+      "post": {
+        "operationId": "inventory_management",
+        "summary": "Simulate inventory availability and bulk-check responses",
+        "description": "Return simulated stock status for requested sizes and a boolean indicating whether the requested bulk quantity can be fulfilled. Do not modify input fields; treat color='any' as a wildcard when summarizing stock.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "product_id": {
+                    "type": "string",
+                    "description": "Unique identifier of the product for which the inventory is being queried."
+                  },
+                  "sizes": {
+                    "type": "array",
+                    "description": "List of sizes to check for stock updates, such as ['S', 'M', 'L', 'XL'].",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  },
+                  "color": {
+                    "type": "string",
+                    "description": "Color of the product to check for stock updates. Expected format is a color name, such as 'red' or 'blue'.",
+                    "default": "any"
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "description": "Quantity of the product for bulk availability checks. Must be a non-negative number.",
+                    "default": 1
+                  }
+                },
+                "required": [
+                  "product_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful inventory lookup payload",
+                  "properties": {
+                    "sizes": {
+                      "type": "array",
+                      "description": "Per-size availability information. If the request supplied sizes, entries should correspond to those sizes; if no sizes were supplied, this may be an empty array or a subset of available sizes.",
+                      "default": [],
+                      "items": {
+                        "type": "object",
+                        "description": "Availability for a single size",
+                        "properties": {
+                          "size": {
+                            "type": "string",
+                            "description": "Size identifier (e.g., 'S', 'M', 'L')."
+                          },
+                          "in_stock": {
+                            "type": "boolean",
+                            "description": "True if the item is currently in stock for this size."
+                          },
+                          "stock": {
+                            "type": "integer",
+                            "description": "Available inventory count for this size. Non-negative integer.",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "size",
+                          "in_stock",
+                          "stock"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_stock": {
+                      "type": "integer",
+                      "description": "Sum of stock counts for the sizes returned (non-negative).",
+                      "minimum": 0
+                    },
+                    "bulk_available": {
+                      "type": "boolean",
+                      "description": "True if the requested quantity can be fulfilled from the returned stock counts."
+                    }
+                  },
+                  "required": [
+                    "sizes",
+                    "total_stock",
+                    "bulk_available"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/product_search": {
+      "post": {
+        "operationId": "product_search",
+        "summary": "Simulate product search results",
+        "description": "Return simulated product search results based on provided filters. Treat the string 'any' for color or size as a wildcard (no filtering).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "category": {
+                    "type": "string",
+                    "description": "The category of the product to filter search results. For example, 'electronics', 'clothing', or 'books'.",
+                    "enum": [
+                      "electronics",
+                      "clothing",
+                      "books",
+                      "home appliances",
+                      "toys"
+                    ]
+                  },
+                  "color": {
+                    "type": "string",
+                    "description": "The color of the product to filter search results. For example, 'red', 'blue', or 'green'.",
+                    "default": "any"
+                  },
+                  "size": {
+                    "type": "string",
+                    "description": "The size of the product to filter search results. Expected values could be 'small', 'medium', 'large', or specific sizes like 'S', 'M', 'L' for clothing.",
+                    "default": "any"
+                  }
+                },
+                "required": [
+                  "category"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search response containing a page of matching products.",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "description": "List of matching products for the requested page.",
+                      "items": {
+                        "type": "object",
+                        "description": "A product returned by the search.",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the product."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Product name."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Detailed product description."
+                          },
+                          "category": {
+                            "type": "string",
+                            "description": "Product category.",
+                            "enum": [
+                              "electronics",
+                              "clothing",
+                              "books",
+                              "home appliances",
+                              "toys"
+                            ]
+                          },
+                          "price": {
+                            "type": "number",
+                            "description": "Price of the product. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "currency": {
+                            "type": "string",
+                            "description": "Currency code for price (e.g., USD)."
+                          },
+                          "color": {
+                            "type": "string",
+                            "description": "Color of the product."
+                          },
+                          "size": {
+                            "type": "string",
+                            "description": "Size of the product."
+                          },
+                          "in_stock": {
+                            "type": "integer",
+                            "description": "Quantity currently in stock."
+                          },
+                          "tags": {
+                            "type": "array",
+                            "description": "Optional tags associated with the product.",
+                            "items": {
+                              "type": "string",
+                              "description": "Array item"
+                            }
+                          },
+                          "images": {
+                            "type": "array",
+                            "description": "List of images for the product.",
+                            "items": {
+                              "type": "object",
+                              "description": "Array item",
+                              "properties": {
+                                "url": {
+                                  "type": "string",
+                                  "description": "URL of the image."
+                                },
+                                "alt": {
+                                  "type": "string",
+                                  "description": "Alt text for the image."
+                                }
+                              },
+                              "required": [
+                                "url"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "category",
+                          "price"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "Total number of matching products across all pages."
+                    },
+                    "page": {
+                      "type": "integer",
+                      "description": "Current page number (1-based)."
+                    },
+                    "per_page": {
+                      "type": "integer",
+                      "description": "Number of results returned per page."
+                    }
+                  },
+                  "required": [
+                    "results",
+                    "total",
+                    "page",
+                    "per_page"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/order_status_check": {
+      "post": {
+        "operationId": "order_status_check",
+        "summary": "Simulate checking an order's current status by order_id and product",
+        "description": "Given an order_id and product name, return the current status and recent history for that order. This is a simulation-focused response schema for successful lookups.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "order_id": {
+                    "type": "string",
+                    "description": "The unique identifier of the order."
+                  },
+                  "product": {
+                    "type": "string",
+                    "description": "The name of the product associated with the order."
+                  }
+                },
+                "required": [
+                  "order_id",
+                  "product"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful order status payload",
+                  "properties": {
+                    "order_id": {
+                      "type": "string",
+                      "description": "The unique identifier of the order."
+                    },
+                    "product": {
+                      "type": "string",
+                      "description": "The name of the product associated with the order."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Current status of the order. This is free-form text; listed examples are not exhaustive."
+                    },
+                    "is_delivered": {
+                      "type": "boolean",
+                      "description": "True if the order has been delivered, false otherwise."
+                    },
+                    "estimated_delivery": {
+                      "type": "string",
+                      "description": "Estimated delivery date or window as a free-text string (e.g., '2026-03-20', 'Within 3 business days')."
+                    },
+                    "last_updated": {
+                      "type": "string",
+                      "description": "Timestamp or human-readable time of the most recent status update."
+                    },
+                    "history": {
+                      "type": "array",
+                      "description": "Chronological list of status events (earliest first).",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "timestamp": {
+                            "type": "string",
+                            "description": "Event timestamp or descriptive time for the event."
+                          },
+                          "location": {
+                            "type": "string",
+                            "description": "Location associated with this event, if applicable."
+                          },
+                          "status": {
+                            "type": "string",
+                            "description": "Status at the time of this event."
+                          },
+                          "note": {
+                            "type": "string",
+                            "description": "Optional human-readable note for the event."
+                          }
+                        },
+                        "required": [
+                          "timestamp",
+                          "status"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "order_id",
+                    "product",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

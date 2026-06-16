@@ -1,0 +1,321 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM728",
+    "version": "1.0.0",
+    "description": "LM728 is a compact salon services API for locating hair stylists, booking appointments, and checking weather for planning visits. Use Services_1_FindProvider to search stylists by city with an optional unisex filter, Services_1_BookAppointment to reserve a specified date and time, and Weather_1_GetWeather to retrieve the forecast for that city and date. Typical flow: find, book, verify weather."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM728"
+    }
+  ],
+  "paths": {
+    "/Services_1_BookAppointment": {
+      "post": {
+        "operationId": "Services_1_BookAppointment",
+        "summary": "Simulate booking a salon appointment",
+        "description": "Simulate creating a booking for a hair stylist or salon. Validate appointment date and time formats and that the scheduled slot is in the future.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "stylist_name": {
+                    "type": "string",
+                    "description": "The full name of the hair stylist or the name of the salon."
+                  },
+                  "appointment_time": {
+                    "type": "string",
+                    "description": "The time of the appointment in 24-hour format (HH:MM).",
+                    "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                  },
+                  "appointment_date": {
+                    "type": "string",
+                    "description": "The date for the appointment in the format of 'YYYY-MM-DD'.",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  }
+                },
+                "required": [
+                  "stylist_name",
+                  "appointment_time",
+                  "appointment_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Confirmation payload for a successfully created appointment.",
+                  "properties": {
+                    "confirmation_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the booking (server-generated)."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Booking status. Example values: 'confirmed', 'pending'."
+                    },
+                    "location": {
+                      "type": "object",
+                      "description": "Salon/contact information where the appointment is scheduled.",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "Salon or branch name."
+                        },
+                        "address": {
+                          "type": "string",
+                          "description": "Full address of the salon/branch."
+                        },
+                        "phone": {
+                          "type": "string",
+                          "description": "Contact phone number for the salon."
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "address"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "instructions": {
+                      "type": "string",
+                      "description": "Any special instructions or notes for the appointment (if applicable)."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "ISO 8601 timestamp when the booking was created (e.g., 2026-03-12T15:04:05Z).",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "confirmation_id",
+                    "status",
+                    "created_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Services_1_FindProvider": {
+      "post": {
+        "operationId": "Services_1_FindProvider",
+        "summary": "Simulate searching hair stylists by city with optional unisex filter",
+        "description": "Simulated search for hair stylists located in the requested city. Use the is_unisex flag to restrict results to salons that are unisex when true. Returns a list of matching providers with distance and optional rating.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "city": {
+                    "type": "string",
+                    "description": "The city where the salon is located, in the format of 'City, State' (e.g., 'New York, NY')."
+                  },
+                  "is_unisex": {
+                    "type": "boolean",
+                    "description": "Flag indicating if the salon is unisex. True for unisex, False for gender-specific.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search results for matching hair stylists.",
+                  "properties": {
+                    "providers": {
+                      "type": "array",
+                      "description": "List of matching providers ordered by relevance/distance.",
+                      "maxItems": 50,
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique provider identifier."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Stylist's full name."
+                          },
+                          "salon_name": {
+                            "type": "string",
+                            "description": "Name of the salon where the stylist works."
+                          },
+                          "address": {
+                            "type": "string",
+                            "description": "Full street address of the salon."
+                          },
+                          "city": {
+                            "type": "string",
+                            "description": "City and state for the salon (same format as the request)."
+                          },
+                          "is_unisex": {
+                            "type": "boolean",
+                            "description": "Whether the salon is unisex."
+                          },
+                          "distance_km": {
+                            "type": "number",
+                            "description": "Distance from the requested location in kilometers. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "rating": {
+                            "type": "number",
+                            "description": "Average customer rating for the provider, if available."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "salon_name",
+                          "address",
+                          "city",
+                          "is_unisex",
+                          "distance_km"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "Total number of matching providers found."
+                    }
+                  },
+                  "required": [
+                    "providers"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Weather_1_GetWeather": {
+      "post": {
+        "operationId": "Weather_1_GetWeather",
+        "summary": "Simulate retrieving a weather forecast for a city and date",
+        "description": "Returns a simulated weather forecast payload for the specified city and optional date. If date is omitted, the service uses the current date.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "city": {
+                    "type": "string",
+                    "description": "The name of the city for which the weather is being requested, such as 'Los Angeles' or 'New York'."
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "The date for which the weather forecast is desired, in the format 'YYYY-MM-DD'. If not provided, the default is the current date.",
+                    "default": "current_date"
+                  }
+                },
+                "required": [
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful weather forecast response",
+                  "properties": {
+                    "city": {
+                      "type": "string",
+                      "description": "The name of the city for which the weather is provided, matching the requested city."
+                    },
+                    "date": {
+                      "type": "string",
+                      "description": "The date of the forecast in 'YYYY-MM-DD' format."
+                    },
+                    "temperature": {
+                      "type": "number",
+                      "description": "Forecasted temperature. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "unit": {
+                      "type": "string",
+                      "description": "Unit of temperature (for example 'C' for Celsius or 'F' for Fahrenheit)."
+                    },
+                    "condition": {
+                      "type": "string",
+                      "description": "Short textual description of the weather conditions (e.g., 'Partly cloudy', 'Rain')."
+                    },
+                    "precipitationChance": {
+                      "type": "number",
+                      "description": "Chance of precipitation expressed as a percentage (0-100). Provide as a float (e.g., 12.5, not 12).",
+                      "format": "double"
+                    },
+                    "humidity": {
+                      "type": "integer",
+                      "description": "Relative humidity as a percentage (0-100)."
+                    },
+                    "windSpeed": {
+                      "type": "number",
+                      "description": "Wind speed in the units implied by the service (e.g., km/h or mph). Provide as a float (e.g., 5.0, not 5).",
+                      "format": "double"
+                    },
+                    "windDirection": {
+                      "type": "string",
+                      "description": "Wind direction as a compass point or degrees (e.g., 'NW' or '270°')."
+                    }
+                  },
+                  "required": [
+                    "city",
+                    "date",
+                    "temperature",
+                    "unit",
+                    "condition"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,278 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM140",
+    "version": "1.0.0",
+    "description": "LM140 is a compact API collection providing two straightforward endpoints: weather_get returns current weather conditions (temperature, wind speed, precipitation) for a specified city and country, and stock_price_get returns the latest trade price for a given stock ticker and exchange. Designed for synchronous, low-latency requests, it suits dashboards, bots, and alerts; calls use simple parameterized queries and return concise JSON for easy parsing and integration."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM140"
+    }
+  ],
+  "paths": {
+    "/weather_get": {
+      "post": {
+        "operationId": "weather_get",
+        "summary": "Simulate current weather (conditions + optional 5-day forecast)",
+        "description": "Return current weather for the requested city and country, including temperature, wind, humidity, and optional 5-day forecast when requested.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "city": {
+                    "type": "string",
+                    "description": "The name of the city for which to retrieve weather information, such as 'San Francisco'."
+                  },
+                  "country": {
+                    "type": "string",
+                    "description": "The ISO country code (2-letter) for the city's country, such as 'US' for the United States."
+                  },
+                  "units": {
+                    "type": "string",
+                    "description": "The unit system used for the weather data. Possible values are 'metric' for Celsius, 'imperial' for Fahrenheit, and 'standard' for Kelvin.",
+                    "enum": [
+                      "metric",
+                      "imperial",
+                      "standard"
+                    ],
+                    "default": "metric"
+                  },
+                  "include_forecast": {
+                    "type": "boolean",
+                    "description": "A flag indicating whether to include a weather forecast for the next 5 days. If true, the forecast will be included.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "city",
+                  "country"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful weather response payload",
+                  "properties": {
+                    "city": {
+                      "type": "string",
+                      "description": "The name of the city for which weather is returned."
+                    },
+                    "country": {
+                      "type": "string",
+                      "description": "The ISO 2-letter country code for the city's country."
+                    },
+                    "units": {
+                      "type": "string",
+                      "description": "Unit system used for the numeric fields in this response. One of 'metric', 'imperial', or 'standard'.",
+                      "enum": [
+                        "metric",
+                        "imperial",
+                        "standard"
+                      ]
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "description": "UTC timestamp when the current conditions were observed (ISO 8601 recommended, e.g. 2023-07-21T17:32:28Z)."
+                    },
+                    "current": {
+                      "type": "object",
+                      "description": "Current weather conditions",
+                      "properties": {
+                        "temperature": {
+                          "type": "number",
+                          "description": "Current air temperature in the requested units. Use float format (e.g., 1.0 not 1).",
+                          "format": "double"
+                        },
+                        "feels_like": {
+                          "type": "number",
+                          "description": "Apparent temperature accounting for wind and humidity. Use float format (e.g., 1.0 not 1).",
+                          "format": "double"
+                        },
+                        "humidity": {
+                          "type": "integer",
+                          "description": "Relative humidity as a percentage (0-100)."
+                        },
+                        "wind_speed": {
+                          "type": "number",
+                          "description": "Wind speed in the requested units. Use float format (e.g., 1.0 not 1).",
+                          "format": "double"
+                        },
+                        "wind_direction": {
+                          "type": "integer",
+                          "description": "Wind direction in degrees clockwise from true north (0-360)."
+                        },
+                        "precipitation": {
+                          "type": "number",
+                          "description": "Precipitation volume for the last hour in the requested units. Use float format (e.g., 1.0 not 1).",
+                          "format": "double"
+                        },
+                        "summary": {
+                          "type": "string",
+                          "description": "Short human-readable summary of current conditions (e.g., 'Light rain')."
+                        }
+                      },
+                      "required": [
+                        "temperature",
+                        "humidity",
+                        "wind_speed"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "forecast": {
+                      "type": "array",
+                      "description": "Five-day daily forecast; present only if the request set include_forecast to true.",
+                      "maxItems": 5,
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "date": {
+                            "type": "string",
+                            "description": "Forecast date in YYYY-MM-DD."
+                          },
+                          "min_temp": {
+                            "type": "number",
+                            "description": "Forecast minimum temperature for the day. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "max_temp": {
+                            "type": "number",
+                            "description": "Forecast maximum temperature for the day. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "precipitation": {
+                            "type": "number",
+                            "description": "Expected precipitation volume for the day in the requested units. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "summary": {
+                            "type": "string",
+                            "description": "Short human-readable forecast summary for the day."
+                          }
+                        },
+                        "required": [
+                          "date",
+                          "min_temp",
+                          "max_temp"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "city",
+                    "country",
+                    "units",
+                    "timestamp",
+                    "current"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stock_price_get": {
+      "post": {
+        "operationId": "stock_price_get",
+        "summary": "Get latest trade price for a stock ticker on an exchange",
+        "description": "Simulate retrieval of the most recent trade price for the given stock ticker on the specified exchange.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "ticker": {
+                    "type": "string",
+                    "description": "The unique stock ticker symbol used to identify the publicly traded shares of a particular stock on an exchange."
+                  },
+                  "exchange": {
+                    "type": "string",
+                    "description": "The stock exchange where the ticker is listed, such as 'NYSE' or 'NASDAQ'.",
+                    "enum": [
+                      "NYSE",
+                      "NASDAQ",
+                      "LSE",
+                      "TSX"
+                    ]
+                  }
+                },
+                "required": [
+                  "ticker",
+                  "exchange"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload containing the latest trade information for the requested ticker.",
+                  "properties": {
+                    "ticker": {
+                      "type": "string",
+                      "description": "The unique stock ticker symbol used to identify the publicly traded shares of a particular stock on an exchange."
+                    },
+                    "exchange": {
+                      "type": "string",
+                      "description": "The stock exchange where the ticker is listed, such as 'NYSE' or 'NASDAQ'.",
+                      "enum": [
+                        "NYSE",
+                        "NASDAQ",
+                        "LSE",
+                        "TSX"
+                      ]
+                    },
+                    "price": {
+                      "type": "number",
+                      "description": "Latest trade price for the ticker. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Currency of the price (e.g., 'USD')."
+                    },
+                    "trade_time": {
+                      "type": "string",
+                      "description": "Time of the trade in ISO 8601 format (e.g., 2023-01-01T12:34:56Z)."
+                    }
+                  },
+                  "required": [
+                    "ticker",
+                    "exchange",
+                    "price"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

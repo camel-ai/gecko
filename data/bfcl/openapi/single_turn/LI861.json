@@ -1,0 +1,150 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI861",
+    "version": "1.0.0",
+    "description": "LI861 is a compact API collection for computing individual federal and state taxes using the calculate_tax tool. It accepts income, filing status, and deduction parameters and returns a numeric tax liability plus a breakdown of applied rates, deductions, and credits. Designed for easy integration into financial apps, you call the endpoint with validated inputs and receive deterministic JSON results suitable for display, reporting, or downstream automation."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI861"
+    }
+  ],
+  "paths": {
+    "/calculate_tax": {
+      "post": {
+        "operationId": "calculate_tax",
+        "summary": "Simulate tax calculation for an income with deductions, exemptions, and filing status",
+        "description": "Calculates the tax owed for a given income using filing_status-specific rates and the specified tax_year. Deductions and exemptions affect taxable income before bracket and rate application.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "income": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The total income amount in dollars for which the tax is to be calculated.. Use float format (e.g., 1.0 not 1)."
+                  },
+                  "filing_status": {
+                    "type": "string",
+                    "description": "The filing status of the taxpayer.",
+                    "enum": [
+                      "single",
+                      "married_filing_jointly",
+                      "married_filing_separately",
+                      "head_of_household"
+                    ]
+                  },
+                  "deductions": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The total amount of deductions in dollars the taxpayer is claiming. Defaults to 0 if not provided.. Use float format (e.g., 1.0 not 1).",
+                    "default": 0.0
+                  },
+                  "exemptions": {
+                    "type": "integer",
+                    "description": "The number of exemptions the taxpayer is claiming, typically one per dependent. Defaults to 1 if not provided.",
+                    "default": 1
+                  },
+                  "tax_year": {
+                    "type": "integer",
+                    "description": "The tax year for which the calculation is made. Defaults to the current year if not specified.",
+                    "default": 2023
+                  }
+                },
+                "required": [
+                  "income",
+                  "filing_status"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful tax calculation payload",
+                  "properties": {
+                    "tax_due": {
+                      "type": "number",
+                      "description": "Total tax owed as a dollar amount. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "taxable_income": {
+                      "type": "number",
+                      "description": "Income amount used to compute tax after applying deductions and exemptions. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "effective_tax_rate": {
+                      "type": "number",
+                      "description": "Effective tax rate expressed as a decimal (e.g., 0.22 for 22%). Provide as a float (e.g., 0.22).",
+                      "format": "double"
+                    },
+                    "breakdown": {
+                      "type": "array",
+                      "description": "Per-bracket breakdown of how tax was computed",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "bracket_start": {
+                            "type": "number",
+                            "description": "Lower bound of this tax bracket (inclusive). Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "bracket_end": {
+                            "type": "string",
+                            "description": "Upper bound of this tax bracket (exclusive). Null indicates no upper bound. Provide as a float when numeric (e.g., 1.0, not 1).",
+                            "format": "double"
+                          },
+                          "rate": {
+                            "type": "number",
+                            "description": "Marginal tax rate applied to income within this bracket, expressed as a decimal (e.g., 0.22 for 22%). Provide as a float (e.g., 0.22).",
+                            "format": "double"
+                          },
+                          "taxable_amount_in_bracket": {
+                            "type": "number",
+                            "description": "Portion of taxable_income that falls into this bracket. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "tax_in_bracket": {
+                            "type": "number",
+                            "description": "Tax computed for the portion of income in this bracket. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          }
+                        },
+                        "required": [
+                          "bracket_start",
+                          "rate",
+                          "taxable_amount_in_bracket",
+                          "tax_in_bracket"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "tax_due",
+                    "taxable_income",
+                    "effective_tax_rate",
+                    "breakdown"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

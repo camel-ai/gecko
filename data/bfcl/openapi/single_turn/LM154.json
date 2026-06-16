@@ -1,0 +1,816 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM154",
+    "version": "1.0.0",
+    "description": "LM154 is an API collection for accessing sensor telemetry across networks and devices. It provides endpoints to retrieve paginated alerts, fetch the latest metric readings per sensor, and obtain historical readings either as full timestamped series or summarized by intervals. Designed for filtering by network, sensor, metric, and timespan, responses are sorted and suitable for monitoring, auditing, and time-series analysis workflows."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM154"
+    }
+  ],
+  "paths": {
+    "/get_sensor_alerts": {
+      "post": {
+        "operationId": "get_sensor_alerts",
+        "summary": "Retrieve paginated sensor alerts",
+        "description": "Simulate retrieval of a paginated list of sensor alerts within a specified timespan or explicit t0/t1 window, optionally filtered by network or sensor criteria.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "perPage": {
+                    "type": "integer",
+                    "description": "The number of entries per page returned. Acceptable range is 3 - 100.",
+                    "minimum": 3,
+                    "maximum": 100
+                  },
+                  "startingAfter": {
+                    "type": "string",
+                    "description": "A server-generated token indicating the start of the page, such as a timestamp or an ID.",
+                    "default": null
+                  },
+                  "endingBefore": {
+                    "type": "string",
+                    "description": "A server-generated token indicating the end of the page, such as a timestamp or an ID.",
+                    "default": null
+                  },
+                  "t0": {
+                    "type": "string",
+                    "description": "The start of the timespan for the data, formatted as an ISO 8601 timestamp (e.g., '2023-01-01T00:00:00Z'). The maximum lookback period is 365 days from today.",
+                    "default": null,
+                    "format": "date-time"
+                  },
+                  "t1": {
+                    "type": "string",
+                    "description": "The end of the timespan for the data, formatted as an ISO 8601 timestamp (e.g., '2023-12-31T23:59:59Z'). t1 can be a maximum of 365 days after t0.",
+                    "default": null,
+                    "format": "date-time"
+                  },
+                  "networkId": {
+                    "type": "array",
+                    "description": "A list of network IDs to filter the returned data.",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  },
+                  "timespan": {
+                    "type": "integer",
+                    "description": "The timespan for which the information will be fetched in seconds. Do not specify if t0 and t1 are provided. Must be less than or equal to 31,536,000 seconds (365 days).",
+                    "default": 31536000,
+                    "maximum": 31536000
+                  },
+                  "sensorSerial": {
+                    "type": "string",
+                    "description": "The sensor serial number to filter the returned data.",
+                    "default": null
+                  },
+                  "triggerMetric": {
+                    "type": "string",
+                    "description": "Filter alerts triggered by a specific metric.",
+                    "enum": [
+                      "apparentPower",
+                      "co2",
+                      "current",
+                      "door",
+                      "frequency",
+                      "humidity",
+                      "indoorAirQuality",
+                      "noise",
+                      "pm25",
+                      "powerFactor",
+                      "realPower",
+                      "temperature",
+                      "tvoc",
+                      "upstreamPower",
+                      "voltage",
+                      "water"
+                    ],
+                    "default": null
+                  }
+                },
+                "required": [
+                  "perPage"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Paginated list of sensor alerts (successful response payload).",
+                  "properties": {
+                    "perPage": {
+                      "type": "integer",
+                      "description": "The number of entries returned on this page."
+                    },
+                    "startingAfter": {
+                      "type": "string",
+                      "description": "Pagination token indicating the start of the page, if present.",
+                      "nullable": true
+                    },
+                    "endingBefore": {
+                      "type": "string",
+                      "description": "Pagination token indicating the end of the page, if present.",
+                      "nullable": true
+                    },
+                    "hasMore": {
+                      "type": "boolean",
+                      "description": "True when more results are available after this page."
+                    },
+                    "data": {
+                      "type": "array",
+                      "description": "Array of sensor alert objects for this page.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique alert identifier."
+                          },
+                          "sensorSerial": {
+                            "type": "string",
+                            "description": "Serial number of the sensor that generated the alert.",
+                            "nullable": true
+                          },
+                          "networkId": {
+                            "type": "string",
+                            "description": "Network ID associated with the sensor.",
+                            "nullable": true
+                          },
+                          "timestamp": {
+                            "type": "string",
+                            "description": "ISO 8601 timestamp when the alert occurred.",
+                            "format": "date-time"
+                          },
+                          "triggerMetric": {
+                            "type": "string",
+                            "description": "Metric that triggered the alert.",
+                            "enum": [
+                              "apparentPower",
+                              "co2",
+                              "current",
+                              "door",
+                              "frequency",
+                              "humidity",
+                              "indoorAirQuality",
+                              "noise",
+                              "pm25",
+                              "powerFactor",
+                              "realPower",
+                              "temperature",
+                              "tvoc",
+                              "upstreamPower",
+                              "voltage",
+                              "water"
+                            ],
+                            "nullable": true
+                          },
+                          "value": {
+                            "type": "number",
+                            "description": "Measured metric value that caused the alert. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "unit": {
+                            "type": "string",
+                            "description": "Unit for the metric value, if applicable.",
+                            "nullable": true
+                          },
+                          "note": {
+                            "type": "string",
+                            "description": "Optional free-text note or context for the alert.",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "timestamp",
+                          "triggerMetric",
+                          "value"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "perPage",
+                    "hasMore"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_sensor_readings_latest": {
+      "post": {
+        "operationId": "get_sensor_readings_latest",
+        "summary": "Return latest readings per sensor (grouped by serial)",
+        "description": "Simulate a response that lists the most recent reading for each requested metric for each sensor, organized by the sensor's serial number.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "perPage": {
+                    "type": "integer",
+                    "description": "Specifies the number of entries per page. Must be within the range of 3 to 100."
+                  },
+                  "startingAfter": {
+                    "type": "string",
+                    "description": "The server-generated token marking the start of the page. Typically a timestamp or ID. If omitted, the server will provide the default starting point.",
+                    "default": null
+                  },
+                  "endingBefore": {
+                    "type": "string",
+                    "description": "The server-generated token marking the end of the page. Typically a timestamp or ID. Optional; if omitted, the server will provide the default ending point.",
+                    "default": null
+                  },
+                  "networkId": {
+                    "type": "array",
+                    "description": "Filters the returned data by network IDs. If omitted, data for all networks is returned.",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  },
+                  "serials": {
+                    "type": "array",
+                    "description": "Filters readings by sensor serial numbers. If omitted, readings for all sensors are returned.",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  },
+                  "metrics": {
+                    "type": "array",
+                    "description": "Specifies the types of sensor readings to retrieve, such as 'temperature', 'humidity', or 'co2'. If omitted, all available types of readings are retrieved.",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item",
+                      "enum": [
+                        "temperature",
+                        "humidity",
+                        "co2",
+                        "battery",
+                        "noise",
+                        "pm2.5"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "perPage"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful payload containing sensors and their latest metric readings.",
+                  "properties": {
+                    "sensors": {
+                      "type": "array",
+                      "description": "List of sensors with their latest readings, ordered by sensor serial.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "serial": {
+                            "type": "string",
+                            "description": "Sensor serial number (unique identifier for the sensor)."
+                          },
+                          "networkId": {
+                            "type": "string",
+                            "description": "Network ID the sensor belongs to (if available)."
+                          },
+                          "readings": {
+                            "type": "array",
+                            "description": "Array of the latest readings for each metric available for this sensor. Each metric appears at most once.",
+                            "items": {
+                              "type": "object",
+                              "description": "Array item",
+                              "properties": {
+                                "metric": {
+                                  "type": "string",
+                                  "description": "Type of metric for this reading.",
+                                  "enum": [
+                                    "temperature",
+                                    "humidity",
+                                    "co2",
+                                    "battery",
+                                    "noise",
+                                    "pm2.5"
+                                  ]
+                                },
+                                "value": {
+                                  "type": "number",
+                                  "description": "Numeric reading value. Use float format (e.g., 1.0 not 1). Units depend on the metric (for example, temperature in °C, humidity in %).",
+                                  "format": "double"
+                                },
+                                "unit": {
+                                  "type": "string",
+                                  "description": "Unit for the value (optional; may be omitted if implied by metric)."
+                                },
+                                "timestamp": {
+                                  "type": "string",
+                                  "description": "Timestamp for the reading as provided by the server (e.g., an ISO 8601 timestamp or server timestamp)."
+                                },
+                                "metadata": {
+                                  "type": "object",
+                                  "description": "Optional additional metadata for this reading (source, quality flags, etc.).",
+                                  "properties": {},
+                                  "additionalProperties": true
+                                }
+                              },
+                              "required": [
+                                "metric",
+                                "value",
+                                "timestamp"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "lastSeenAt": {
+                            "type": "string",
+                            "description": "Timestamp for when the sensor was last seen by the system (optional)."
+                          }
+                        },
+                        "required": [
+                          "serial",
+                          "readings"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "description": "Pagination information for the returned page.",
+                      "properties": {
+                        "perPage": {
+                          "type": "integer",
+                          "description": "The number of entries returned per page (echoed from request)."
+                        },
+                        "startingAfter": {
+                          "type": "string",
+                          "description": "Token indicating the start of this page (may be null)."
+                        },
+                        "endingBefore": {
+                          "type": "string",
+                          "description": "Token indicating the end of this page (may be null)."
+                        },
+                        "hasMore": {
+                          "type": "boolean",
+                          "description": "Indicates if more pages are available after this page."
+                        }
+                      },
+                      "required": [
+                        "perPage",
+                        "hasMore"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "sensors",
+                    "pagination"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_sensor_readings_history_by_interval": {
+      "post": {
+        "operationId": "get_sensor_readings_history_by_interval",
+        "summary": "Simulate retrieval of historical sensor readings summarized by interval",
+        "description": "Returns sensor reading summaries for each interval within the requested timespan, sorted by interval start (newest first). Supports filtering by networkId, serials, metrics, models and cursor-based pagination.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "perPage": {
+                    "type": "integer",
+                    "description": "Number of entries per page, within the range of 3 to 100.",
+                    "default": 10
+                  },
+                  "startingAfter": {
+                    "type": "string",
+                    "description": "Server-generated token indicating the start of the page, typically a timestamp or ID.",
+                    "default": null
+                  },
+                  "endingBefore": {
+                    "type": "string",
+                    "description": "Server-generated token indicating the end of the page, typically a timestamp or ID.",
+                    "default": null
+                  },
+                  "networkId": {
+                    "type": "array",
+                    "description": "Filter data by the specified network IDs.",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  },
+                  "serials": {
+                    "type": "array",
+                    "description": "Filter readings by sensor serial numbers.",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  },
+                  "metrics": {
+                    "type": "array",
+                    "description": "Specify sensor reading types to retrieve, such as 'temperature', 'humidity', 'pressure'. Defaults to all available types if not supplied.",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  },
+                  "timespan": {
+                    "type": "integer",
+                    "description": "The timespan for fetching data, in seconds. The maximum is equivalent to 730 days and 12 hours."
+                  },
+                  "t0": {
+                    "type": "string",
+                    "description": "Start of the data timespan, in the ISO 8601 format 'YYYY-MM-DDTHH:MM:SSZ'. The maximum lookback period is 730 days and 12 hours.",
+                    "default": null
+                  },
+                  "t1": {
+                    "type": "string",
+                    "description": "End of the data timespan, in the ISO 8601 format 'YYYY-MM-DDTHH:MM:SSZ'. This can be a maximum of 730 days and 12 hours after t0.",
+                    "default": null
+                  },
+                  "interval": {
+                    "type": "integer",
+                    "description": "The time interval in seconds for the data returned. Valid values are 15, 120, 300, 900, 3600, 14400, 86400, or 604800.",
+                    "enum": [
+                      15,
+                      120,
+                      300,
+                      900,
+                      3600,
+                      14400,
+                      86400,
+                      604800
+                    ],
+                    "default": 86400
+                  },
+                  "models": {
+                    "type": "array",
+                    "description": "Filter readings by one or more sensor models. Available models include 'MT10', 'MT11', 'MT12', 'MT14', 'MT20', 'MT30'.",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item",
+                      "enum": [
+                        "MT10",
+                        "MT11",
+                        "MT12",
+                        "MT14",
+                        "MT20",
+                        "MT30"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "timespan"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing interval summaries and pagination info.",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "description": "Array of interval summaries sorted by interval_start in descending order.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "interval_start": {
+                            "type": "string",
+                            "description": "ISO 8601 timestamp (UTC) marking the start of the interval (e.g., 2023-01-01T00:00:00Z)."
+                          },
+                          "interval_end": {
+                            "type": "string",
+                            "description": "ISO 8601 timestamp (UTC) marking the end of the interval (exclusive)."
+                          },
+                          "metrics": {
+                            "type": "object",
+                            "description": "Mapping from metric name to aggregated values for this interval.",
+                            "properties": {},
+                            "additionalProperties": {
+                              "type": "object",
+                              "properties": {
+                                "count": {
+                                  "type": "integer",
+                                  "description": "Number of samples aggregated for this metric in the interval."
+                                },
+                                "min": {
+                                  "type": "number",
+                                  "format": "double",
+                                  "description": "Minimum observed value for the metric in this interval. Use float format (e.g., 1.0 not 1)."
+                                },
+                                "max": {
+                                  "type": "number",
+                                  "format": "double",
+                                  "description": "Maximum observed value for the metric in this interval. Use float format (e.g., 1.0 not 1)."
+                                },
+                                "avg": {
+                                  "type": "number",
+                                  "format": "double",
+                                  "description": "Average value for the metric in this interval. Use float format (e.g., 1.0 not 1)."
+                                },
+                                "sum": {
+                                  "type": "number",
+                                  "format": "double",
+                                  "description": "Sum of values for the metric in this interval. Use float format (e.g., 1.0 not 1)."
+                                },
+                                "last": {
+                                  "type": "number",
+                                  "format": "double",
+                                  "description": "Most recent observed value for the metric within the interval. Use float format (e.g., 1.0 not 1)."
+                                },
+                                "unit": {
+                                  "type": "string",
+                                  "description": "Unit for the metric values (for example: '°C', '%', 'hPa')."
+                                }
+                              },
+                              "required": [
+                                "count"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "interval_start",
+                          "interval_end",
+                          "metrics"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "description": "Pagination tokens and page sizing for the returned results.",
+                      "properties": {
+                        "perPage": {
+                          "type": "integer",
+                          "description": "Number of entries returned per page."
+                        },
+                        "startingAfter": {
+                          "type": "string",
+                          "description": "Token that can be used to request the next page (cursor after the last returned item)."
+                        },
+                        "endingBefore": {
+                          "type": "string",
+                          "description": "Token that can be used to request the previous page (cursor before the first returned item)."
+                        },
+                        "hasMore": {
+                          "type": "boolean",
+                          "description": "Indicates whether additional pages of data are available after this page."
+                        }
+                      },
+                      "required": [
+                        "perPage",
+                        "hasMore"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "results",
+                    "pagination"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_sensor_readings_history": {
+      "post": {
+        "operationId": "get_sensor_readings_history",
+        "summary": "Simulate returning sensor readings over a requested timespan, sorted by timestamp.",
+        "description": "Return a page of sensor readings (various metrics) for the requested timespan, ordered by timestamp. Response includes pagination tokens when applicable.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "perPage": {
+                    "type": "integer",
+                    "description": "The number of entries per page returned. Must be within the range of 3 to 100.",
+                    "default": 10
+                  },
+                  "startingAfter": {
+                    "type": "string",
+                    "description": "A server-side token that represents the start of the page, such as a timestamp in the format 'YYYY-MM-DDTHH:MM:SSZ'. This should not be manually set by the client.",
+                    "default": null
+                  },
+                  "endingBefore": {
+                    "type": "string",
+                    "description": "A server-side token that represents the end of the page, such as a timestamp in the format 'YYYY-MM-DDTHH:MM:SSZ'. This should not be manually set by the client.",
+                    "default": null
+                  },
+                  "networkId": {
+                    "type": "array",
+                    "description": "The network IDs to filter the returned data. If omitted, data from all networks will be included.",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  },
+                  "serials": {
+                    "type": "array",
+                    "description": "Sensor serial numbers to filter the readings by. If omitted, readings from all sensors will be included.",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  },
+                  "metrics": {
+                    "type": "array",
+                    "description": "Types of sensor readings to retrieve, such as 'temperature', 'humidity', 'co2'. If omitted, all available types will be retrieved.",
+                    "default": [],
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  },
+                  "timespan": {
+                    "type": "integer",
+                    "description": "The duration for which sensor data will be fetched, specified in seconds. Maximum value corresponds to 730 days and 12 hours."
+                  },
+                  "t0": {
+                    "type": "string",
+                    "description": "The start of the timespan for the data, in the format 'YYYY-MM-DDTHH:MM:SSZ'. Maximum lookback is 365 days and 6 hours from today.",
+                    "default": null
+                  },
+                  "t1": {
+                    "type": "string",
+                    "description": "The end of the timespan for the data, in the format 'YYYY-MM-DDTHH:MM:SSZ'. 't1' can be at most 7 days after 't0'.",
+                    "default": null
+                  }
+                },
+                "required": [
+                  "timespan"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Page of sensor readings sorted by timestamp (chronological order).",
+                  "properties": {
+                    "readings": {
+                      "type": "array",
+                      "description": "List of sensor readings in chronological order (oldest first).",
+                      "items": {
+                        "type": "object",
+                        "description": "A single sensor reading record.",
+                        "properties": {
+                          "timestamp": {
+                            "type": "string",
+                            "description": "Timestamp of the reading in ISO 8601 UTC (e.g., '2023-01-02T15:04:05Z')."
+                          },
+                          "networkId": {
+                            "type": "string",
+                            "description": "Identifier of the network that reported the reading."
+                          },
+                          "serial": {
+                            "type": "string",
+                            "description": "Sensor serial number that produced this reading."
+                          },
+                          "metric": {
+                            "type": "string",
+                            "description": "Metric name for this reading (for example: 'temperature', 'humidity', 'co2')."
+                          },
+                          "value": {
+                            "type": "number",
+                            "description": "Measurement value. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "unit": {
+                            "type": "string",
+                            "description": "Optional unit for the measurement (for example: '°C', '%').",
+                            "nullable": true
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "description": "Optional free-form metadata associated with the reading.",
+                            "properties": {},
+                            "additionalProperties": true
+                          }
+                        },
+                        "required": [
+                          "timestamp",
+                          "networkId",
+                          "serial",
+                          "metric",
+                          "value"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "perPage": {
+                      "type": "integer",
+                      "description": "Number of entries returned in this page."
+                    },
+                    "hasMore": {
+                      "type": "boolean",
+                      "description": "True if additional pages are available after this page."
+                    },
+                    "nextPageToken": {
+                      "type": "string",
+                      "description": "Opaque token to request the next page; may be null when hasMore is false.",
+                      "nullable": true
+                    },
+                    "previousPageToken": {
+                      "type": "string",
+                      "description": "Opaque token to request the previous page; may be null when there is no previous page.",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "readings",
+                    "perPage",
+                    "hasMore"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

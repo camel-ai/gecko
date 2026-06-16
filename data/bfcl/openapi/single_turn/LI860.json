@@ -1,0 +1,148 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI860",
+    "version": "1.0.0",
+    "description": "LI860 is a compact API collection for computing individual tax liabilities: it exposes a calculate_tax operation that accepts income, filing status, and deductions and returns computed tax amounts and breakdowns. Designed for straightforward integration into web, mobile, and backend systems, it validates inputs, supports common deduction rules and rate tables, and returns machine-readable results for display, storage, or further automated processing."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI860"
+    }
+  ],
+  "paths": {
+    "/calculate_tax": {
+      "post": {
+        "operationId": "calculate_tax",
+        "summary": "Simulate tax calculation for an income with deductions, exemptions, and filing status",
+        "description": "Computes the tax for the given income using the provided filing_status, deductions, exemptions, and tax_year. Returns taxable income used for the calculation, the final tax owed, an effective tax rate, and an optional breakdown by bracket.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "income": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The total income amount in dollars for which the tax is to be calculated.. Use float format (e.g., 1.0 not 1)."
+                  },
+                  "filing_status": {
+                    "type": "string",
+                    "description": "The filing status of the taxpayer.",
+                    "enum": [
+                      "single",
+                      "married_filing_jointly",
+                      "married_filing_separately",
+                      "head_of_household"
+                    ]
+                  },
+                  "deductions": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The total amount of deductions in dollars the taxpayer is claiming. Defaults to 0 if not provided.. Use float format (e.g., 1.0 not 1).",
+                    "default": 0.0
+                  },
+                  "exemptions": {
+                    "type": "integer",
+                    "description": "The number of exemptions the taxpayer is claiming, typically one per dependent. Defaults to 1 if not provided.",
+                    "default": 1
+                  },
+                  "tax_year": {
+                    "type": "integer",
+                    "description": "The tax year for which the calculation is made. Defaults to the current year if not specified.",
+                    "default": 2023
+                  }
+                },
+                "required": [
+                  "income",
+                  "filing_status"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful tax calculation result",
+                  "properties": {
+                    "taxable_income": {
+                      "type": "number",
+                      "description": "Taxable income used for the calculation after applying deductions and exemptions. If calculation yields a negative value it is treated as 0 for tax computation. Returned as a decimal number (e.g., 1.0, not 1).",
+                      "format": "double"
+                    },
+                    "tax_due": {
+                      "type": "number",
+                      "description": "Total tax amount owed for the inputs provided. Returned as a decimal number (e.g., 1.0, not 1).",
+                      "format": "double"
+                    },
+                    "effective_tax_rate": {
+                      "type": "number",
+                      "description": "Effective tax rate expressed as a decimal fraction (for example, 0.22 represents 22%). If taxable_income is 0, this value will be 0. Returned as a decimal number (e.g., 0.22).",
+                      "format": "double"
+                    },
+                    "breakdown_by_bracket": {
+                      "type": "array",
+                      "description": "Optional detailed breakdown showing how much tax was applied at each marginal rate/bracket.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "rate": {
+                            "type": "number",
+                            "description": "Marginal tax rate for this bracket as a decimal (e.g., 0.12 for 12%). Returned as a decimal number (e.g., 0.12, not 0.12).",
+                            "format": "double"
+                          },
+                          "income_in_bracket": {
+                            "type": "number",
+                            "description": "Portion of taxable income that fell into this bracket. Returned as a decimal number (e.g., 1.0, not 1).",
+                            "format": "double"
+                          },
+                          "tax_amount": {
+                            "type": "number",
+                            "description": "Amount of tax attributable to this bracket. Returned as a decimal number (e.g., 1.0, not 1).",
+                            "format": "double"
+                          },
+                          "bracket_lower_bound": {
+                            "type": "number",
+                            "description": "Lower bound of this bracket (inclusive) expressed in the same units as the request income/deductions (dollars).",
+                            "format": "double"
+                          },
+                          "bracket_upper_bound": {
+                            "type": "string",
+                            "description": "Upper bound of this bracket (exclusive) expressed in the same units as the request income/deductions (dollars). Null indicates no upper bound.",
+                            "format": "double"
+                          }
+                        },
+                        "required": [
+                          "rate",
+                          "income_in_bracket",
+                          "tax_amount"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "taxable_income",
+                    "tax_due",
+                    "effective_tax_rate"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

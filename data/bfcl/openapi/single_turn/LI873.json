@@ -1,0 +1,494 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI873",
+    "version": "1.0.0",
+    "description": "LI873 is an integrated API collection for document-driven Q&A, code analysis, scripted automation, material creation, and search-and-insert workflows. Use doc_qa to extract answers from English documents, code_explain for detailed code analysis, attach_script to generate reusable scripts, create_material to register new components from descriptions, and search_insert_assert to locate and insert items into system locations. Calls are prompt-driven and return structured results suitable for automation and integration."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI873"
+    }
+  ],
+  "paths": {
+    "/doc_qa": {
+      "post": {
+        "operationId": "doc_qa",
+        "summary": "Answer a question using a provided English document",
+        "description": "Extract the most relevant information from document_content to answer the prompt. Return a concise, document-grounded answer with supporting excerpts and optional confidence when requested.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "prompt": {
+                    "type": "string",
+                    "description": "The question posed by the user about the document."
+                  },
+                  "document_content": {
+                    "type": "string",
+                    "description": "The full text of the document to search for the answer.",
+                    "default": ""
+                  },
+                  "context_length": {
+                    "type": "integer",
+                    "description": "The number of surrounding words to include with the answer for context.",
+                    "default": 50
+                  },
+                  "include_confidence": {
+                    "type": "boolean",
+                    "description": "Whether to include the model's confidence score with the answer.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "prompt"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload containing the answer and optional supporting metadata.",
+                  "properties": {
+                    "answer": {
+                      "type": "string",
+                      "description": "Direct answer to the prompt derived from the document_content. Prefer concise, factual responses grounded in the document."
+                    },
+                    "excerpts": {
+                      "type": "array",
+                      "description": "One or more excerpts from the document_content that support the answer, ordered by relevance.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "text": {
+                            "type": "string",
+                            "description": "The exact excerpt text taken from document_content."
+                          },
+                          "start_index": {
+                            "type": "integer",
+                            "description": "Start index of the excerpt within document_content (indexing scheme not specified)."
+                          },
+                          "end_index": {
+                            "type": "integer",
+                            "description": "End index of the excerpt within document_content (indexing scheme not specified)."
+                          },
+                          "context": {
+                            "type": "string",
+                            "description": "A short surrounding snippet providing additional context; length should reflect the request's context_length."
+                          }
+                        },
+                        "required": [
+                          "text"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "confidence": {
+                      "type": "number",
+                      "description": "Model confidence in the answer as a decimal between 0.0 and 1.0. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    }
+                  },
+                  "required": [
+                    "answer"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/code_explain": {
+      "post": {
+        "operationId": "code_explain",
+        "summary": "Explain a code snippet or answer a code-related question",
+        "description": "Simulate generating a detailed explanation of the provided code snippet or an answer to a code-related question from the script editor.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "prompt": {
+                    "type": "string",
+                    "description": "The code snippet selected by the user or a question regarding the code that needs explanation."
+                  },
+                  "language": {
+                    "type": "string",
+                    "description": "The programming language of the code snippet.",
+                    "enum": [
+                      "Python",
+                      "JavaScript",
+                      "Java",
+                      "C++",
+                      "C#"
+                    ],
+                    "default": "Python"
+                  },
+                  "context": {
+                    "type": "string",
+                    "description": "Additional context or information related to the code snippet which can help in generating a better explanation.",
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "prompt"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload containing the explanation and related guidance.",
+                  "properties": {
+                    "explanation": {
+                      "type": "string",
+                      "description": "A detailed, human-readable explanation of the code's behavior, purpose, and logic. Prefer step-by-step reasoning, highlight important control flow, and use concrete examples where helpful."
+                    },
+                    "key_points": {
+                      "type": "array",
+                      "description": "Concise bullet points summarizing important aspects, assumptions, potential pitfalls, and noteworthy behavior.",
+                      "items": {
+                        "type": "string",
+                        "description": "Array item"
+                      }
+                    },
+                    "suggested_fixes": {
+                      "type": "array",
+                      "description": "Concrete suggested fixes or improvements. Each item includes a description and may include a replacement snippet.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "description": {
+                            "type": "string",
+                            "description": "A short description of the suggested fix or improvement."
+                          },
+                          "replacement_snippet": {
+                            "type": "string",
+                            "description": "Optional short code snippet illustrating the suggested fix or improvement."
+                          }
+                        },
+                        "required": [
+                          "description"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "complexity": {
+                      "type": "string",
+                      "description": "If applicable, a concise statement of time and/or space complexity (for example, \"O(n) time, O(1) space\")."
+                    }
+                  },
+                  "required": [
+                    "explanation"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/attach_script": {
+      "post": {
+        "operationId": "attach_script",
+        "summary": "Generate a runnable code script from a textual prompt",
+        "description": "Simulate generating a complete, runnable code script based on prompt_script. Respect the requested language, script_type, and add_comments flags when producing the script.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "prompt_script": {
+                    "type": "string",
+                    "description": "The textual requirement or description from which to generate the code script."
+                  },
+                  "language": {
+                    "type": "string",
+                    "description": "The programming language for the generated script.",
+                    "enum": [
+                      "Python",
+                      "JavaScript",
+                      "Ruby",
+                      "Bash"
+                    ],
+                    "default": "Python"
+                  },
+                  "script_type": {
+                    "type": "string",
+                    "description": "The type of script to be generated, such as 'standalone' or 'module'.",
+                    "enum": [
+                      "standalone",
+                      "module"
+                    ],
+                    "default": "standalone"
+                  },
+                  "add_comments": {
+                    "type": "boolean",
+                    "description": "Indicates if explanatory comments should be included in the generated script.",
+                    "default": true
+                  }
+                },
+                "required": [
+                  "prompt_script"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful payload containing the generated script.",
+                  "properties": {
+                    "script": {
+                      "type": "string",
+                      "description": "The generated code script as plain text."
+                    },
+                    "filename": {
+                      "type": "string",
+                      "description": "Optional suggested filename for the generated script (a suggested name, not an echo of request payload)."
+                    }
+                  },
+                  "required": [
+                    "script"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/create_material": {
+      "post": {
+        "operationId": "create_material",
+        "summary": "Simulate creating a material resource from a text description",
+        "description": "Simulates creating a new material entry using prompt_material plus optional material_type, quantity, and dimensions.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "prompt_material": {
+                    "type": "string",
+                    "description": "The text description that specifies the material requirements. For example, 'oak wood door' or 'stainless steel panel'."
+                  },
+                  "material_type": {
+                    "type": "string",
+                    "description": "The category of material to be created.",
+                    "enum": [
+                      "door",
+                      "metal",
+                      "wood",
+                      "plastic",
+                      "glass"
+                    ],
+                    "default": "metal"
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "description": "The number of material units required. Unit refers to the countable quantity of the material, such as '5 doors' or '20 panels'.",
+                    "default": 1
+                  },
+                  "dimensions": {
+                    "type": "string",
+                    "description": "The dimensions of the material required, specified in the format 'Width x Height x Depth' in inches. For example, '24 x 78 x 1.5' for a door.",
+                    "default": "Not specified"
+                  }
+                },
+                "required": [
+                  "prompt_material"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Representation of the successfully created material.",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Unique identifier for the created material."
+                    },
+                    "prompt_material": {
+                      "type": "string",
+                      "description": "The original material description provided in the request."
+                    },
+                    "material_type": {
+                      "type": "string",
+                      "description": "The category of material.",
+                      "enum": [
+                        "door",
+                        "metal",
+                        "wood",
+                        "plastic",
+                        "glass"
+                      ]
+                    },
+                    "quantity": {
+                      "type": "integer",
+                      "description": "The number of material units created."
+                    },
+                    "dimensions": {
+                      "type": "string",
+                      "description": "Dimensions provided for the created material, matching the request's dimensions value (for example, '24 x 78 x 1.5' or the default 'Not specified')."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp (ISO 8601) when the material was created.",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "prompt_material",
+                    "material_type",
+                    "quantity",
+                    "dimensions",
+                    "created_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/search_insert_assert": {
+      "post": {
+        "operationId": "search_insert_assert",
+        "summary": "Simulate searching for an item and inserting it",
+        "description": "Simulate searching for an item matching the user's query and inserting it into the specified location. Returns metadata about the inserted item when successful.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "description": "The description of the item to be searched and inserted."
+                  },
+                  "location": {
+                    "type": "string",
+                    "description": "The location where the item will be inserted, specified in the format 'section/shelf'.",
+                    "default": "unsorted/general"
+                  },
+                  "priority": {
+                    "type": "boolean",
+                    "description": "A flag indicating whether the item should be inserted with high priority.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "query"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Metadata for the successfully inserted item",
+                  "properties": {
+                    "inserted_id": {
+                      "type": "string",
+                      "description": "Unique identifier assigned to the inserted item."
+                    },
+                    "query": {
+                      "type": "string",
+                      "description": "The original query describing the item that was searched and inserted."
+                    },
+                    "location": {
+                      "type": "string",
+                      "description": "The location where the item was inserted, in 'section/shelf' format."
+                    },
+                    "priority": {
+                      "type": "boolean",
+                      "description": "Whether the item was inserted with high priority."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Result status of the operation (e.g., 'inserted', 'duplicate', 'skipped')."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable message describing the result."
+                    },
+                    "inserted_at": {
+                      "type": "string",
+                      "description": "Timestamp (RFC 3339) when the item was inserted.",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "inserted_id",
+                    "query",
+                    "location",
+                    "priority",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

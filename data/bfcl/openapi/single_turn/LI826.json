@@ -1,0 +1,137 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI826",
+    "version": "1.0.0",
+    "description": "LI826 is an API collection for computing and integrating progressive income tax calculations into financial applications. It exposes a simple, stateless JSON interface centered on the calculate_tax tool, which computes tax amounts from taxable income and configurable bracket sets. Designed for straightforward RESTful calls, predictable responses, and clear validation/error messages, LI826 supports batch requests and integration into server-side workflows or front-end calculators with minimal configuration."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI826"
+    }
+  ],
+  "paths": {
+    "/calculate_tax": {
+      "post": {
+        "operationId": "calculate_tax",
+        "summary": "Simulate tax calculation from income and tax brackets",
+        "description": "Compute total tax and per-bracket breakdown using progressive tax brackets.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "taxable_income": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The total income subject to tax, in dollars.. Use float format (e.g., 1.0 not 1)."
+                  },
+                  "tax_brackets": {
+                    "type": "array",
+                    "description": "A list of tax brackets. Each bracket is a dict containing the upper limit and corresponding tax rate.",
+                    "items": {
+                      "type": "object",
+                      "description": "Array item",
+                      "properties": {}
+                    }
+                  },
+                  "filing_status": {
+                    "type": "string",
+                    "description": "The tax filing status of the individual.",
+                    "enum": [
+                      "single",
+                      "married_filing_jointly",
+                      "married_filing_separately",
+                      "head_of_household"
+                    ],
+                    "default": "single"
+                  },
+                  "state": {
+                    "type": "string",
+                    "description": "The state for which the tax is being calculated. This should be in the two-letter state code format, such as 'CA' for California.",
+                    "default": "CA"
+                  }
+                },
+                "required": [
+                  "taxable_income",
+                  "tax_brackets"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Tax calculation result",
+                  "properties": {
+                    "total_tax": {
+                      "type": "number",
+                      "description": "Total tax amount owed, in dollars. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "effective_tax_rate": {
+                      "type": "number",
+                      "description": "Effective tax rate = total_tax / taxable_income, expressed as a decimal (e.g., 0.22 for 22%). Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "breakdown": {
+                      "type": "array",
+                      "description": "Per-bracket breakdown showing how much income was taxed at each bracket and the tax computed for that bracket.",
+                      "items": {
+                        "type": "object",
+                        "description": "Breakdown entry",
+                        "properties": {
+                          "upper_limit": {
+                            "type": "string",
+                            "description": "Upper limit of this bracket in dollars. Null indicates no upper bound. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "rate": {
+                            "type": "number",
+                            "description": "Tax rate applied to this bracket as a decimal (e.g., 0.22 for 22%). Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "taxable_amount": {
+                            "type": "number",
+                            "description": "Amount of income taxed at this bracket, in dollars. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "tax_for_bracket": {
+                            "type": "number",
+                            "description": "Tax computed for this bracket, in dollars. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          }
+                        },
+                        "required": [
+                          "rate",
+                          "taxable_amount",
+                          "tax_for_bracket"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "total_tax",
+                    "breakdown",
+                    "effective_tax_rate"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

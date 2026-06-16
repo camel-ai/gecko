@@ -1,0 +1,539 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM767",
+    "version": "1.0.0",
+    "description": "LM767 is a compact service collection for consumer dining and personal-care bookings, combining restaurant search and reservation with hair stylist discovery and appointment scheduling. Use straightforward endpoints to find restaurants by location and cuisine, apply filters (price, vegetarian, outdoor), reserve tables by name, date, time and party size, search stylists by city and gender accommodation, and book salon appointments by provider name and desired slot. Designed for simple parameterized requests and immediate confirmations."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM767"
+    }
+  ],
+  "paths": {
+    "/Restaurants_2_ReserveRestaurant": {
+      "post": {
+        "operationId": "Restaurants_2_ReserveRestaurant",
+        "summary": "Simulate creating a restaurant table reservation",
+        "description": "Simulate making a table reservation (restaurant, location, date, time, seats). Return a confirmation payload when successful.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "restaurant_name": {
+                    "type": "string",
+                    "description": "The full name of the restaurant where the reservation is to be made."
+                  },
+                  "location": {
+                    "type": "string",
+                    "description": "The location of the restaurant in the format of 'City, State', such as 'San Francisco, CA'."
+                  },
+                  "time": {
+                    "type": "string",
+                    "description": "The reservation time in 24-hour format, e.g., '18:30' for 6:30 PM."
+                  },
+                  "number_of_seats": {
+                    "type": "integer",
+                    "description": "The number of seats to reserve at the restaurant.",
+                    "default": 2
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "The reservation date in ISO 8601 format, e.g., 'YYYY-MM-DD'."
+                  }
+                },
+                "required": [
+                  "restaurant_name",
+                  "location",
+                  "time",
+                  "date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Reservation confirmation payload returned on successful booking.",
+                  "properties": {
+                    "reservation_id": {
+                      "type": "string",
+                      "description": "Server-generated unique identifier for the reservation."
+                    },
+                    "confirmation_code": {
+                      "type": "string",
+                      "description": "Short code guests can use to confirm, modify, or cancel the reservation."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Current reservation status (for example, confirmed or pending)."
+                    },
+                    "party_size": {
+                      "type": "integer",
+                      "description": "Number of seats reserved."
+                    },
+                    "restaurant": {
+                      "type": "object",
+                      "description": "Canonical restaurant information recorded by the system.",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "Official restaurant name as recorded by the system."
+                        },
+                        "location": {
+                          "type": "string",
+                          "description": "Canonical restaurant location (for example, 'San Francisco, CA')."
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "location"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp when the reservation was created (recommended ISO 8601, e.g., '2026-03-12T18:30:00Z')."
+                    },
+                    "expires_at": {
+                      "type": "string",
+                      "description": "Timestamp when the reservation hold or ephemeral confirmation expires (recommended ISO 8601)."
+                    },
+                    "notes": {
+                      "type": "string",
+                      "description": "Optional message from the restaurant (e.g., seating notes or special instructions)."
+                    }
+                  },
+                  "required": [
+                    "reservation_id",
+                    "confirmation_code",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Restaurants_2_FindRestaurants": {
+      "post": {
+        "operationId": "Restaurants_2_FindRestaurants",
+        "summary": "Simulate finding restaurants by location and category with optional filters",
+        "description": "Locate restaurants matching the provided category and location, optionally filtering by price range, vegetarian options, and outdoor seating. Returns a ranked list with basic metadata (address, flags, rating, distance).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "category": {
+                    "type": "string",
+                    "description": "The type of cuisine or food category offered by the restaurant.",
+                    "enum": [
+                      "Mexican",
+                      "Bistro",
+                      "Izakaya",
+                      "Brunch",
+                      "Thai",
+                      "Sandwich",
+                      "Seafood",
+                      "Barbecue",
+                      "European",
+                      "Steakhouse",
+                      "Vietnamese",
+                      "Asian",
+                      "Coffeehouse",
+                      "American",
+                      "Gastropub",
+                      "Austrian",
+                      "Italian",
+                      "Indian",
+                      "Spanish",
+                      "Vegetarian",
+                      "Brasserie",
+                      "Chinese",
+                      "Breakfast",
+                      "Greek",
+                      "California",
+                      "Tapas",
+                      "Take-out",
+                      "Japanese"
+                    ]
+                  },
+                  "location": {
+                    "type": "string",
+                    "description": "The location of the restaurant, in the format of 'City, State', such as 'Berkeley, CA' and 'New York, NY'."
+                  },
+                  "price_range": {
+                    "type": "string",
+                    "description": "The general price range for dining at the restaurant.",
+                    "enum": [
+                      "cheap",
+                      "moderate",
+                      "pricey",
+                      "ultra high-end"
+                    ],
+                    "default": "dontcare"
+                  },
+                  "has_vegetarian_options": {
+                    "type": "boolean",
+                    "description": "Indicates whether the restaurant offers a selection of vegetarian dishes.",
+                    "default": null
+                  },
+                  "has_seating_outdoors": {
+                    "type": "boolean",
+                    "description": "Specifies if the restaurant provides outdoor seating for customers.",
+                    "default": null
+                  }
+                },
+                "required": [
+                  "category",
+                  "location"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search results for restaurants matching the request",
+                  "properties": {
+                    "restaurants": {
+                      "type": "array",
+                      "description": "List of matching restaurants, ordered by relevance",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the restaurant"
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Restaurant name"
+                          },
+                          "category": {
+                            "type": "string",
+                            "description": "Primary cuisine or food category"
+                          },
+                          "address": {
+                            "type": "string",
+                            "description": "Full street address, if available"
+                          },
+                          "city": {
+                            "type": "string",
+                            "description": "City of the restaurant"
+                          },
+                          "state": {
+                            "type": "string",
+                            "description": "State of the restaurant"
+                          },
+                          "price_range": {
+                            "type": "string",
+                            "description": "General price range (e.g., cheap, moderate, pricey, ultra high-end) when available"
+                          },
+                          "has_vegetarian_options": {
+                            "type": "boolean",
+                            "description": "Whether the restaurant offers vegetarian options"
+                          },
+                          "has_seating_outdoors": {
+                            "type": "boolean",
+                            "description": "Whether the restaurant provides outdoor seating"
+                          },
+                          "rating": {
+                            "type": "number",
+                            "description": "Aggregate customer rating. Provide as a float (e.g., 4.5, not 4)",
+                            "format": "double"
+                          },
+                          "review_count": {
+                            "type": "integer",
+                            "description": "Number of reviews contributing to the rating"
+                          },
+                          "distance_miles": {
+                            "type": "number",
+                            "description": "Estimated distance from the requested location in miles. Provide as a float (e.g., 1.2, not 1)",
+                            "format": "double"
+                          },
+                          "phone": {
+                            "type": "string",
+                            "description": "Contact phone number, if available"
+                          },
+                          "url": {
+                            "type": "string",
+                            "description": "Website or menu URL, if available"
+                          },
+                          "opening_hours": {
+                            "type": "string",
+                            "description": "Human-readable summary of opening hours, if available"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "city",
+                          "state"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "result_count": {
+                      "type": "integer",
+                      "description": "Total number of restaurants included in this response"
+                    }
+                  },
+                  "required": [
+                    "restaurants"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Services_1_BookAppointment": {
+      "post": {
+        "operationId": "Services_1_BookAppointment",
+        "summary": "Simulate booking a hair appointment",
+        "description": "Simulates booking an appointment with a specified hair stylist or salon for hairdressing services. Validates required fields and formats but does not actually persist data.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "stylist_name": {
+                    "type": "string",
+                    "description": "The full name of the hair stylist or the name of the salon where the appointment will be booked."
+                  },
+                  "appointment_time": {
+                    "type": "string",
+                    "description": "The specific time for the appointment, in 24-hour format 'HH:MM'."
+                  },
+                  "appointment_date": {
+                    "type": "string",
+                    "description": "The date for the appointment, in the format 'YYYY-MM-DD'."
+                  },
+                  "service_type": {
+                    "type": "string",
+                    "description": "The type of service requested for the appointment.",
+                    "enum": [
+                      "haircut",
+                      "coloring",
+                      "styling",
+                      "treatment"
+                    ],
+                    "default": "haircut"
+                  },
+                  "contact_number": {
+                    "type": "string",
+                    "description": "The contact phone number for appointment confirmation, in the format '123-456-7890'.",
+                    "default": null
+                  },
+                  "confirmation_email": {
+                    "type": "boolean",
+                    "description": "Whether a confirmation email should be sent. If true, an email is sent to the provided email address.",
+                    "default": true
+                  }
+                },
+                "required": [
+                  "stylist_name",
+                  "appointment_time",
+                  "appointment_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful appointment booking response",
+                  "properties": {
+                    "appointment_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the booked appointment."
+                    },
+                    "stylist_name": {
+                      "type": "string",
+                      "description": "The full name of the hair stylist or the name of the salon where the appointment was booked."
+                    },
+                    "appointment_date": {
+                      "type": "string",
+                      "description": "The date for the appointment, in the format 'YYYY-MM-DD'."
+                    },
+                    "appointment_time": {
+                      "type": "string",
+                      "description": "The specific time for the appointment, in 24-hour format 'HH:MM'."
+                    },
+                    "service_type": {
+                      "type": "string",
+                      "description": "The type of service requested for the appointment.",
+                      "enum": [
+                        "haircut",
+                        "coloring",
+                        "styling",
+                        "treatment"
+                      ]
+                    },
+                    "contact_number": {
+                      "type": "string",
+                      "description": "The contact phone number for appointment confirmation, in the format '123-456-7890'."
+                    },
+                    "confirmation_email_sent": {
+                      "type": "boolean",
+                      "description": "Whether a confirmation email was sent as part of booking."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp (ISO 8601) when the appointment was created.",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "appointment_id",
+                    "stylist_name",
+                    "appointment_date",
+                    "appointment_time",
+                    "service_type",
+                    "confirmation_email_sent",
+                    "created_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Services_1_FindProvider": {
+      "post": {
+        "operationId": "Services_1_FindProvider",
+        "summary": "Simulate search for hair stylists in a city (with optional unisex filter)",
+        "description": "Simulated endpoint: search for hair stylists within a specified city. Optionally filter results to salons that are unisex.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "city": {
+                    "type": "string",
+                    "description": "The city where the search for a hair stylist is targeted, in the format 'City, State', such as 'New York, NY' or 'Los Angeles, CA'."
+                  },
+                  "is_unisex": {
+                    "type": "boolean",
+                    "description": "Indicates if the salon should be unisex or not. A value of 'true' searches for unisex salons, 'false' for non-unisex salons.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful search result containing a list of matching providers.",
+                  "properties": {
+                    "providers": {
+                      "type": "array",
+                      "description": "Array of provider records matching the search criteria.",
+                      "items": {
+                        "type": "object",
+                        "description": "A single hair stylist / salon provider.",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the provider."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Full name of the stylist or primary contact."
+                          },
+                          "salon_name": {
+                            "type": "string",
+                            "description": "Name of the salon or business."
+                          },
+                          "address": {
+                            "type": "string",
+                            "description": "Street address for the salon (may be partial)."
+                          },
+                          "city": {
+                            "type": "string",
+                            "description": "City and state for the salon, e.g., 'New York, NY'."
+                          },
+                          "is_unisex": {
+                            "type": "boolean",
+                            "description": "Whether the salon is unisex."
+                          },
+                          "distance_miles": {
+                            "type": "number",
+                            "description": "Distance from the search center in miles. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "salon_name",
+                          "city",
+                          "is_unisex"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "providers"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

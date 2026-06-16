@@ -1,0 +1,465 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM239",
+    "version": "1.0.0",
+    "description": "LM239 is an extensible multimodal assistant API collection exposing tools for image generation, text-to-speech, file writing (Markdown/HTML), web search, and URL content scraping. It’s designed for programmatic workflows where applications request generated media, save formatted outputs, or retrieve web data; use tools by invoking their clear intents (generate_image_tool, tts_tool, write_markdown_tool, write_html_tool, search_web_tool, get_url_content) and handle file outputs and search responses in your orchestration layer."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM239"
+    }
+  ],
+  "paths": {
+    "/generate_image_tool": {
+      "post": {
+        "operationId": "generate_image_tool",
+        "summary": "Generate image and save to file",
+        "description": "Simulate generating a raster image from a detailed natural-language description and saving it under the provided file name. If aspects of the scene are not described, those aspects may be chosen randomly. Not intended for generating images from textual data.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "desc": {
+                    "type": "string",
+                    "description": "A single string that provides a detailed description of the desired image. For example, 'a sunset over the mountains with a lake in the foreground'."
+                  },
+                  "file_name": {
+                    "type": "string",
+                    "description": "The name of the file to which the generated image will be saved. It should include the file extension, such as 'image.png'."
+                  }
+                },
+                "required": [
+                  "desc",
+                  "file_name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful image generation result",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "description": "Publicly accessible URL where the generated image is saved."
+                    },
+                    "mime_type": {
+                      "type": "string",
+                      "description": "MIME type of the generated image (for example: image/png)."
+                    },
+                    "width": {
+                      "type": "integer",
+                      "description": "Pixel width of the generated image."
+                    },
+                    "height": {
+                      "type": "integer",
+                      "description": "Pixel height of the generated image."
+                    },
+                    "size_bytes": {
+                      "type": "integer",
+                      "description": "Size of the generated image file in bytes."
+                    }
+                  },
+                  "required": [
+                    "url",
+                    "mime_type"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tts_tool": {
+      "post": {
+        "operationId": "tts_tool",
+        "summary": "Convert text to speech and save audio file",
+        "description": "Simulates converting the provided text into a spoken audio file and returns metadata about the saved audio.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "content": {
+                    "type": "string",
+                    "description": "The text content that needs to be converted to speech."
+                  },
+                  "speaker": {
+                    "type": "string",
+                    "description": "The voice to be used for the text-to-speech conversion.",
+                    "enum": [
+                      "male",
+                      "female",
+                      "bria",
+                      "alex"
+                    ],
+                    "default": "female"
+                  },
+                  "file_name": {
+                    "type": "string",
+                    "description": "The name of the file to save the audio output without the extension. If left empty, a default name will be generated based on the content.",
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "content"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Result of a successful text-to-speech conversion",
+                  "properties": {
+                    "file_name": {
+                      "type": "string",
+                      "description": "Name of the saved audio file without the extension."
+                    },
+                    "file_path": {
+                      "type": "string",
+                      "description": "Full filesystem path or URL to the saved audio file, including the file extension."
+                    },
+                    "format": {
+                      "type": "string",
+                      "description": "Audio file format/codec used for the saved file (e.g., mp3, wav)."
+                    },
+                    "duration_seconds": {
+                      "type": "number",
+                      "description": "Duration of the generated audio in seconds. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "size_bytes": {
+                      "type": "integer",
+                      "description": "Size of the generated audio file in bytes."
+                    }
+                  },
+                  "required": [
+                    "file_name",
+                    "file_path",
+                    "format"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/write_markdown_tool": {
+      "post": {
+        "operationId": "write_markdown_tool",
+        "summary": "Write Markdown file",
+        "description": "Simulate writing provided Markdown content to a .md file on disk. Validate minimal input requirements and confirm successful write without echoing the content.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "content": {
+                    "type": "string",
+                    "description": "The Markdown formatted text content to be written to the file."
+                  },
+                  "filename": {
+                    "type": "string",
+                    "description": "The name of the file to which the Markdown content will be written. If not provided, a default filename will be used.",
+                    "default": "output.md"
+                  }
+                },
+                "required": [
+                  "content"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Result of a successful write operation.",
+                  "properties": {
+                    "written": {
+                      "type": "boolean",
+                      "description": "True if the file was successfully written to disk."
+                    },
+                    "bytes_written": {
+                      "type": "integer",
+                      "description": "Number of bytes written to disk.",
+                      "format": "int64"
+                    }
+                  },
+                  "required": [
+                    "written",
+                    "bytes_written"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/write_html_tool": {
+      "post": {
+        "operationId": "write_html_tool",
+        "summary": "Write HTML file to disk",
+        "description": "Simulates writing provided HTML content to a file; ensures HTML tags in the content are properly closed. Use for save operations where HTML must be persisted.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "content": {
+                    "type": "string",
+                    "description": "The HTML content to be written to the file. Must contain valid HTML structure."
+                  },
+                  "filename": {
+                    "type": "string",
+                    "description": "The name of the file to which the HTML content will be written. If not provided, a default filename will be used.",
+                    "default": "output.html"
+                  }
+                },
+                "required": [
+                  "content"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful result payload for a write operation.",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "True if the file was written successfully."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable status message describing the outcome."
+                    },
+                    "file_path": {
+                      "type": "string",
+                      "description": "Absolute or relative path to the written file, if available."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/search_web_tool": {
+      "post": {
+        "operationId": "search_web_tool",
+        "summary": "Simulate DuckDuckGo search and return results",
+        "description": "Simulates executing a DuckDuckGo search for the given query and returns up to num_results search results from the chosen source. Use this simulation to preview result structure and typical fields (title, url, snippet, source, rank).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "description": "The search term or phrase to be queried."
+                  },
+                  "num_results": {
+                    "type": "integer",
+                    "description": "The maximum number of search results to return. A positive integer.",
+                    "default": 3
+                  },
+                  "source": {
+                    "type": "string",
+                    "description": "The source from which the search results should be fetched.",
+                    "enum": [
+                      "text",
+                      "news"
+                    ],
+                    "default": "text"
+                  }
+                },
+                "required": [
+                  "query"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful search response containing an ordered list of search results.",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "description": "List of search results ordered by relevance (rank 1 is the top result).",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "title": {
+                            "type": "string",
+                            "description": "The title or headline of the search result."
+                          },
+                          "url": {
+                            "type": "string",
+                            "description": "The canonical URL of the result."
+                          },
+                          "snippet": {
+                            "type": "string",
+                            "description": "A short excerpt or summary of the result content."
+                          },
+                          "source": {
+                            "type": "string",
+                            "description": "The source category of the result.",
+                            "enum": [
+                              "text",
+                              "news"
+                            ]
+                          },
+                          "rank": {
+                            "type": "integer",
+                            "description": "Position of the result in the returned list (1 = highest relevance)."
+                          }
+                        },
+                        "required": [
+                          "title",
+                          "url",
+                          "snippet",
+                          "source",
+                          "rank"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "results"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_url_content": {
+      "post": {
+        "operationId": "get_url_content",
+        "summary": "Scrape a URL and return extracted textual content",
+        "description": "Simulate scraping the provided URL and return the extracted textual content as a single string payload.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "The web address of the page to scrape. It should be a valid URL format, such as 'http://www.example.com'."
+                  },
+                  "timeout": {
+                    "type": "integer",
+                    "description": "The maximum time in seconds to wait for the server to send data before giving up, with a default value that allows for a reasonable amount of time for most web pages to load.",
+                    "default": 30
+                  },
+                  "user_agent": {
+                    "type": "string",
+                    "description": "The User-Agent string to be used for the HTTP request to simulate a particular browser, which is optional. Some websites may require this for access.",
+                    "default": "Mozilla/5.0"
+                  }
+                },
+                "required": [
+                  "url"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing the scraped textual content.",
+                  "properties": {
+                    "content": {
+                      "type": "string",
+                      "description": "The extracted textual content of the page (visible text with scripts/styles removed)."
+                    }
+                  },
+                  "required": [
+                    "content"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

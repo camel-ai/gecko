@@ -1,0 +1,329 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM1007",
+    "version": "1.0.0",
+    "description": "The LM1007 collection provides lightweight diagnostic and configuration endpoints for inspecting runtime and application state: retrieve software_versions with optional filters to list installed runtimes and package managers, call HealthApi_get_version to obtain current API version metadata, and use ApplicationSettingsApi_get_application_configs to read environment variables, feature toggles, and system behaviors. Designed for safe, read-only usage in monitoring, deployment validation, and automated tooling, it supports concise queries and predictable, machine-friendly JSON responses."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM1007"
+    }
+  ],
+  "paths": {
+    "/software_versions": {
+      "post": {
+        "operationId": "software_versions",
+        "summary": "Simulated retrieval of installed software versions",
+        "description": "Simulate returning information about installed software (runtimes and package managers). Apply optional filters from the request to narrow results; when simulating, return representative entries that match provided filters.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "time": {
+                    "type": "string",
+                    "description": "The time at which the software details were retrieved, in the format 'YYYY-MM-DD HH:MM:SS'.",
+                    "default": "null"
+                  },
+                  "origin": {
+                    "type": "string",
+                    "description": "The source or repository from which the software was installed.",
+                    "default": ""
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "The type of the software, such as 'runtime' or 'package_manager'.",
+                    "enum": [
+                      "runtime",
+                      "package_manager"
+                    ],
+                    "default": ""
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The name of the software to filter by.",
+                    "default": ""
+                  },
+                  "version": {
+                    "type": "string",
+                    "description": "The version of the software to filter by.",
+                    "default": ""
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "description": "A list of installed software entries that match the request filters.",
+                  "items": {
+                    "type": "object",
+                    "description": "An installed software record.",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The name of the software."
+                      },
+                      "version": {
+                        "type": "string",
+                        "description": "The version string of the software."
+                      },
+                      "type": {
+                        "type": "string",
+                        "description": "The category of the software; one of 'runtime' or 'package_manager'.",
+                        "enum": [
+                          "runtime",
+                          "package_manager"
+                        ]
+                      },
+                      "origin": {
+                        "type": "string",
+                        "description": "The source or repository from which the software was installed."
+                      },
+                      "retrieved_at": {
+                        "type": "string",
+                        "description": "The time at which this software detail was retrieved, in the format 'YYYY-MM-DD HH:MM:SS'."
+                      },
+                      "details": {
+                        "type": "object",
+                        "description": "Optional, implementation-specific metadata about the package (e.g., install path, vendor).",
+                        "properties": {},
+                        "additionalProperties": true
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "version"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/HealthApi_get_version": {
+      "post": {
+        "operationId": "HealthApi_get_version",
+        "summary": "Get API version info",
+        "description": "Simulate retrieval of the API's current version information. Return a minimal JSON object describing the API version and optional build/commit metadata.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Version information payload",
+                  "properties": {
+                    "version": {
+                      "type": "string",
+                      "description": "Semantic version of the API (e.g., 1.2.3). This field is required."
+                    },
+                    "build": {
+                      "type": "string",
+                      "description": "Optional build identifier or build tag (if available)."
+                    },
+                    "commit": {
+                      "type": "string",
+                      "description": "Optional VCS commit hash associated with this build (if available)."
+                    },
+                    "uptime_seconds": {
+                      "type": "number",
+                      "description": "Optional service uptime in seconds."
+                    }
+                  },
+                  "required": [
+                    "version"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ApplicationSettingsApi_get_application_configs": {
+      "post": {
+        "operationId": "ApplicationSettingsApi_get_application_configs",
+        "summary": "Simulate retrieval of application configuration settings",
+        "description": "Return all application configuration entries matching the requested environment and config_type. Optionally include sensitive values when requested (simulations should avoid exposing real secrets).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "environment": {
+                    "type": "string",
+                    "description": "The deployment environment for which the application configurations are being retrieved, such as 'development', 'staging', or 'production'.",
+                    "enum": [
+                      "development",
+                      "staging",
+                      "production"
+                    ]
+                  },
+                  "include_sensitive": {
+                    "type": "boolean",
+                    "description": "A flag indicating whether to include sensitive configurations like API keys and passwords. It is recommended to keep this false unless necessary.",
+                    "default": false
+                  },
+                  "config_type": {
+                    "type": "string",
+                    "description": "The type of configurations to retrieve, such as 'feature_toggles' or 'system_behaviors'.",
+                    "enum": [
+                      "all",
+                      "feature_toggles",
+                      "system_behaviors"
+                    ],
+                    "default": "all"
+                  }
+                },
+                "required": [
+                  "environment"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "A list of configuration entries and simple metadata about the result.",
+                  "properties": {
+                    "configs": {
+                      "type": "array",
+                      "description": "Matching configuration entries. Order is not guaranteed.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "key": {
+                            "type": "string",
+                            "description": "Unique configuration key identifier (e.g., 'FEATURE_X_ENABLED' or 'db.max_connections')."
+                          },
+                          "value": {
+                            "type": "object",
+                            "description": "Value of the configuration item. Can be a primitive, object, array, or null depending on the configuration.",
+                            "oneOf": [
+                              {
+                                "type": "string",
+                                "description": "Parameter value option 1"
+                              },
+                              {
+                                "type": "number",
+                                "description": "Parameter value option 2"
+                              },
+                              {
+                                "type": "boolean",
+                                "description": "Parameter value option 3"
+                              },
+                              {
+                                "type": "object",
+                                "description": "Parameter value option 4",
+                                "properties": {}
+                              },
+                              {
+                                "type": "array",
+                                "description": "Parameter value option 5",
+                                "items": {
+                                  "type": "string",
+                                  "description": "Array item"
+                                }
+                              },
+                              {
+                                "type": "null",
+                                "description": "Parameter value option 6"
+                              }
+                            ],
+                            "properties": {}
+                          },
+                          "is_sensitive": {
+                            "type": "boolean",
+                            "description": "Whether this configuration contains sensitive data (e.g., API keys, passwords). Sensitive values should be redacted unless include_sensitive was requested and allowed."
+                          },
+                          "config_category": {
+                            "type": "string",
+                            "description": "A broad category describing the configuration (for example: feature_toggles, system_behaviors, or other)."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Optional human-readable description of what the configuration controls."
+                          }
+                        },
+                        "required": [
+                          "key",
+                          "value",
+                          "is_sensitive",
+                          "config_category"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "description": "Result metadata.",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "description": "Total number of configuration entries returned."
+                        },
+                        "returned": {
+                          "type": "integer",
+                          "description": "Number of items in the configs array (should equal meta.total)."
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "returned"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "configs",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI451",
+    "version": "1.0.0",
+    "description": "LI451 is a concise API collection for dynamic service pricing that provides endpoints to compute location-aware rates, exposing a calculate_dynamic_pricing operation to determine customer prices based on geolocation while enforcing configurable minimum thresholds. Designed for RESTful integration, it supports token-based authentication, predictable idempotent calls, and light-weight JSON requests/responses so clients can easily integrate real-time price calculations into booking, checkout, or quoting workflows."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI451"
+    }
+  ],
+  "paths": {
+    "/calculate_dynamic_pricing": {
+      "post": {
+        "operationId": "calculate_dynamic_pricing",
+        "summary": "Calculate final dynamic price given geolocation and minimum threshold",
+        "description": "Simulates pricing logic: apply a location multiplier to the base price, then ensure the result meets the configured minimum price.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "geolocation": {
+                    "type": "string",
+                    "description": "The geolocation of the customer in the format of 'Latitude, Longitude', such as '34.0522, -118.2437'."
+                  },
+                  "base_price": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The base price for the service before location-based adjustments.. Use float format (e.g., 1.0 not 1)."
+                  },
+                  "minimum_price": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The minimum price to charge regardless of the customer's location.. Use float format (e.g., 1.0 not 1)."
+                  },
+                  "location_multiplier": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "Multiplier applied to the base price based on customer's geolocation. A higher multiplier indicates a more expensive area.. Use float format (e.g., 1.0 not 1).",
+                    "default": 1.0
+                  }
+                },
+                "required": [
+                  "geolocation",
+                  "base_price",
+                  "minimum_price"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "adjusted_price": {
+                      "type": "number",
+                      "description": "Price after applying the location multiplier to the base price (base_price * location_multiplier). Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "final_price": {
+                      "type": "number",
+                      "description": "Final price to charge. This is the greater of adjusted_price and the provided minimum_price; guaranteed to be >= the provided minimum_price. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "minimum_applied": {
+                      "type": "boolean",
+                      "description": "True if the minimum_price was enforced because the adjusted_price was below it."
+                    }
+                  },
+                  "required": [
+                    "adjusted_price",
+                    "final_price",
+                    "minimum_applied"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

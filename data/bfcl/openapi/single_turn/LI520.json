@@ -1,0 +1,198 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI520",
+    "version": "1.0.0",
+    "description": "LI520 is a compact scheduling API collection for programmatic event management, offering time-zone aware operations to query and modify calendar entries. Use list_events to retrieve ISO-8601-formatted events within a specified date/time range, and reschedule to move a specified event to a new date and time with automatic time zone adjustment. The API favors precise ISO-8601 inputs, idempotent updates, and predictable, machine-friendly responses."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI520"
+    }
+  ],
+  "paths": {
+    "/reschedule": {
+      "post": {
+        "operationId": "reschedule",
+        "summary": "Simulate moving an event to a new local date/time and adjust for timezone differences",
+        "description": "Simulate rescheduling an event: interpret the provided local date/time in the specified timezone (or UTC default), apply timezone and DST rules, and produce the resulting scheduled time. Do not echo input fields in the response.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "identifier": {
+                    "type": "string",
+                    "description": "A unique identifier for the event to be rescheduled."
+                  },
+                  "dateortime": {
+                    "type": "string",
+                    "description": "The new date and time for the event, in ISO-8601 format (YYYY-MM-DDTHH:MM:SS), without a timezone offset."
+                  },
+                  "timezone": {
+                    "type": "string",
+                    "description": "The Olson timezone identifier representing the timezone for the new event time, such as 'Asia/Tokyo'.",
+                    "enum": [
+                      "Asia/Tokyo",
+                      "America/New_York",
+                      "Europe/London",
+                      "UTC"
+                    ],
+                    "default": "UTC"
+                  }
+                },
+                "required": [
+                  "identifier",
+                  "dateortime"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Result of a successful reschedule operation.",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "description": "Operation outcome. Example values include 'rescheduled' or 'no-change'. (Not an exhaustive list; callers should interpret text.)"
+                    },
+                    "scheduled_time": {
+                      "type": "string",
+                      "description": "The new scheduled time converted to UTC in ISO-8601 format with 'Z' timezone designator (e.g., '2026-03-12T14:30:00Z')."
+                    },
+                    "adjustments": {
+                      "type": "array",
+                      "description": "Optional list of human-readable notes describing adjustments applied during scheduling (for example, handling of DST transitions, conflict resolution, or rounding rules). May be empty.",
+                      "items": {
+                        "type": "string",
+                        "description": "Array item"
+                      }
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "scheduled_time"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/list_events": {
+      "post": {
+        "operationId": "list_events",
+        "summary": "List events within an ISO-8601 date/time range",
+        "description": "Simulate returning events whose time windows fall inside the provided ISO-8601 start/end range.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "start": {
+                    "type": "string",
+                    "description": "The start date and time of the query window, in ISO-8601 format (e.g., '2023-01-01T00:00:00Z')."
+                  },
+                  "end": {
+                    "type": "string",
+                    "description": "The end date and time of the query window, in ISO-8601 format (e.g., '2023-01-02T00:00:00Z')."
+                  }
+                },
+                "required": [
+                  "start",
+                  "end"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "A successful response containing matching events.",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "description": "Array of event objects that occur within the requested range.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the event."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Short human-readable title for the event."
+                          },
+                          "start": {
+                            "type": "string",
+                            "description": "Event start timestamp in ISO-8601 format (e.g., '2023-01-01T00:00:00Z')."
+                          },
+                          "end": {
+                            "type": "string",
+                            "description": "Event end timestamp in ISO-8601 format (e.g., '2023-01-01T01:00:00Z')."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Optional longer description or notes for the event."
+                          },
+                          "location": {
+                            "type": "string",
+                            "description": "Optional human-readable location for the event."
+                          },
+                          "all_day": {
+                            "type": "boolean",
+                            "description": "If true, the event is an all-day event (no specific time-of-day)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "start",
+                          "end"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "Total number of matching events available for the given range.",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "events",
+                    "total"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

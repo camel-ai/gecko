@@ -1,0 +1,301 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM221",
+    "version": "1.0.0",
+    "description": "LM221 is an integrated API collection that streamlines ride discovery and visual analysis by exposing two focused endpoints: uber_ride for matching customers to appropriate Uber options based on origin, ride type, and maximum wait time, and segment for detecting and segmenting all objects in an image to identify distinct elements for downstream processing. Designed for straightforward REST calls, predictable JSON payloads, and rapid integration into mobile or server workflows."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM221"
+    }
+  ],
+  "paths": {
+    "/uber_ride": {
+      "post": {
+        "operationId": "uber_ride",
+        "summary": "Suggest a single Uber ride matching location, ride type, and max wait",
+        "description": "Simulate selecting the best Uber ride option given a start location ('City, State' free-text), the requested ride type, and the maximum wait time in minutes.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "loc": {
+                    "type": "string",
+                    "description": "Location of the starting point for the Uber ride, in the format of 'City, State', such as 'Berkeley, CA' or 'New York, NY'."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Type of Uber ride the user is requesting.",
+                    "enum": [
+                      "plus",
+                      "comfort",
+                      "black"
+                    ]
+                  },
+                  "time": {
+                    "type": "integer",
+                    "description": "The maximum amount of time the customer is willing to wait for the ride, in minutes."
+                  }
+                },
+                "required": [
+                  "loc",
+                  "type",
+                  "time"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful ride suggestion response",
+                  "properties": {
+                    "ride_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the suggested ride option."
+                    },
+                    "vehicle_type": {
+                      "type": "string",
+                      "description": "Vehicle classification for this suggestion (e.g., 'plus', 'comfort', 'black')."
+                    },
+                    "eta_minutes": {
+                      "type": "integer",
+                      "description": "Estimated time of arrival in minutes.",
+                      "minimum": 0
+                    },
+                    "wait_time_minutes": {
+                      "type": "integer",
+                      "description": "Estimated wait time in minutes for this option (should be <= the requested maximum).",
+                      "minimum": 0
+                    },
+                    "price": {
+                      "type": "object",
+                      "description": "Estimated fare for the ride.",
+                      "properties": {
+                        "amount": {
+                          "type": "number",
+                          "description": "Fare amount as a decimal number. Use float format (e.g., 1.0 not 1).",
+                          "format": "double"
+                        },
+                        "currency": {
+                          "type": "string",
+                          "description": "Currency code (ISO 4217), e.g., 'USD'."
+                        }
+                      },
+                      "required": [
+                        "amount",
+                        "currency"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "driver": {
+                      "type": "object",
+                      "description": "Driver details, if available.",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "Driver's display name."
+                        },
+                        "rating": {
+                          "type": "number",
+                          "description": "Driver rating from riders (e.g., 4.9)."
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ride_id",
+                    "vehicle_type",
+                    "eta_minutes",
+                    "price"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/segment": {
+      "post": {
+        "operationId": "segment",
+        "summary": "Segment image into distinct objects",
+        "description": "Simulate segmenting all objects in the provided image and return structured segment data (masks, bounding boxes, optional labels and confidence scores).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "img_path": {
+                    "type": "string",
+                    "description": "The file system path to the image to be segmented, in the format of '/path/to/image.jpg'."
+                  }
+                },
+                "required": [
+                  "img_path"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Segmentation result containing detected segments for the input image.",
+                  "properties": {
+                    "segments": {
+                      "type": "array",
+                      "description": "List of detected segments in the image, ordered by detection confidence where available.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for this segment."
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "Optional human-readable label or category assigned to the segment, if available."
+                          },
+                          "confidence": {
+                            "type": "number",
+                            "description": "Confidence score for this segment. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "bounding_box": {
+                            "type": "object",
+                            "description": "Axis-aligned bounding box in image pixel coordinates, expressed as [x, y, width, height].",
+                            "properties": {
+                              "x": {
+                                "type": "number",
+                                "description": "X coordinate of the top-left corner (in pixels)."
+                              },
+                              "y": {
+                                "type": "number",
+                                "description": "Y coordinate of the top-left corner (in pixels)."
+                              },
+                              "width": {
+                                "type": "number",
+                                "description": "Width of the bounding box (in pixels)."
+                              },
+                              "height": {
+                                "type": "number",
+                                "description": "Height of the bounding box (in pixels)."
+                              }
+                            },
+                            "required": [
+                              "x",
+                              "y",
+                              "width",
+                              "height"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "mask": {
+                            "type": "object",
+                            "description": "Mask representation(s) for the segment. At least one representation SHOULD be present.",
+                            "properties": {
+                              "rle": {
+                                "type": "object",
+                                "description": "Run-length encoding (RLE) mask representation (COCO-style).",
+                                "properties": {
+                                  "counts": {
+                                    "type": "string",
+                                    "description": "RLE counts string."
+                                  },
+                                  "size": {
+                                    "type": "array",
+                                    "description": "Mask dimensions as [height, width].",
+                                    "items": {
+                                      "type": "integer",
+                                      "description": "Array item"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "counts",
+                                  "size"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "bitmap_png_base64": {
+                                "type": "string",
+                                "description": "Binary mask encoded as a PNG image, then base64-encoded."
+                              },
+                              "polygon": {
+                                "type": "array",
+                                "description": "List of linear rings. Each ring is an array of [x, y] coordinate pairs in pixel units.",
+                                "items": {
+                                  "type": "array",
+                                  "description": "Array item",
+                                  "items": {
+                                    "type": "number",
+                                    "description": "Coordinate value in pixels."
+                                  }
+                                }
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "mask"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "description": "Optional metadata about the segmentation run.",
+                      "properties": {
+                        "processing_time_ms": {
+                          "type": "number",
+                          "description": "Processing time in milliseconds."
+                        },
+                        "model_version": {
+                          "type": "string",
+                          "description": "Identifier for the model/version used to produce the segments."
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "segments"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,467 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM412",
+    "version": "1.0.0",
+    "description": "LM412 provides a movie-ticketing and showtime API collection that lets clients search theaters and movies by location, genre, and show type, retrieve detailed showtimes for a specific title and venue on a given date, and complete purchases for particular showings including ticket counts and schedule. Designed for synchronous, transactional use in web or mobile apps, it emphasizes clear query parameters and secure, idempotent purchase flows."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM412"
+    }
+  ],
+  "paths": {
+    "/Movies_1_BuyMovieTickets": {
+      "post": {
+        "operationId": "Movies_1_BuyMovieTickets",
+        "summary": "Simulate purchasing movie tickets and return a purchase confirmation.",
+        "description": "Simulate a ticket purchase for a specific movie showing (number of tickets, optional show date, time, location, and show type) and return a confirmation payload.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "movie_name": {
+                    "type": "string",
+                    "description": "The title of the movie for which tickets are being purchased."
+                  },
+                  "number_of_tickets": {
+                    "type": "integer",
+                    "description": "The total number of tickets to be bought."
+                  },
+                  "show_date": {
+                    "type": "string",
+                    "description": "The date on which the movie is showing, in the format 'YYYY-MM-DD'.",
+                    "default": null
+                  },
+                  "location": {
+                    "type": "string",
+                    "description": "The city in which the movie theater is located, in the format of 'City, State', such as 'Los Angeles, CA'. State names must be abbreviated"
+                  },
+                  "show_time": {
+                    "type": "string",
+                    "description": "The start time of the movie showing, in 24-hour format 'HH:MM'.",
+                    "default": "20:00"
+                  },
+                  "show_type": {
+                    "type": "string",
+                    "description": "The format of the movie showing.",
+                    "enum": [
+                      "regular",
+                      "3d",
+                      "imax"
+                    ],
+                    "default": "regular"
+                  }
+                },
+                "required": [
+                  "movie_name",
+                  "number_of_tickets",
+                  "location"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Confirmation payload returned when a ticket purchase succeeds.",
+                  "properties": {
+                    "confirmation_id": {
+                      "type": "string",
+                      "description": "Unique identifier for this successful ticket purchase."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "High-level purchase status.",
+                      "enum": [
+                        "confirmed",
+                        "pending"
+                      ]
+                    },
+                    "total_amount": {
+                      "type": "number",
+                      "description": "Total amount charged for the purchase. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "ISO 4217 currency code for the charged amount.",
+                      "default": "USD"
+                    },
+                    "tickets": {
+                      "type": "array",
+                      "description": "List of issued tickets for this purchase (one item per ticket).",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "ticket_id": {
+                            "type": "string",
+                            "description": "Identifier for an individual issued ticket."
+                          },
+                          "seat": {
+                            "type": "string",
+                            "description": "Assigned seat label (if applicable). May be null or omitted for open/general admission."
+                          },
+                          "price": {
+                            "type": "number",
+                            "description": "Price charged for this individual ticket. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          }
+                        },
+                        "required": [
+                          "ticket_id"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "purchase_timestamp": {
+                      "type": "string",
+                      "description": "Timestamp when the purchase was completed (ISO 8601 / RFC3339 recommended)."
+                    }
+                  },
+                  "required": [
+                    "confirmation_id",
+                    "status",
+                    "total_amount",
+                    "currency",
+                    "tickets",
+                    "purchase_timestamp"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Movies_1_FindMovies": {
+      "post": {
+        "operationId": "Movies_1_FindMovies",
+        "summary": "Find movies by city, theater, genre, and show type",
+        "description": "Simulate searching for movies playing at theaters in a specified city/state. Return matching movies with showtimes and theatre details.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "The city where the theatre is located, in the format of 'City, State', such as 'Berkeley, CA' or 'New York, NY'."
+                  },
+                  "theater_name": {
+                    "type": "string",
+                    "description": "The name of the theatre. If unspecified, all theatres are considered.",
+                    "default": "dontcare"
+                  },
+                  "genre": {
+                    "type": "string",
+                    "description": "The genre of the movie. If unspecified, all genres are considered.",
+                    "enum": [
+                      "World",
+                      "Offbeat",
+                      "Mystery",
+                      "Supernatural",
+                      "Horror",
+                      "Animation",
+                      "Sci-fi",
+                      "Documentary",
+                      "Drama",
+                      "War",
+                      "Family",
+                      "Action"
+                    ],
+                    "default": "dontcare"
+                  },
+                  "show_type": {
+                    "type": "string",
+                    "description": "The type of movie show. If unspecified, all show types are considered.",
+                    "enum": [
+                      "regular",
+                      "3d",
+                      "imax"
+                    ],
+                    "default": "dontcare"
+                  }
+                },
+                "required": [
+                  "location"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search results payload containing a list of matching movies and metadata.",
+                  "properties": {
+                    "movies": {
+                      "type": "array",
+                      "description": "List of movies matching the search criteria. Each item represents a movie and its available showtimes.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "movie_id": {
+                            "type": "string",
+                            "description": "Unique identifier for the movie."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Movie title."
+                          },
+                          "genre": {
+                            "type": "string",
+                            "description": "Movie genre (matches the same genre values available in the request)."
+                          },
+                          "runtime_minutes": {
+                            "type": "integer",
+                            "description": "Runtime in minutes."
+                          },
+                          "rating": {
+                            "type": "string",
+                            "description": "Rating or classification (e.g., PG-13)."
+                          },
+                          "synopsis": {
+                            "type": "string",
+                            "description": "Brief synopsis of the movie."
+                          },
+                          "directors": {
+                            "type": "array",
+                            "description": "List of directors.",
+                            "items": {
+                              "type": "string",
+                              "description": "Array item"
+                            }
+                          },
+                          "cast": {
+                            "type": "array",
+                            "description": "Principal cast members.",
+                            "items": {
+                              "type": "string",
+                              "description": "Array item"
+                            }
+                          },
+                          "showtimes": {
+                            "type": "array",
+                            "description": "Available showtimes for this movie, grouped by theatre and start time.",
+                            "items": {
+                              "type": "object",
+                              "description": "Array item",
+                              "properties": {
+                                "theater_name": {
+                                  "type": "string",
+                                  "description": "Name of the theatre where this showing occurs."
+                                },
+                                "address": {
+                                  "type": "string",
+                                  "description": "Street address of the theatre, if available."
+                                },
+                                "city_state": {
+                                  "type": "string",
+                                  "description": "City and state where the theatre is located (e.g., 'Berkeley, CA')."
+                                },
+                                "show_type": {
+                                  "type": "string",
+                                  "description": "Type of show (e.g., regular, 3d, imax)."
+                                },
+                                "start_time": {
+                                  "type": "string",
+                                  "description": "Show start time as an ISO 8601 timestamp (e.g., 2023-08-01T19:30:00)."
+                                },
+                                "auditorium": {
+                                  "type": "string",
+                                  "description": "Auditorium or screen identifier within the theatre, if available."
+                                }
+                              },
+                              "required": [
+                                "theater_name",
+                                "start_time"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "movie_id",
+                          "title",
+                          "showtimes"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of movie entries returned in this response."
+                    }
+                  },
+                  "required": [
+                    "movies"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Movies_1_GetTimesForMovie": {
+      "post": {
+        "operationId": "Movies_1_GetTimesForMovie",
+        "summary": "Simulate retrieval of show times for a movie at a theater on a date",
+        "description": "Returns showings for the specified movie, location, and date. Simulation-focused: produce a list of showings (start times, format, auditorium, price, availability) matching the request.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "movie_name": {
+                    "type": "string",
+                    "description": "The title of the movie for which to find show times."
+                  },
+                  "location": {
+                    "type": "string",
+                    "description": "The city and state where the theater is located, in the format of 'City, State', such as 'Berkeley, CA' and 'New York, NY'."
+                  },
+                  "show_date": {
+                    "type": "string",
+                    "description": "The date of the show in the format 'YYYY-MM-DD', for example, '2023-04-15'."
+                  },
+                  "theater_name": {
+                    "type": "string",
+                    "description": "The name of the theater where the movie is showing. If not specified, any theater will be considered.",
+                    "default": "Any Theater"
+                  },
+                  "show_type": {
+                    "type": "string",
+                    "description": "The format of the movie showing.",
+                    "enum": [
+                      "regular",
+                      "3D",
+                      "IMAX"
+                    ],
+                    "default": "regular"
+                  }
+                },
+                "required": [
+                  "movie_name",
+                  "location",
+                  "show_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload containing show times for the requested movie/date/location.",
+                  "properties": {
+                    "movie_name": {
+                      "type": "string",
+                      "description": "The title of the movie."
+                    },
+                    "location": {
+                      "type": "string",
+                      "description": "The city and state where the theater is located (e.g., 'Berkeley, CA')."
+                    },
+                    "show_date": {
+                      "type": "string",
+                      "description": "The date of the show in 'YYYY-MM-DD'."
+                    },
+                    "theater_name": {
+                      "type": "string",
+                      "description": "The name of the theater where the movie is showing. May be omitted when multiple theaters are returned."
+                    },
+                    "showings": {
+                      "type": "array",
+                      "description": "List of showings that match the request criteria.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "start_time": {
+                            "type": "string",
+                            "description": "Start time of the showing in local time (e.g., '19:30')."
+                          },
+                          "show_type": {
+                            "type": "string",
+                            "description": "The format of the showing.",
+                            "enum": [
+                              "regular",
+                              "3D",
+                              "IMAX"
+                            ]
+                          },
+                          "auditorium": {
+                            "type": "string",
+                            "description": "Identifier or name of the auditorium/screen."
+                          },
+                          "price": {
+                            "type": "number",
+                            "description": "Ticket price. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "seats_available": {
+                            "type": "integer",
+                            "description": "Number of seats currently available for this showing.",
+                            "minimum": 0
+                          },
+                          "purchase_url": {
+                            "type": "string",
+                            "description": "URL where tickets for this showing can be purchased, if available."
+                          }
+                        },
+                        "required": [
+                          "start_time",
+                          "show_type"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "movie_name",
+                    "location",
+                    "show_date",
+                    "showings"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

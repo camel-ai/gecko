@@ -1,0 +1,851 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM565",
+    "version": "1.0.0",
+    "description": "LM565 is a travel and events API suite that lets developers search and book bus itineraries, event tickets, and short-term rental houses. It provides search endpoints for buses, cultural events, and houses with optional filters (date, city, laundry, adults, rating), plus purchase endpoints for bus and event tickets (including optional luggage) and a house booking endpoint requiring location in 'City, State' format. Designed for straightforward request/response integration."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM565"
+    }
+  ],
+  "paths": {
+    "/Buses_3_FindBus": {
+      "post": {
+        "operationId": "Buses_3_FindBus",
+        "summary": "Simulate searching bus itineraries between two cities for a given date",
+        "description": "Given departure city, destination city, and departure date, return matching bus itineraries (multiple options, stops, times, price, availability). This simulation returns realistic itinerary entries without performing external lookups.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "from_city": {
+                    "type": "string",
+                    "description": "The city to depart from, in the format of 'City, State' (e.g., 'Los Angeles, CA')."
+                  },
+                  "to_city": {
+                    "type": "string",
+                    "description": "The destination city of the trip, in the format of 'City, State' (e.g., 'New York, NY')."
+                  },
+                  "departure_date": {
+                    "type": "string",
+                    "description": "The date of departure, in the format 'YYYY-MM-DD' (e.g., '2023-04-15')."
+                  },
+                  "num_passengers": {
+                    "type": "integer",
+                    "description": "The number of tickets required for the trip.",
+                    "enum": [
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ],
+                    "default": 1
+                  },
+                  "category": {
+                    "type": "string",
+                    "description": "The type of bus route based on the number of stops.",
+                    "enum": [
+                      "direct",
+                      "one-stop"
+                    ],
+                    "default": "direct"
+                  }
+                },
+                "required": [
+                  "from_city",
+                  "to_city",
+                  "departure_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search results containing matching itineraries and metadata.",
+                  "properties": {
+                    "itineraries": {
+                      "type": "array",
+                      "description": "List of matching itineraries, ordered by relevance (e.g., direct and cheaper options first).",
+                      "minItems": 0,
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Stable unique identifier for this itinerary."
+                          },
+                          "departure_city": {
+                            "type": "string",
+                            "description": "Departure city in the same 'City, State' format as the request."
+                          },
+                          "arrival_city": {
+                            "type": "string",
+                            "description": "Arrival city in the same 'City, State' format as the request."
+                          },
+                          "departure_datetime": {
+                            "type": "string",
+                            "description": "Scheduled departure datetime in ISO 8601 (local to the departure city), e.g. 2023-04-15T08:30:00"
+                          },
+                          "arrival_datetime": {
+                            "type": "string",
+                            "description": "Scheduled arrival datetime in ISO 8601 (local to the arrival city)."
+                          },
+                          "duration_minutes": {
+                            "type": "integer",
+                            "description": "Total trip duration in minutes."
+                          },
+                          "stops": {
+                            "type": "integer",
+                            "description": "Number of intermediate stops (0 indicates direct)."
+                          },
+                          "stop_locations": {
+                            "type": "array",
+                            "description": "Ordered list of intermediate stops; empty for direct routes.",
+                            "items": {
+                              "type": "string",
+                              "description": "Intermediate stop city (same 'City, State' format)."
+                            }
+                          },
+                          "price": {
+                            "type": "number",
+                            "description": "Total price for this itinerary. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "currency": {
+                            "type": "string",
+                            "description": "Currency code for price (ISO 4217, e.g., USD)."
+                          },
+                          "available_seats": {
+                            "type": "integer",
+                            "description": "Number of seats currently available for booking for this itinerary."
+                          },
+                          "operator": {
+                            "type": "string",
+                            "description": "Name of the bus operator providing this itinerary."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "departure_datetime",
+                          "arrival_datetime",
+                          "duration_minutes",
+                          "stops",
+                          "price",
+                          "currency",
+                          "available_seats"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "count": {
+                      "type": "integer",
+                      "description": "Total number of itineraries returned in the itineraries array."
+                    },
+                    "query": {
+                      "type": "object",
+                      "description": "Echo of the validated query parameters used to produce results.",
+                      "properties": {
+                        "from_city": {
+                          "type": "string",
+                          "description": "Departure city provided in the request."
+                        },
+                        "to_city": {
+                          "type": "string",
+                          "description": "Destination city provided in the request."
+                        },
+                        "departure_date": {
+                          "type": "string",
+                          "description": "Departure date provided in the request."
+                        },
+                        "num_passengers": {
+                          "type": "integer",
+                          "description": "Number of passengers requested."
+                        },
+                        "category": {
+                          "type": "string",
+                          "description": "Requested route category from the request."
+                        }
+                      },
+                      "required": [
+                        "from_city",
+                        "to_city",
+                        "departure_date"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "itineraries",
+                    "count",
+                    "query"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Buses_3_BuyBusTicket": {
+      "post": {
+        "operationId": "Buses_3_BuyBusTicket",
+        "summary": "Simulate purchasing bus tickets",
+        "description": "Simulate a successful bus ticket purchase for a given route, date, and time. Returns a booking confirmation with pricing and ticket allocation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "from_city": {
+                    "type": "string",
+                    "description": "The city of origin for the trip, such as 'New York, NY'."
+                  },
+                  "to_city": {
+                    "type": "string",
+                    "description": "The destination city for the trip, such as 'Boston, MA'."
+                  },
+                  "departure_date": {
+                    "type": "string",
+                    "description": "The date of departure in the format 'YYYY-MM-DD'."
+                  },
+                  "departure_time": {
+                    "type": "string",
+                    "description": "The time of departure in 24-hour format 'HH:MM'."
+                  },
+                  "num_passengers": {
+                    "type": "integer",
+                    "description": "The number of passengers for whom the tickets are being purchased.",
+                    "enum": [
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ],
+                    "default": 1
+                  },
+                  "additional_luggage": {
+                    "type": "boolean",
+                    "description": "Indicates whether additional luggage space is required.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "from_city",
+                  "to_city",
+                  "departure_date",
+                  "departure_time"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful booking response",
+                  "properties": {
+                    "booking_id": {
+                      "type": "string",
+                      "description": "A unique identifier for the confirmed booking."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Booking status. Expected value on success: 'confirmed'."
+                    },
+                    "total_amount": {
+                      "type": "number",
+                      "description": "Total amount charged for the booking. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Currency for the total amount, expressed as an ISO 4217 currency code (e.g., USD)."
+                    },
+                    "num_tickets": {
+                      "type": "integer",
+                      "description": "Number of tickets issued in this booking."
+                    },
+                    "tickets": {
+                      "type": "array",
+                      "description": "Individual ticket details included in the booking.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "ticket_id": {
+                            "type": "string",
+                            "description": "Unique identifier for the individual ticket."
+                          },
+                          "passenger_index": {
+                            "type": "integer",
+                            "description": "Zero-based index indicating which passenger this ticket is for (0 = first passenger)."
+                          },
+                          "seat_number": {
+                            "type": "string",
+                            "description": "Allocated seat identifier (if seats are assigned). May be null or empty if unassigned."
+                          },
+                          "fare": {
+                            "type": "number",
+                            "description": "Fare charged for this ticket. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          }
+                        },
+                        "required": [
+                          "ticket_id",
+                          "passenger_index",
+                          "fare"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp (ISO 8601) when the booking was created."
+                    },
+                    "payment_reference": {
+                      "type": "string",
+                      "description": "Reference identifier for the payment transaction used to complete the booking."
+                    }
+                  },
+                  "required": [
+                    "booking_id",
+                    "status",
+                    "total_amount",
+                    "currency",
+                    "num_tickets",
+                    "tickets",
+                    "created_at",
+                    "payment_reference"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Events_3_FindEvents": {
+      "post": {
+        "operationId": "Events_3_FindEvents",
+        "summary": "List cultural events in a city",
+        "description": "Simulate finding cultural events (e.g., concerts, plays) scheduled in a specified city and optional date.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "event_type": {
+                    "type": "string",
+                    "description": "The category of the cultural event.",
+                    "enum": [
+                      "Music",
+                      "Theater"
+                    ]
+                  },
+                  "city": {
+                    "type": "string",
+                    "description": "The name of the city where the event is happening, formatted as 'City, State' or 'City' if the city does not have a state. For example, 'New York, NY' or 'Paris'."
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "Concrete event date in 'YYYY-MM-DD'. Use this field only when the user gives a concrete calendar date in that format or a directly mappable calendar date. If the user does not provide a concrete calendar date, leave this parameter unset or at its schema default instead of inventing a current date. Relative requests like 'today', 'tonight', or 'this weekend' should use the tool's default/open-date behavior unless a concrete date is explicitly provided.",
+                    "default": "any"
+                  }
+                },
+                "required": [
+                  "event_type",
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing a list of matching events",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "description": "Array of matching event objects",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique event identifier (e.g., 'evt_12345')"
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Display title of the event"
+                          },
+                          "event_type": {
+                            "type": "string",
+                            "description": "Category of the cultural event",
+                            "enum": [
+                              "Music",
+                              "Theater"
+                            ]
+                          },
+                          "city": {
+                            "type": "string",
+                            "description": "The name of the city where the event is happening, formatted as 'City, State' or 'City' if no state (e.g., 'New York, NY' or 'Paris')."
+                          },
+                          "date": {
+                            "type": "string",
+                            "description": "Date of the event in 'YYYY-MM-DD' format",
+                            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                          },
+                          "start_time": {
+                            "type": "string",
+                            "description": "Event start time in 24-hour 'HH:MM' format (e.g., '19:30')"
+                          },
+                          "venue": {
+                            "type": "object",
+                            "description": "Venue information",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "description": "Venue name"
+                              },
+                              "address": {
+                                "type": "string",
+                                "description": "Venue address"
+                              }
+                            },
+                            "required": [
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "price": {
+                            "type": "number",
+                            "description": "Ticket price. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "currency": {
+                            "type": "string",
+                            "description": "Currency code for price (e.g., 'USD')"
+                          },
+                          "available_tickets": {
+                            "type": "integer",
+                            "description": "Number of tickets currently available"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "event_type",
+                          "city",
+                          "date"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "Total number of matching events"
+                    }
+                  },
+                  "required": [
+                    "events"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Events_3_BuyEventTickets": {
+      "post": {
+        "operationId": "Events_3_BuyEventTickets",
+        "summary": "Simulate purchasing tickets for a cultural event",
+        "description": "Simulate a ticket purchase for a named event on a specified date and city. Produce a purchase confirmation with issued tickets, total amount, currency, and a timestamp.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "event_name": {
+                    "type": "string",
+                    "description": "The name of the artist or the play for which tickets are being purchased."
+                  },
+                  "number_of_tickets": {
+                    "type": "integer",
+                    "description": "The total number of tickets to be reserved for the event.",
+                    "enum": [
+                      1,
+                      2,
+                      3,
+                      4,
+                      5,
+                      6,
+                      7,
+                      8,
+                      9
+                    ]
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "The date of the event, in the format 'YYYY-MM-DD'."
+                  },
+                  "city": {
+                    "type": "string",
+                    "description": "The city where the event is located, expected in the format of 'City, State', such as 'New York, NY'."
+                  }
+                },
+                "required": [
+                  "event_name",
+                  "number_of_tickets",
+                  "date",
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful ticket purchase response",
+                  "properties": {
+                    "confirmation_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the completed purchase (useful for lookup and refunds)."
+                    },
+                    "tickets": {
+                      "type": "array",
+                      "description": "Array of issued tickets for this purchase.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "ticket_id": {
+                            "type": "string",
+                            "description": "Unique identifier for this individual ticket."
+                          },
+                          "seat": {
+                            "type": "string",
+                            "description": "Assigned seat label (e.g., 'A12') or null for general-admission tickets."
+                          },
+                          "price": {
+                            "type": "number",
+                            "description": "Price charged for this ticket. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          }
+                        },
+                        "required": [
+                          "ticket_id",
+                          "price"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_amount": {
+                      "type": "number",
+                      "description": "Total charged amount for the purchase. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Currency for the amounts, expressed as an ISO 4217 code (e.g., 'USD')."
+                    },
+                    "purchase_datetime": {
+                      "type": "string",
+                      "description": "Timestamp when the purchase was recorded, in RFC 3339 / ISO 8601 format.",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "confirmation_id",
+                    "tickets",
+                    "total_amount",
+                    "currency"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Hotels_2_BookHouse": {
+      "post": {
+        "operationId": "Hotels_2_BookHouse",
+        "summary": "Simulate booking a house for given dates and adults",
+        "description": "Simulate creating a booking for the selected house for the provided check-in/check-out dates and number_of_adults. The location must follow the 'City, State' form (e.g., 'New York, NY').",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "where_to": {
+                    "type": "string",
+                    "description": "The location of the house in the format of 'City, State', such as 'Berkeley, CA' or 'New York, NY'."
+                  },
+                  "number_of_adults": {
+                    "type": "integer",
+                    "description": "The number of adults for the reservation. Must be a positive integer."
+                  },
+                  "check_in_date": {
+                    "type": "string",
+                    "description": "The start date for the reservation in the format 'YYYY-MM-DD'."
+                  },
+                  "check_out_date": {
+                    "type": "string",
+                    "description": "The end date for the reservation in the format 'YYYY-MM-DD'."
+                  }
+                },
+                "required": [
+                  "where_to",
+                  "number_of_adults",
+                  "check_in_date",
+                  "check_out_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful booking payload",
+                  "properties": {
+                    "booking_id": {
+                      "type": "string",
+                      "description": "Unique booking identifier generated by the system."
+                    },
+                    "property_id": {
+                      "type": "string",
+                      "description": "Identifier of the booked house/property."
+                    },
+                    "confirmation_url": {
+                      "type": "string",
+                      "description": "URL where the user can view or manage the booking."
+                    },
+                    "check_in_date": {
+                      "type": "string",
+                      "description": "Confirmed check-in date in the format 'YYYY-MM-DD'."
+                    },
+                    "check_out_date": {
+                      "type": "string",
+                      "description": "Confirmed check-out date in the format 'YYYY-MM-DD'."
+                    },
+                    "number_of_adults": {
+                      "type": "integer",
+                      "description": "Confirmed number of adults for the reservation."
+                    },
+                    "total_price": {
+                      "type": "number",
+                      "description": "Total price charged for the booking. Use float format (e.g., 1.0 not 1)."
+                    }
+                  },
+                  "required": [
+                    "booking_id",
+                    "property_id",
+                    "confirmation_url",
+                    "check_in_date",
+                    "check_out_date",
+                    "number_of_adults",
+                    "total_price"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Hotels_2_SearchHouse": {
+      "post": {
+        "operationId": "Hotels_2_SearchHouse",
+        "summary": "Simulate searching rental houses with optional filters",
+        "description": "Return a simulated list of available houses matching the provided location and optional filters. 'dontcare' values mean the filter should be ignored.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "where_to": {
+                    "type": "string",
+                    "description": "The location of the house to search for, in the format of 'City, State' or 'City, Country'. For example, 'San Francisco, CA' or 'Paris, France'."
+                  },
+                  "has_laundry_service": {
+                    "type": "string",
+                    "description": "Flag indicating if the house should include laundry service.",
+                    "enum": [
+                      "True",
+                      "False"
+                    ]
+                  },
+                  "number_of_adults": {
+                    "type": "integer",
+                    "description": "The number of adults for the reservation. Select 'dontcare' if no specific number is required.",
+                    "enum": [
+                      "1",
+                      "2",
+                      "3",
+                      "4",
+                      "5"
+                    ]
+                  },
+                  "rating": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The minimum review rating of the house on a scale from 1.0 to 5.0, with higher numbers indicating better ratings. Select 'dontcare' to include all ratings.. Use float format (e.g., 1.0 not 1).",
+                    "default": "dontcare"
+                  }
+                },
+                "required": [
+                  "where_to"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search results payload containing matching houses",
+                  "properties": {
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of matching houses",
+                      "minimum": 0
+                    },
+                    "houses": {
+                      "type": "array",
+                      "description": "Array of house summary objects that match the search criteria",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the house"
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Display name or title of the house listing"
+                          },
+                          "location": {
+                            "type": "string",
+                            "description": "Human-readable location (e.g., 'City, State' or 'City, Country')"
+                          },
+                          "has_laundry_service": {
+                            "type": "string",
+                            "description": "Indicates whether the house offers laundry service. Values mirror request usage (e.g., 'True', 'False', or 'dontcare')"
+                          },
+                          "number_of_adults": {
+                            "type": "integer",
+                            "description": "Recommended/max number of adults accommodated"
+                          },
+                          "rating": {
+                            "type": "number",
+                            "description": "Average review rating on a 1.0–5.0 scale. Use float format (e.g., 1.0 not 1).",
+                            "format": "double",
+                            "minimum": 1.0,
+                            "maximum": 5.0
+                          },
+                          "price_per_night": {
+                            "type": "number",
+                            "description": "Price per night in the host currency. Use float format (e.g., 1.0 not 1).",
+                            "format": "double",
+                            "minimum": 0.0
+                          },
+                          "currency": {
+                            "type": "string",
+                            "description": "Currency code for price (e.g., 'USD')."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "location",
+                          "has_laundry_service",
+                          "number_of_adults",
+                          "rating",
+                          "price_per_night",
+                          "currency"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "total_results",
+                    "houses"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

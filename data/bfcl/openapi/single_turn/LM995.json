@@ -1,0 +1,371 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM995",
+    "version": "1.0.0",
+    "description": "The LM995 API collection provides comprehensive access to event data across Kubernetes and agent monitoring systems within specified timeframes. It supports flexible querying options to filter events by update status or exclude those triggered before the timeframe, enabling efficient batch retrieval for third-party integrations. The APIs are designed to handle historical event data with considerations for eventual consistency, making them suitable for monitoring, auditing, and analytics workflows."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM995"
+    }
+  ],
+  "paths": {
+    "/EventsApi_kubernetes_info_events": {
+      "post": {
+        "operationId": "EventsApi_kubernetes_info_events",
+        "summary": "Simulate retrieval of Kubernetes info events within a timeframe.",
+        "description": "Simulates fetching Kubernetes info events filtered by timeframe and update status, suitable for scheduled batch integrations.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "to": {
+                    "type": "integer",
+                    "description": "The end of the requested timeframe as a Unix timestamp.",
+                    "minimum": 0
+                  },
+                  "windowSize": {
+                    "type": "integer",
+                    "description": "The size of the requested timeframe in milliseconds relative to 'to'. Defaults to 10 minutes (600,000 milliseconds) if neither 'windowSize' nor 'from' is provided.",
+                    "default": 600000,
+                    "minimum": 1
+                  },
+                  "_from": {
+                    "type": "integer",
+                    "description": "The start of the requested timeframe as a Unix timestamp, defining the range [from, to). Optional. If not provided, defaults to 'to' minus 'windowSize'.",
+                    "default": null
+                  },
+                  "excludeTriggeredBefore": {
+                    "type": "boolean",
+                    "description": "Exclude events that were triggered before the requested timeframe. Useful for only searching events that started within the given timeframe. Defaults to false.",
+                    "default": false
+                  },
+                  "filterEventUpdates": {
+                    "type": "boolean",
+                    "description": "Filter results to only include event updates that occurred within the given timeframe. Defaults to false.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "to"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "description": "Parameter events",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier of the event."
+                          },
+                          "timestamp": {
+                            "type": "integer",
+                            "description": "Unix timestamp when the event occurred."
+                          },
+                          "type": {
+                            "type": "string",
+                            "description": "Type of the event."
+                          },
+                          "reason": {
+                            "type": "string",
+                            "description": "Reason for the event."
+                          },
+                          "message": {
+                            "type": "string",
+                            "description": "Detailed message of the event."
+                          },
+                          "source": {
+                            "type": "string",
+                            "description": "Source component that generated the event."
+                          },
+                          "isUpdate": {
+                            "type": "boolean",
+                            "description": "Indicates if the event is an update."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "timestamp",
+                          "type",
+                          "reason",
+                          "message",
+                          "source",
+                          "isUpdate"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "events"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/EventsApi_get_events": {
+      "post": {
+        "operationId": "EventsApi_get_events",
+        "summary": "Retrieve events within a specified timeframe with optional filters.",
+        "description": "Simulates retrieval of all events occurring within a given timeframe, supporting filters for event updates, exclusion of earlier events, and event type filtering.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "to": {
+                    "type": "integer",
+                    "description": "The end of the requested timeframe as a Unix timestamp. Defaults to the current service time if not provided.",
+                    "minimum": 0
+                  },
+                  "windowSize": {
+                    "type": "integer",
+                    "description": "The size of the requested timeframe in milliseconds relative to 'to'. Defaults to 600000 milliseconds (10 minutes) if not provided.",
+                    "default": 600000,
+                    "minimum": 1
+                  },
+                  "_from": {
+                    "type": "integer",
+                    "description": "Alternative to 'windowSize', defines the start of the timeframe in Unix timestamp format. The query spans the range ['from', 'to').",
+                    "default": null,
+                    "minimum": 0,
+                    "nullable": true
+                  },
+                  "excludeTriggeredBefore": {
+                    "type": "boolean",
+                    "description": "Exclude events that were triggered before the requested timeframe. Useful for batch jobs that only care about new events. Defaults to 'false'.",
+                    "default": false
+                  },
+                  "filterEventUpdates": {
+                    "type": "boolean",
+                    "description": "Filters results to event updates that occurred within the query timeframe. Defaults to 'false'.",
+                    "default": false
+                  },
+                  "includeAgentMonitoringIssues": {
+                    "type": "boolean",
+                    "description": "Include Agent Monitoring Issues in the results. This parameter is deprecated. Defaults to 'false'.",
+                    "default": false
+                  },
+                  "includeKubernetesInfoEvents": {
+                    "type": "boolean",
+                    "description": "Include Kubernetes Info Events in the results. This parameter is deprecated. Defaults to 'false'.",
+                    "default": false
+                  },
+                  "eventTypeFilters": {
+                    "type": "string",
+                    "description": "Filters events by type. Acceptable values are 'INFO', 'WARN', and 'ERROR'.",
+                    "enum": [
+                      "INFO",
+                      "WARN",
+                      "ERROR"
+                    ],
+                    "default": null
+                  }
+                },
+                "required": [
+                  "to"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "description": "Parameter events",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier of the event."
+                          },
+                          "timestamp": {
+                            "type": "integer",
+                            "description": "Unix timestamp when the event occurred."
+                          },
+                          "type": {
+                            "type": "string",
+                            "description": "Type of the event.",
+                            "enum": [
+                              "INFO",
+                              "WARN",
+                              "ERROR"
+                            ]
+                          },
+                          "message": {
+                            "type": "string",
+                            "description": "Descriptive message of the event."
+                          },
+                          "isUpdate": {
+                            "type": "boolean",
+                            "description": "Indicates if the event is an update."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "timestamp",
+                          "type",
+                          "message",
+                          "isUpdate"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "events"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent_monitoring_events": {
+      "post": {
+        "operationId": "agent_monitoring_events",
+        "summary": "Retrieve agent monitoring events within a specified timeframe.",
+        "description": "Simulates retrieval of agent monitoring events for a given timeframe, supporting filtering by event updates and exclusion of events triggered before the timeframe.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "to": {
+                    "type": "integer",
+                    "description": "The end of the requested timeframe as a Unix timestamp. Defaults to the current service time if not provided.",
+                    "minimum": 0
+                  },
+                  "windowSize": {
+                    "type": "integer",
+                    "description": "The size of the requested timeframe in milliseconds relative to 'to'. Defaults to 600000 milliseconds (10 minutes) if neither 'windowSize' nor 'from' is provided.",
+                    "default": 600000,
+                    "minimum": 1
+                  },
+                  "_from": {
+                    "type": "integer",
+                    "description": "The start of the requested timeframe as a Unix timestamp. If not provided, defaults to 'to' minus 'windowSize'. Defines the timeframe in range ['from', 'to').",
+                    "default": null,
+                    "minimum": 0,
+                    "nullable": true
+                  },
+                  "excludeTriggeredBefore": {
+                    "type": "boolean",
+                    "description": "If set to true, excludes events that were triggered before the requested timeframe. This enables searching for new events that started within the given timeframe. Useful for batch jobs that operate on fixed intervals.",
+                    "default": false
+                  },
+                  "filterEventUpdates": {
+                    "type": "boolean",
+                    "description": "If set to true, filters the results to event updates only, including an event only if its state changed within the query timeframe. Useful for batch jobs that need to track event state updates.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "to"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "description": "Parameter events",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "eventId": {
+                            "type": "string",
+                            "description": "Unique identifier of the event."
+                          },
+                          "timestamp": {
+                            "type": "integer",
+                            "description": "Unix timestamp when the event occurred."
+                          },
+                          "state": {
+                            "type": "string",
+                            "description": "Current state of the event."
+                          },
+                          "details": {
+                            "type": "object",
+                            "description": "Additional event details.",
+                            "properties": {},
+                            "additionalProperties": true
+                          }
+                        },
+                        "required": [
+                          "eventId",
+                          "timestamp",
+                          "state"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "events"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

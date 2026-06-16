@@ -1,0 +1,567 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM559",
+    "version": "1.0.0",
+    "description": "LM559 is a unified travel and leisure API that lets apps discover and book cultural events and rental cars. Use FindEvents to search upcoming concerts and plays, BuyEventTickets to purchase seats, GetCarsAvailable to list rentals for specified dates and locations, and ReserveCar to confirm pickup, vehicle type and insurance. Designed for synchronous request/response flows, idempotent reservation calls, and straightforward parameter-driven integration."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM559"
+    }
+  ],
+  "paths": {
+    "/Events_3_FindEvents": {
+      "post": {
+        "operationId": "Events_3_FindEvents",
+        "summary": "Simulate searching cultural events in a city (by date or upcoming)",
+        "description": "Simulate finding concerts or plays in the requested city for the specified date, or return upcoming events when date is 'dontcare'.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "event_type": {
+                    "type": "string",
+                    "description": "The category of the cultural event to find.",
+                    "enum": [
+                      "Music",
+                      "Theater"
+                    ]
+                  },
+                  "city": {
+                    "type": "string",
+                    "description": "The city in which the search for events is to be conducted, in the format of 'City, State' (e.g., 'San Francisco, CA')."
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "Concrete event date in 'YYYY-MM-DD'. Use this field only when the user gives a concrete calendar date in that format or a directly mappable calendar date. If the user does not provide a concrete calendar date, leave this parameter unset or at its schema default instead of inventing a current date. Relative requests like 'today', 'tonight', or 'this weekend' should use the tool's default/open-date behavior unless a concrete date is explicitly provided.",
+                    "default": "dontcare"
+                  }
+                },
+                "required": [
+                  "event_type",
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing matched events",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "description": "List of matching events (may be empty). Events are ordered by event date ascending when a date is not specified.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the event."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Short title of the event."
+                          },
+                          "event_type": {
+                            "type": "string",
+                            "description": "Category of the event (should match request event_type where applicable)."
+                          },
+                          "date": {
+                            "type": "string",
+                            "description": "Date of the event formatted as 'MM/DD/YYYY'."
+                          },
+                          "start_time": {
+                            "type": "string",
+                            "description": "Local start time for the event (e.g., '19:30')."
+                          },
+                          "end_time": {
+                            "type": "string",
+                            "description": "Local end time for the event when available."
+                          },
+                          "venue": {
+                            "type": "object",
+                            "description": "Parameter venue",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "description": "Venue name."
+                              },
+                              "address": {
+                                "type": "string",
+                                "description": "Venue street address."
+                              },
+                              "city": {
+                                "type": "string",
+                                "description": "City and state for the venue (e.g., 'San Francisco, CA')."
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "address"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "location": {
+                            "type": "object",
+                            "description": "Optional geographic coordinates for the venue.",
+                            "properties": {
+                              "latitude": {
+                                "type": "number",
+                                "description": "Latitude of the venue. Provide as a float (e.g., 37.7749, not 37).",
+                                "format": "double"
+                              },
+                              "longitude": {
+                                "type": "number",
+                                "description": "Longitude of the venue. Provide as a float (e.g., -122.4194, not -122).",
+                                "format": "double"
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "price": {
+                            "type": "string",
+                            "description": "Lowest available price for a ticket. Provide as a float (e.g., 25.0, not 25). Null if price unavailable.",
+                            "format": "double"
+                          },
+                          "currency": {
+                            "type": "string",
+                            "description": "Currency code for the price (e.g., 'USD')."
+                          },
+                          "ticket_url": {
+                            "type": "string",
+                            "description": "URL where tickets can be purchased, if available."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Short description or blurb for the event."
+                          },
+                          "tags": {
+                            "type": "array",
+                            "description": "Optional tags or subgenres for the event.",
+                            "items": {
+                              "type": "string",
+                              "description": "Array item"
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "event_type",
+                          "date",
+                          "venue"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "events"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Events_3_BuyEventTickets": {
+      "post": {
+        "operationId": "Events_3_BuyEventTickets",
+        "summary": "Simulate purchasing event tickets",
+        "description": "Simulate a purchase transaction for tickets to a specified cultural event on a given date and city.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "event_name": {
+                    "type": "string",
+                    "description": "The exact title of the artist's performance or play for which tickets are being purchased."
+                  },
+                  "number_of_tickets": {
+                    "type": "integer",
+                    "description": "The quantity of tickets to book for the event."
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "The scheduled date of the event, in the format 'MM/DD/YYYY'."
+                  },
+                  "city": {
+                    "type": "string",
+                    "description": "The city where the event will take place, formatted as 'City, State', such as 'Los Angeles, CA' or 'New York, NY'."
+                  }
+                },
+                "required": [
+                  "event_name",
+                  "number_of_tickets",
+                  "date",
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Confirmation returned when ticket purchase is successful.",
+                  "properties": {
+                    "order_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the completed order."
+                    },
+                    "confirmation_code": {
+                      "type": "string",
+                      "description": "Short code the customer can present at venue entry or use to look up the order."
+                    },
+                    "total_price": {
+                      "type": "number",
+                      "description": "Total amount charged for the order. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "ISO 4217 currency code for the charged amount (for example, USD)."
+                    },
+                    "tickets": {
+                      "type": "array",
+                      "description": "List of issued tickets included in the order.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "ticket_id": {
+                            "type": "string",
+                            "description": "Unique identifier for this ticket."
+                          },
+                          "seat": {
+                            "type": "string",
+                            "description": "Seat assignment or 'General Admission' if no fixed seat."
+                          }
+                        },
+                        "required": [
+                          "ticket_id"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "venue": {
+                      "type": "string",
+                      "description": "Venue name where the event will take place."
+                    },
+                    "event_date": {
+                      "type": "string",
+                      "description": "Event date as recorded by the ticketing system."
+                    }
+                  },
+                  "required": [
+                    "order_id",
+                    "confirmation_code",
+                    "total_price",
+                    "currency",
+                    "tickets"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/RentalCars_3_GetCarsAvailable": {
+      "post": {
+        "operationId": "RentalCars_3_GetCarsAvailable",
+        "summary": "Simulate available rental cars for a location and period",
+        "description": "Return a simulated list of rental cars available for the requested city and rental period.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "city": {
+                    "type": "string",
+                    "description": "The city in which the rental car will be picked up, such as 'Los Angeles, CA'."
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "description": "The start date for the rental period, in the format 'YYYY-MM-DD'."
+                  },
+                  "pickup_time": {
+                    "type": "string",
+                    "description": "The pickup time on the start date, in 24-hour format 'HH:MM'."
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "description": "The end date for the rental period, in the format 'YYYY-MM-DD'."
+                  },
+                  "car_type": {
+                    "type": "string",
+                    "description": "The preferred type of rental car.",
+                    "enum": [
+                      "Hatchback",
+                      "Sedan",
+                      "SUV"
+                    ]
+                  }
+                },
+                "required": [
+                  "city",
+                  "start_date",
+                  "pickup_time",
+                  "end_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "description": "Array of available rental car offers",
+                  "items": {
+                    "type": "object",
+                    "description": "Array item",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "Unique identifier for this car offering."
+                      },
+                      "vendor": {
+                        "type": "string",
+                        "description": "Rental provider name."
+                      },
+                      "make": {
+                        "type": "string",
+                        "description": "Vehicle manufacturer."
+                      },
+                      "model": {
+                        "type": "string",
+                        "description": "Vehicle model name."
+                      },
+                      "car_type": {
+                        "type": "string",
+                        "description": "Vehicle category.",
+                        "enum": [
+                          "Hatchback",
+                          "Sedan",
+                          "SUV",
+                          "dontcare"
+                        ]
+                      },
+                      "seats": {
+                        "type": "integer",
+                        "description": "Number of passenger seats."
+                      },
+                      "luggage_capacity": {
+                        "type": "integer",
+                        "description": "Number of standard luggage pieces that fit."
+                      },
+                      "transmission": {
+                        "type": "string",
+                        "description": "Transmission type (e.g., automatic, manual)."
+                      },
+                      "fuel_type": {
+                        "type": "string",
+                        "description": "Fuel type (e.g., petrol, diesel, electric, hybrid)."
+                      },
+                      "price_per_day": {
+                        "type": "number",
+                        "description": "Daily rental price. Use float format (e.g., 1.0 not 1).",
+                        "format": "double"
+                      },
+                      "currency": {
+                        "type": "string",
+                        "description": "Currency code (ISO 4217), e.g., 'USD'."
+                      },
+                      "estimated_total": {
+                        "type": "number",
+                        "description": "Estimated total price for the rental period. Use float format (e.g., 1.0 not 1).",
+                        "format": "double"
+                      },
+                      "available": {
+                        "type": "boolean",
+                        "description": "Whether this car is available for the requested period."
+                      },
+                      "policies": {
+                        "type": "object",
+                        "description": "Key rental policies for this offer.",
+                        "properties": {
+                          "mileage_limit": {
+                            "type": "string",
+                            "description": "Mileage policy description."
+                          },
+                          "fuel_policy": {
+                            "type": "string",
+                            "description": "Fuel policy description."
+                          },
+                          "cancellation": {
+                            "type": "string",
+                            "description": "Cancellation policy description."
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "vendor",
+                      "make",
+                      "model",
+                      "car_type",
+                      "seats",
+                      "price_per_day",
+                      "currency",
+                      "available"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/RentalCars_3_ReserveCar": {
+      "post": {
+        "operationId": "RentalCars_3_ReserveCar",
+        "summary": "Simulate creating a rental car reservation",
+        "description": "Simulate making a reservation for a rental car given pickup location, dates/times, car type, and insurance option. Return confirmation details and cost calculation without echoing raw request inputs.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "pickup_location": {
+                    "type": "string",
+                    "description": "The location where the car will be picked up, in the format of 'City, State', such as 'San Francisco, CA'."
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "description": "The start date for the car rental in the format 'MM/DD/YYYY'."
+                  },
+                  "pickup_time": {
+                    "type": "string",
+                    "description": "The time for picking up the car in the format 'HH:MM AM/PM'."
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "description": "The end date for returning the rental car, in the format 'MM/DD/YYYY'."
+                  },
+                  "car_type": {
+                    "type": "string",
+                    "description": "The desired type of rental car.",
+                    "enum": [
+                      "Hatchback",
+                      "Sedan",
+                      "SUV"
+                    ]
+                  },
+                  "add_insurance": {
+                    "type": "boolean",
+                    "description": "Indicates whether additional insurance is to be purchased. True to add insurance, False otherwise."
+                  }
+                },
+                "required": [
+                  "pickup_location",
+                  "start_date",
+                  "pickup_time",
+                  "end_date",
+                  "car_type",
+                  "add_insurance"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful reservation response",
+                  "properties": {
+                    "reservation_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the confirmed reservation."
+                    },
+                    "confirmation_code": {
+                      "type": "string",
+                      "description": "Human-friendly confirmation code for customer reference."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Reservation status (for example, 'confirmed')."
+                    },
+                    "total_cost": {
+                      "type": "number",
+                      "description": "Total cost for the reservation. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "ISO 4217 currency code for total_cost (for example, 'USD')."
+                    },
+                    "pickup_instructions": {
+                      "type": "string",
+                      "description": "Instructions for pickup such as office location details, required documents, and office hours."
+                    },
+                    "insurance_purchased": {
+                      "type": "boolean",
+                      "description": "True if additional insurance was added to the confirmed reservation."
+                    }
+                  },
+                  "required": [
+                    "reservation_id",
+                    "status",
+                    "total_cost",
+                    "currency"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

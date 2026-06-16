@@ -1,0 +1,206 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI573",
+    "version": "1.0.0",
+    "description": "LI573 is a compact calendar API collection that lets clients search and manage events: use EventQuery to find events by matching text in titles and descriptions, then call reschedule_event with the target event ID and an ISO-8601 datetime to update its scheduled time. Calls are simple, request/response style; validate datetimes client-side, handle typical success and error responses, and chain queries + rescheduling in automation or user-driven flows."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI573"
+    }
+  ],
+  "paths": {
+    "/EventQuery": {
+      "post": {
+        "operationId": "EventQuery",
+        "summary": "Search calendar events by text query",
+        "description": "Simulate searching a user's calendar for events whose title or description match the provided text. Optional date range and recurring-event inclusion affect which events are returned.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "search_string": {
+                    "type": "string",
+                    "description": "The text to search for within the title and description of an event."
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "description": "The start date for the range of events to search, in the format 'YYYY-MM-DD'.",
+                    "default": "null"
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "description": "The end date for the range of events to search, in the format 'YYYY-MM-DD'.",
+                    "default": "null"
+                  },
+                  "include_recurring": {
+                    "type": "boolean",
+                    "description": "A flag to indicate whether to include recurring events in the search.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "search_string"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "A list of matching calendar events and a total count of matches.",
+                  "properties": {
+                    "total_count": {
+                      "type": "integer",
+                      "description": "Total number of events that match the query."
+                    },
+                    "events": {
+                      "type": "array",
+                      "description": "Array of matching events, sorted by event start date ascending.",
+                      "items": {
+                        "type": "object",
+                        "description": "A calendar event that matched the query.",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique event identifier."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Event title."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Event description or notes.",
+                            "nullable": true
+                          },
+                          "start": {
+                            "type": "string",
+                            "description": "Event start date/time as stored by the system."
+                          },
+                          "end": {
+                            "type": "string",
+                            "description": "Event end date/time as stored by the system."
+                          },
+                          "location": {
+                            "type": "string",
+                            "description": "Event location, if available.",
+                            "nullable": true
+                          },
+                          "is_recurring": {
+                            "type": "boolean",
+                            "description": "Whether this event is part of a recurring series."
+                          },
+                          "recurrence_rule": {
+                            "type": "string",
+                            "description": "Recurrence rule for the event when applicable (present only for recurring events).",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "start",
+                          "end",
+                          "is_recurring"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "total_count",
+                    "events"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reschedule_event": {
+      "post": {
+        "operationId": "reschedule_event",
+        "summary": "Reschedule event to a new ISO-8601 datetime",
+        "description": "Simulate rescheduling an event by assigning it a new ISO-8601 datetime. Validate the provided datetime is a parseable ISO-8601 timestamp and return the updated schedule information.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "event_identifier": {
+                    "type": "string",
+                    "description": "A unique identifier for the event, such as a UUID."
+                  },
+                  "new_datetime": {
+                    "type": "string",
+                    "description": "The new date and time to which the event is being rescheduled, in ISO-8601 format (e.g., 'YYYY-MM-DDTHH:MM:SSZ')."
+                  }
+                },
+                "required": [
+                  "event_identifier",
+                  "new_datetime"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Response returned when an event has been successfully rescheduled.",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "description": "Outcome of the operation. For a successful reschedule, return a value indicating success (e.g., 'rescheduled')."
+                    },
+                    "scheduled_datetime": {
+                      "type": "string",
+                      "description": "The event's new scheduled datetime in ISO-8601 format (e.g., '2023-03-05T14:30:00Z').",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "description": "Timestamp when the reschedule was applied, in ISO-8601 format.",
+                      "format": "date-time"
+                    },
+                    "notes": {
+                      "type": "string",
+                      "description": "Optional human-readable note about the rescheduling result (e.g., conflict resolution, notifications sent)."
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "scheduled_datetime"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

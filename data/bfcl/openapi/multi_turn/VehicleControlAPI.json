@@ -1,0 +1,2987 @@
+{
+  "openapi": "3.1.0",
+  "paths": {
+    "/startEngine": {
+      "post": {
+        "operationId": "startEngine",
+        "summary": "Starts the engine of the vehicle",
+        "description": "Starts the engine of the vehicle using the specified ignition mode. The ignition mode must be either 'START' or 'STOP'. Starting with 'START' requires all doors locked and the brake pedal fully pressed first. Pressing the brake is a precondition; do not release the brake pedal afterward unless the user explicitly asks to release it.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ignitionMode": {
+                    "type": "string",
+                    "description": "The ignition mode of the vehicle. Allowed values are 'START' or 'STOP'. Validation rule: must not violate `not (ignitionMode == 'START' or ignitionMode == 'STOP')`."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Request payload",
+                "required": [
+                  "ignitionMode"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "engineState": {
+                          "type": "string",
+                          "enum": [
+                            "running",
+                            "stopped"
+                          ],
+                          "description": "engineState (string)"
+                        },
+                        "fuelLevel": {
+                          "type": "number",
+                          "description": "fuelLevel (number)",
+                          "format": "float"
+                        },
+                        "batteryVoltage": {
+                          "type": "number",
+                          "description": "batteryVoltage (number)",
+                          "format": "float"
+                        }
+                      },
+                      "required": [
+                        "engineState",
+                        "fuelLevel",
+                        "batteryVoltage"
+                      ],
+                      "additionalProperties": true,
+                      "description": "Returns current engine state, fuel level, and battery voltage"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "type": "string",
+                          "description": "error (string)"
+                        }
+                      },
+                      "required": [
+                        "error"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Returns an error message describing the failure"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fillFuelTank": {
+      "post": {
+        "operationId": "fillFuelTank",
+        "summary": "Fill the vehicle's fuel tank",
+        "description": "Adds the specified amount of fuel to the vehicle's fuel tank, which has a maximum capacity of 50 gallons. The argument is additional fuel to add, not the desired final fuel level. If the user asks to end with a target level or fill completely, add only target_level - current fuelLevel; exactly 50.0 gallons after filling is valid.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fuelAmount": {
+                    "type": "number",
+                    "format": "float",
+                    "description": "The additional amount of fuel to add to the tank, in gallons. This is a delta, not a final target level. For 'full tank' or 'fill completely', use 50.0 - current fuelLevel. For 'end with X gallons' or 'X gallons total', use X - current fuelLevel. For 'add X gallons' or 'refuel with X gallons', use X. Validation rule: must not violate `fuelAmount < 0` or `fuelLevel + fuelAmount > 50.0`; `fuelLevel + fuelAmount == 50.0` is valid."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Request payload",
+                "required": [
+                  "fuelAmount"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "fuelLevel": {
+                          "type": "number",
+                          "description": "fuelLevel (number)",
+                          "format": "float"
+                        }
+                      },
+                      "required": [
+                        "fuelLevel"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Returns updated fuelLevel after filling"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "type": "string",
+                          "description": "error (string)"
+                        }
+                      },
+                      "required": [
+                        "error"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Returns error message describing the validation failure"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lockDoors": {
+      "post": {
+        "operationId": "lockDoors",
+        "summary": "LockDoors",
+        "description": "Locks or unlocks specified doors of the vehicle based on the unlock flag and door list.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "unlock": {
+                    "type": "boolean",
+                    "description": "True if the doors are to be unlocked, False otherwise."
+                  },
+                  "door": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "The list of doors to lock or unlock. Allowed values: [\"driver\", \"passenger\", \"rear_left\", \"rear_right\"]"
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Request payload",
+                "required": [
+                  "door",
+                  "unlock"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "lockStatus": {
+                          "type": "string",
+                          "enum": [
+                            "unlocked"
+                          ],
+                          "description": "lockStatus (string)"
+                        },
+                        "remainingUnlockedDoors": {
+                          "type": "integer",
+                          "description": "remainingUnlockedDoors (integer)"
+                        }
+                      },
+                      "required": [
+                        "lockStatus",
+                        "remainingUnlockedDoors"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Doors are unlocked"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "lockStatus": {
+                          "type": "string",
+                          "enum": [
+                            "locked"
+                          ],
+                          "description": "lockStatus (string)"
+                        },
+                        "remainingUnlockedDoors": {
+                          "type": "integer",
+                          "description": "remainingUnlockedDoors (integer)"
+                        }
+                      },
+                      "required": [
+                        "lockStatus",
+                        "remainingUnlockedDoors"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Doors are locked"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/adjustClimateControl": {
+      "post": {
+        "operationId": "adjustClimateControl",
+        "summary": "Adjusts the vehicle's climate control settings",
+        "description": "Adjusts the climate control of the vehicle by setting the temperature, unit, fan speed, and mode. The temperature is converted to Celsius if provided in Fahrenheit. Fan speed must be between 0 and 100 inclusive.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "temperature": {
+                    "type": "number",
+                    "format": "float",
+                    "description": "The temperature to set in degrees, default unit is Celsius"
+                  },
+                  "unit": {
+                    "type": "string",
+                    "description": "The unit of temperature, either 'celsius' or 'fahrenheit'",
+                    "default": "celsius"
+                  },
+                  "fanSpeed": {
+                    "type": "integer",
+                    "description": "The fan speed to set, an integer from 0 to 100 Validation rule: must not violate `not 0 <= fanSpeed <= 100`.",
+                    "default": 50
+                  },
+                  "mode": {
+                    "type": "string",
+                    "description": "The climate mode to set, one of 'auto', 'cool', 'heat', or 'defrost'",
+                    "default": "auto"
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Request payload",
+                "required": [
+                  "temperature"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "currentACTemperature": {
+                          "type": "number",
+                          "description": "currentACTemperature (number)",
+                          "format": "float"
+                        },
+                        "climateMode": {
+                          "type": "string",
+                          "description": "climateMode (string)"
+                        },
+                        "humidityLevel": {
+                          "type": "number",
+                          "description": "humidityLevel (number)",
+                          "format": "float"
+                        }
+                      },
+                      "required": [
+                        "currentACTemperature",
+                        "climateMode",
+                        "humidityLevel"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Returns current climate control settings with temperature in Celsius, mode, and humidity level"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "type": "string",
+                          "description": "error (string)"
+                        }
+                      },
+                      "required": [
+                        "error"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Returns error indicating invalid fan speed"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_outside_temperature_from_google": {
+      "post": {
+        "operationId": "get_outside_temperature_from_google",
+        "summary": "Get outside temperature from Google",
+        "description": "Gets the outside temperature in degrees Celsius as a float value.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false,
+                "description": "Request payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "outsideTemperature": {
+                          "type": "number",
+                          "minimum": -10.0,
+                          "maximum": 40.0,
+                          "description": "outsideTemperature (number)",
+                          "format": "float"
+                        }
+                      },
+                      "required": [
+                        "outsideTemperature"
+                      ],
+                      "additionalProperties": true,
+                      "description": "Success response"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "type": "string",
+                          "description": "Error message"
+                        }
+                      },
+                      "required": [
+                        "error"
+                      ],
+                      "description": "Error response",
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_outside_temperature_from_weather_com": {
+      "post": {
+        "operationId": "get_outside_temperature_from_weather_com",
+        "summary": "Get outside temperature from Weather.com",
+        "description": "Gets the outside temperature in degrees Celsius from Weather.com.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false,
+                "description": "Request payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "type": "integer",
+                          "enum": [
+                            404
+                          ],
+                          "description": "error (integer)"
+                        }
+                      },
+                      "required": [
+                        "error"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Success response"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "type": "string",
+                          "description": "Error message"
+                        }
+                      },
+                      "required": [
+                        "error"
+                      ],
+                      "description": "Error response",
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/setHeadlights": {
+      "post": {
+        "operationId": "setHeadlights",
+        "summary": "SetHeadlights",
+        "description": "Sets the headlights of the vehicle. The mode parameter controls the headlights and accepts 'on', 'off', or 'auto'. The 'auto' mode is treated as 'off' in the response.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "description": "The mode of the headlights. Allowed values are 'on', 'off', or 'auto'. Validation rule: must not violate `mode not in ['on', 'off', 'auto']`."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Request payload",
+                "required": [
+                  "mode"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "headlightStatus": "on",
+                      "description": "Headlights are turned on"
+                    },
+                    {
+                      "headlightStatus": "off",
+                      "description": "Headlights are turned off or set to auto (treated as off)"
+                    },
+                    {
+                      "error": "Invalid headlight mode.",
+                      "description": "Invalid headlight mode error"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/displayCarStatus": {
+      "post": {
+        "operationId": "displayCarStatus",
+        "summary": "Display the status of the vehicle based on the selected option",
+        "description": "Displays the status of the vehicle according to the specified option, which can be one of fuel, battery, doors, climate, headlights, parkingBrake, brakePedal, or engine. Returns detailed status information relevant to the chosen option.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "option": {
+                    "type": "string",
+                    "description": "The option to display. Allowed values: \"fuel\", \"battery\", \"doors\", \"climate\", \"headlights\", \"parkingBrake\", \"brakePedal\", \"engine\" Validation rule: must not violate `option in [\"fuel\", \"battery\", \"doors\", \"climate\", \"headlights\", \"parkingBrake\", \"brakePedal\", \"engine\"]`."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Request payload",
+                "required": [
+                  "option"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "fuelLevel": "float",
+                      "description": "Returns the fuel level in gallons"
+                    },
+                    {
+                      "batteryVoltage": "float",
+                      "description": "Returns the battery voltage in volts"
+                    },
+                    {
+                      "doorStatus": {
+                        "driver": "locked|unlocked",
+                        "passenger": "locked|unlocked",
+                        "rear_left": "locked|unlocked",
+                        "rear_right": "locked|unlocked"
+                      },
+                      "description": "Returns the status of each door"
+                    },
+                    {
+                      "currentACTemperature": "float",
+                      "fanSpeed": "int",
+                      "climateMode": "auto|cool|heat|defrost",
+                      "humidityLevel": "float",
+                      "description": "Returns climate control settings"
+                    },
+                    {
+                      "headlightStatus": "on|off",
+                      "description": "Returns the headlight status"
+                    },
+                    {
+                      "parkingBrakeStatus": "engaged|released",
+                      "parkingBrakeForce": "float",
+                      "slopeAngle": "float",
+                      "description": "Returns parking brake status and related forces"
+                    },
+                    {
+                      "brakePedalStatus": "pressed|released",
+                      "brakePedalForce": "float",
+                      "description": "Returns brake pedal status and force"
+                    },
+                    {
+                      "engineState": "running|stopped",
+                      "description": "Returns engine state"
+                    },
+                    {
+                      "error": "Invalid option",
+                      "description": "Returns error for invalid option"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/activateParkingBrake": {
+      "post": {
+        "operationId": "activateParkingBrake",
+        "summary": "ActivateParkingBrake",
+        "description": "Activates the parking brake of the vehicle. The mode parameter determines whether to engage or release the brake.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "description": "The mode to set. Allowed values are 'engage' to apply the parking brake and 'release' to disengage it. Validation rule: must not violate `mode not in ['engage', 'release']`."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Request payload",
+                "required": [
+                  "mode"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "parkingBrakeStatus": "engaged",
+                      "parkingBrakeForce": 500.0,
+                      "slopeAngle": 10.0,
+                      "description": "Parking brake engaged"
+                    },
+                    {
+                      "parkingBrakeStatus": "released",
+                      "parkingBrakeForce": 0.0,
+                      "slopeAngle": 10.0,
+                      "description": "Parking brake released"
+                    },
+                    {
+                      "error": "Invalid mode",
+                      "description": "Invalid mode error"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pressBrakePedal": {
+      "post": {
+        "operationId": "pressBrakePedal",
+        "summary": "Press the brake pedal",
+        "description": "Presses the brake pedal based on the given pedal position, which ranges from 0 (not pressed) to 1 (fully pressed). The brake pedal remains pressed until explicitly released.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "pedalPosition": {
+                    "type": "number",
+                    "format": "float",
+                    "description": "Position of the brake pedal, between 0 (not pressed) and 1 (fully pressed). Validation rule: must not violate `not 0 <= pedalPosition <= 1`."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Request payload",
+                "required": [
+                  "pedalPosition"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "brakePedalStatus": {
+                          "type": "string",
+                          "enum": [
+                            "released"
+                          ],
+                          "description": "brakePedalStatus (string)"
+                        },
+                        "brakePedalForce": {
+                          "type": "number",
+                          "format": "float",
+                          "enum": [
+                            0.0
+                          ],
+                          "description": "brakePedalForce (number)"
+                        }
+                      },
+                      "required": [
+                        "brakePedalStatus",
+                        "brakePedalForce"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Brake pedal released with zero force"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "brakePedalStatus": {
+                          "type": "string",
+                          "enum": [
+                            "pressed"
+                          ],
+                          "description": "brakePedalStatus (string)"
+                        },
+                        "brakePedalForce": {
+                          "type": "number",
+                          "format": "float",
+                          "minimum": 0.0,
+                          "maximum": 1000.0,
+                          "description": "brakePedalForce (number)"
+                        }
+                      },
+                      "required": [
+                        "brakePedalStatus",
+                        "brakePedalForce"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Brake pedal pressed with proportional force"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "type": "string",
+                          "enum": [
+                            "Pedal position must be between 0 and 1."
+                          ],
+                          "description": "error (string)"
+                        }
+                      },
+                      "required": [
+                        "error"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Invalid pedal position error"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/releaseBrakePedal": {
+      "post": {
+        "operationId": "releaseBrakePedal",
+        "summary": "Release the brake pedal",
+        "description": "Releases the brake pedal of the vehicle, setting its status to 'released' and the applied force to zero. This is not part of starting the engine; call it only when the user explicitly asks to release the brake pedal.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false,
+                "description": "Request payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "brakePedalStatus": {
+                          "type": "string",
+                          "enum": [
+                            "released"
+                          ],
+                          "description": "brakePedalStatus (string)"
+                        },
+                        "brakePedalForce": {
+                          "type": "number",
+                          "format": "float",
+                          "enum": [
+                            0.0
+                          ],
+                          "description": "brakePedalForce (number)"
+                        }
+                      },
+                      "required": [
+                        "brakePedalStatus",
+                        "brakePedalForce"
+                      ],
+                      "additionalProperties": true,
+                      "description": "Success response"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/setCruiseControl": {
+      "post": {
+        "operationId": "setCruiseControl",
+        "summary": "Set the vehicle's cruise control status and speed",
+        "description": "Sets the cruise control of the vehicle with a specified speed and activation status, considering the distance to the next vehicle in meters.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "speed": {
+                    "type": "number",
+                    "format": "float",
+                    "description": "The speed to set in miles per hour; must be between 0 and 120 and a multiple of 5. Validation rule: must not violate `activate == true and (speed < 0 or speed > 120 or speed % 5 != 0)`."
+                  },
+                  "activate": {
+                    "type": "boolean",
+                    "description": "Boolean indicating whether to activate (true) or deactivate (false) the cruise control."
+                  },
+                  "distanceToNextVehicle": {
+                    "type": "number",
+                    "format": "float",
+                    "description": "The distance to the next vehicle in meters."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Request payload",
+                "required": [
+                  "activate",
+                  "distanceToNextVehicle",
+                  "speed"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "cruiseStatus": "active",
+                      "currentSpeed": "float",
+                      "distanceToNextVehicle": "float",
+                      "description": "Cruise control activated with given speed and distance"
+                    },
+                    {
+                      "cruiseStatus": "inactive",
+                      "currentSpeed": "float",
+                      "distanceToNextVehicle": "float",
+                      "description": "Cruise control deactivated with given speed and distance"
+                    },
+                    {
+                      "error": "string",
+                      "description": "Error when engine is stopped and cruise control activation is attempted"
+                    },
+                    {
+                      "error": "string",
+                      "description": "Error when speed is invalid while activating cruise control"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_current_speed": {
+      "post": {
+        "operationId": "get_current_speed",
+        "summary": "Get current speed",
+        "description": "Gets the current speed of the vehicle in kilometers per hour.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false,
+                "description": "Request payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "currentSpeed": {
+                          "type": "number",
+                          "minimum": 0.0,
+                          "maximum": 120.0,
+                          "description": "currentSpeed (number)",
+                          "format": "float"
+                        }
+                      },
+                      "required": [
+                        "currentSpeed"
+                      ],
+                      "additionalProperties": true,
+                      "description": "Success response"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "type": "string",
+                          "description": "Error message"
+                        }
+                      },
+                      "required": [
+                        "error"
+                      ],
+                      "description": "Error response",
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/display_log": {
+      "post": {
+        "operationId": "display_log",
+        "summary": "Display log messages",
+        "description": "Displays the provided list of log messages and returns them as confirmation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "messages": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "The list of messages to display."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Request payload",
+                "required": [
+                  "messages"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "log": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "log (array)"
+                        }
+                      },
+                      "required": [
+                        "log"
+                      ],
+                      "additionalProperties": true,
+                      "description": "Success response"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "type": "string",
+                          "description": "Error message"
+                        }
+                      },
+                      "required": [
+                        "error"
+                      ],
+                      "description": "Error response",
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/estimate_drive_feasibility_by_mileage": {
+      "post": {
+        "operationId": "estimate_drive_feasibility_by_mileage",
+        "summary": "Estimate drive feasibility by mileage",
+        "description": "Estimates whether the vehicle can drive the specified distance based on current fuel level and mileage efficiency.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "distance": {
+                    "type": "number",
+                    "format": "float",
+                    "description": "The distance to travel in miles. Validation rule: must not violate `distance >= 0`."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Request payload",
+                "required": [
+                  "distance"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "canDrive": true,
+                      "description": "Vehicle can drive the requested distance"
+                    },
+                    {
+                      "canDrive": false,
+                      "description": "Vehicle cannot drive the requested distance"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/liter_to_gallon": {
+      "post": {
+        "operationId": "liter_to_gallon",
+        "summary": "Convert liters to gallons",
+        "description": "Converts a given volume in liters to its equivalent in gallons. The input must be a non-negative float representing the volume in liters.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "liter": {
+                    "type": "number",
+                    "format": "float",
+                    "description": "The volume in liters to convert, as a non-negative float. Validation rule: must not violate `liter >= 0`."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Request payload",
+                "required": [
+                  "liter"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "gallon": {
+                          "type": "number",
+                          "description": "gallon (number)",
+                          "format": "float"
+                        }
+                      },
+                      "required": [
+                        "gallon"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Success response"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "type": "string",
+                          "description": "Error message"
+                        }
+                      },
+                      "required": [
+                        "error"
+                      ],
+                      "description": "Error response",
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gallon_to_liter": {
+      "post": {
+        "operationId": "gallon_to_liter",
+        "summary": "Convert gallons to liters",
+        "description": "Converts the given amount in gallons to its equivalent volume in liters.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "gallon": {
+                    "type": "number",
+                    "format": "float",
+                    "description": "The amount of gallon to convert. Validation rule: must not violate `gallon is not None and isinstance(gallon, (int, float)) and gallon >= 0`."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Request payload",
+                "required": [
+                  "gallon"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "liter": {
+                          "type": "number",
+                          "description": "liter (number)",
+                          "format": "float"
+                        }
+                      },
+                      "required": [
+                        "liter"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Success response"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "type": "string",
+                          "description": "Error message"
+                        }
+                      },
+                      "required": [
+                        "error"
+                      ],
+                      "description": "Error response",
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/estimate_distance": {
+      "post": {
+        "operationId": "estimate_distance",
+        "summary": "Estimate distance between two cities",
+        "description": "Estimates the distance between two cities given their zipcodes and optionally returns intermediary cities if available.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "cityA": {
+                    "type": "string",
+                    "description": "The zipcode of the first city. Validation rule: must not violate `cityA and cityB form a known city pair in static data`."
+                  },
+                  "cityB": {
+                    "type": "string",
+                    "description": "The zipcode of the second city. Validation rule: must not violate `cityA and cityB form a known city pair in static data`."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Request payload",
+                "required": [
+                  "cityA",
+                  "cityB"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "distance": "float",
+                      "intermediaryCities": "optional list of strings",
+                      "description": "Returns the distance between the two cities in kilometers"
+                    },
+                    {
+                      "error": "string",
+                      "description": "Returns an error indicating the distance is not found"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_zipcode_based_on_city": {
+      "post": {
+        "operationId": "get_zipcode_based_on_city",
+        "summary": "Get zipcode based on city",
+        "description": "Gets the zipcode based on the city. The method returns a known zipcode for recognized cities or a default '00000' for unknown cities.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "city": {
+                    "type": "string",
+                    "description": "The name of the city. Validation rule: must not violate `city is a non-empty string`."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Request payload",
+                "required": [
+                  "city"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "zipcode": {
+                          "type": "string",
+                          "enum": [
+                            "83214",
+                            "74532",
+                            "56108",
+                            "62947",
+                            "71354",
+                            "83462",
+                            "47329",
+                            "52013",
+                            "69238",
+                            "51479",
+                            "94016"
+                          ],
+                          "description": "zipcode (string)"
+                        }
+                      },
+                      "required": [
+                        "zipcode"
+                      ],
+                      "additionalProperties": true,
+                      "description": "Returns the zipcode corresponding to the known city"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "zipcode": {
+                          "type": "string",
+                          "const": "00000",
+                          "description": "zipcode (string)"
+                        }
+                      },
+                      "required": [
+                        "zipcode"
+                      ],
+                      "additionalProperties": true,
+                      "description": "Returns default zipcode '00000' for unknown city"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/set_navigation": {
+      "post": {
+        "operationId": "set_navigation",
+        "summary": "Set navigation",
+        "description": "Navigates to the specified destination given as a string in the format of street, city, state. When a prior tool returns a destination such as shopLocation and the user asks for directions or navigation there, pass that returned location as destination.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "destination": {
+                    "type": "string",
+                    "description": "The destination to navigate in the format of street, city, state. Use an explicit user-provided destination or a location returned by a prior lookup tool when the user asked to navigate or get directions there."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Request payload",
+                "required": [
+                  "destination"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "description": "status (string)"
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ],
+                      "additionalProperties": true,
+                      "description": "Success response"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/check_tire_pressure": {
+      "post": {
+        "operationId": "check_tire_pressure",
+        "summary": "Check tire pressure",
+        "description": "Checks the tire pressure of the vehicle and returns the pressure of each tire along with an overall healthy tire pressure indicator and car metadata.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false,
+                "description": "Request payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "frontLeftTirePressure": "float",
+                      "frontRightTirePressure": "float",
+                      "rearLeftTirePressure": "float",
+                      "rearRightTirePressure": "float",
+                      "healthy_tire_pressure": "bool",
+                      "car_info": "dict",
+                      "description": "Success response"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "type": "string",
+                          "description": "Error message"
+                        }
+                      },
+                      "required": [
+                        "error"
+                      ],
+                      "description": "Error response",
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/find_nearest_tire_shop": {
+      "post": {
+        "operationId": "find_nearest_tire_shop",
+        "summary": "Find nearest tire shop",
+        "description": "Finds the nearest tire shop and returns its location. This only looks up the shop; if the user asks to navigate, get directions, chart a course, or detour to that shop, follow this call with set_navigation using the returned shopLocation.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false,
+                "description": "Request payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "shopLocation": {
+                          "type": "string",
+                          "description": "shopLocation (string)"
+                        }
+                      },
+                      "required": [
+                        "shopLocation"
+                      ],
+                      "additionalProperties": true,
+                      "description": "Success response"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "info": {
+    "title": "VehicleControlAPI",
+    "version": "1.0.0",
+    "description": "VehicleControlAPI provides comprehensive management of a vehicle's operational systems, including engine control, fuel management, door locking, climate settings, lighting, braking, cruise control, navigation, and status monitoring. It maintains an internal state reflecting key vehicle attributes such as fuel level, battery voltage, engine status, door locks, climate conditions, and brake states. Initialization occurs by loading a scenario configuration that sets these state variables, ensuring consistent starting conditions. The API uses clear enumerations for modes and statuses, and returns structured dictionaries representing current system states. It supports unit conversions and distance estimations relevant to vehicle operation. Equality comparison between instances is based on matching all public state attributes. Error handling and response conventions follow standard dictionary-based status reporting without specialized error schemas.",
+    "x-default-state": {
+      "global": {
+        "runtime_defaults": {}
+      },
+      "tools": {
+        "startEngine": {
+          "state_access": "write",
+          "state_effects": [
+            "set durable public field engine_state to 'running' if ignitionMode is 'START'.",
+            "set durable public field engine_state to 'stopped' if ignitionMode is 'STOP'."
+          ],
+          "state_effects_on_success": [
+            "set durable public field engine_state to 'running' if ignitionMode is 'START'.",
+            "set durable public field engine_state to 'stopped' if ignitionMode is 'STOP'."
+          ],
+          "behavior_hints": [
+            "preserve explicit ignitionMode literal when valid",
+            "persistent public state uses engine_state; response payload uses engineState",
+            "do not create a durable engineState field from the response alias",
+            "require all doors locked before engine start",
+            "require brake pedal fully pressed before engine start"
+          ],
+          "persistent_state_shapes": [
+            {
+              "path": "engine_state",
+              "key_rule": "singleton",
+              "fields": {
+                "engine_state": "string literal 'running' or 'stopped'"
+              }
+            }
+          ],
+          "response_only_fields": [
+            "engineState",
+            "fuelLevel",
+            "batteryVoltage",
+            "error"
+          ],
+          "response_variants": [
+            {
+              "kind": "success",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "engineState": {
+                    "type": "string",
+                    "enum": [
+                      "running",
+                      "stopped"
+                    ]
+                  },
+                  "fuelLevel": {
+                    "type": "number"
+                  },
+                  "batteryVoltage": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "engineState",
+                  "fuelLevel",
+                  "batteryVoltage"
+                ],
+                "additionalProperties": true
+              },
+              "description": "Returns current engine state, fuel level, and battery voltage",
+              "when": "ignitionMode is 'START' or 'STOP' and all validations pass"
+            },
+            {
+              "kind": "error",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "error": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "error"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Returns an error message describing the failure",
+              "when": "any validation rule fails"
+            }
+          ],
+          "keep_error_branch": true,
+          "preconditions": [
+            {
+              "state_path": "doorStatus",
+              "required_value": {
+                "driver": "locked",
+                "passenger": "locked",
+                "rear_left": "locked",
+                "rear_right": "locked"
+              },
+              "remedy": {
+                "name": "lockDoors",
+                "arguments": {
+                  "unlock": false,
+                  "door": [
+                    "driver",
+                    "passenger",
+                    "rear_left",
+                    "rear_right"
+                  ]
+                }
+              },
+              "rationale": "startEngine requires all vehicle doors to be locked first; the Python VehicleControlAPI class rejects engine start while any door remains unlocked."
+            },
+            {
+              "state_path": "brakePedalStatus",
+              "required_value": "pressed",
+              "remedy": {
+                "name": "pressBrakePedal",
+                "arguments": {
+                  "pedalPosition": 1.0
+                }
+              },
+              "rationale": "startEngine requires the brake pedal to be pressed first; the Python VehicleControlAPI class sets brakePedalStatus='pressed' via pressBrakePedal(1.0) before engine ignition."
+            }
+          ]
+        },
+        "fillFuelTank": {
+          "state_access": "write",
+          "state_effects": [
+            "increase fuelLevel by fuelAmount."
+          ],
+          "state_effects_on_success": [
+            "increase fuelLevel by fuelAmount."
+          ],
+          "behavior_hints": [
+            "preserve explicit user-provided fuelAmount when valid",
+            "fuelAmount is additional fuel, not a final target level",
+            "for full tank or target final fuel level, add target_level - current fuelLevel",
+            "fuelLevel + fuelAmount == 50.0 is valid; only values above 50.0 exceed capacity",
+            "canonical runtime field naming: fuelLevel"
+          ],
+          "persistent_state_shapes": [
+            {
+              "path": "fuelLevel",
+              "key_rule": "singleton",
+              "fields": {
+                "fuelLevel": "float"
+              }
+            }
+          ],
+          "response_only_fields": [
+            "error"
+          ],
+          "response_variants": [
+            {
+              "kind": "success",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fuelLevel": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "fuelLevel"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Returns updated fuelLevel after filling",
+              "when": "fuelAmount is valid and fuelLevel + fuelAmount <= 50.0"
+            },
+            {
+              "kind": "error",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "error": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "error"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Returns error message describing the validation failure",
+              "when": "fuelAmount < 0 or fuelLevel + fuelAmount > 50.0"
+            }
+          ],
+          "keep_error_branch": true
+        },
+        "lockDoors": {
+          "state_access": "write",
+          "state_effects": [
+            "set doorStatus[d] to locked or unlocked for each door d in input list.",
+            "increment remainingUnlockedDoors by 1 for each door unlocked.",
+            "decrement remainingUnlockedDoors by 1 for each door locked."
+          ],
+          "state_effects_on_success": [
+            "set doorStatus[d] to locked or unlocked for each door d in input list.",
+            "increment remainingUnlockedDoors by 1 for each door unlocked.",
+            "decrement remainingUnlockedDoors by 1 for each door locked."
+          ],
+          "behavior_hints": [
+            "canonical runtime field naming for doorStatus and remainingUnlockedDoors",
+            "preserve explicit user intent for unlock parameter",
+            "lockStatus response field is an enum with values locked/unlocked",
+            "remainingUnlockedDoors reflects current count after operation"
+          ],
+          "persistent_state_shapes": [
+            {
+              "path": "doorStatus",
+              "key_rule": "door in [\"driver\", \"passenger\", \"rear_left\", \"rear_right\"]",
+              "fields": {
+                "doorStatus[d]": "string enum locked/unlocked"
+              }
+            },
+            {
+              "path": "remainingUnlockedDoors",
+              "key_rule": "singleton",
+              "fields": {
+                "remainingUnlockedDoors": "integer count of unlocked doors"
+              }
+            }
+          ],
+          "response_only_fields": [
+            "lockStatus"
+          ],
+          "response_variants": [
+            {
+              "kind": "success",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "lockStatus": {
+                    "type": "string",
+                    "enum": [
+                      "unlocked"
+                    ]
+                  },
+                  "remainingUnlockedDoors": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "lockStatus",
+                  "remainingUnlockedDoors"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Doors are unlocked",
+              "when": "unlock is true"
+            },
+            {
+              "kind": "success",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "lockStatus": {
+                    "type": "string",
+                    "enum": [
+                      "locked"
+                    ]
+                  },
+                  "remainingUnlockedDoors": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "lockStatus",
+                  "remainingUnlockedDoors"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Doors are locked",
+              "when": "unlock is false"
+            }
+          ]
+        },
+        "adjustClimateControl": {
+          "state_access": "write",
+          "state_effects": [
+            "set acTemperature.",
+            "set fanSpeed.",
+            "set acMode."
+          ],
+          "state_effects_on_success": [
+            "set acTemperature.",
+            "set fanSpeed.",
+            "set acMode."
+          ],
+          "behavior_hints": [
+            "canonical runtime field naming for acTemperature, fanSpeed, acMode",
+            "fanSpeed must be validated to be between 0 and 100 inclusive",
+            "preserve explicit user-provided temperature unit conversion from fahrenheit to celsius",
+            "response includes currentACTemperature in celsius regardless of input unit"
+          ],
+          "persistent_state_shapes": [
+            {
+              "path": "acSettings",
+              "key_rule": "static",
+              "fields": {
+                "acTemperature": "acTemperature",
+                "fanSpeed": "fanSpeed",
+                "acMode": "acMode"
+              }
+            }
+          ],
+          "response_only_fields": [
+            "currentACTemperature",
+            "climateMode",
+            "humidityLevel",
+            "error"
+          ],
+          "response_variants": [
+            {
+              "kind": "success",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "currentACTemperature": {
+                    "type": "number"
+                  },
+                  "climateMode": {
+                    "type": "string"
+                  },
+                  "humidityLevel": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "currentACTemperature",
+                  "climateMode",
+                  "humidityLevel"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Returns current climate control settings with temperature in Celsius, mode, and humidity level",
+              "when": "fanSpeed is between 0 and 100 inclusive"
+            },
+            {
+              "kind": "error",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "error": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "error"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Returns error indicating invalid fan speed",
+              "when": "fanSpeed is outside 0 to 100 range"
+            }
+          ],
+          "keep_error_branch": true
+        },
+        "get_outside_temperature_from_weather_com": {
+          "static_data": {
+            "return_value": {
+              "error": 404
+            }
+          },
+          "state_access": "read",
+          "state_effects": [],
+          "response_only_fields": [
+            "error"
+          ],
+          "response_variants": [
+            {
+              "kind": "error",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "error": {
+                    "type": "integer",
+                    "enum": [
+                      404
+                    ]
+                  }
+                },
+                "required": [
+                  "error"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Indicates that the outside temperature data is not available",
+              "when": "the method returns an error field with value 404"
+            }
+          ],
+          "keep_error_branch": true
+        },
+        "setHeadlights": {
+          "state_access": "write",
+          "state_effects": [
+            "set headLightStatus to 'on' if mode is 'on', otherwise 'off'."
+          ],
+          "state_effects_on_success": [
+            "set headLightStatus to 'on' if mode is 'on', otherwise 'off'."
+          ],
+          "behavior_hints": [
+            "canonical runtime field naming: headLightStatus",
+            "response-shape caveats: headlightStatus is always present with values 'on' or 'off'",
+            "mode 'auto' is treated as 'off' in state and response"
+          ],
+          "persistent_state_shapes": [
+            {
+              "path": "headLightStatus",
+              "key_rule": "singleton",
+              "fields": {
+                "headLightStatus": "mode == 'on' ? 'on' : 'off'"
+              }
+            }
+          ],
+          "response_variants": [
+            {
+              "kind": "success",
+              "schema": {
+                "headlightStatus": "on"
+              },
+              "description": "Headlights are turned on",
+              "when": "mode == 'on'"
+            },
+            {
+              "kind": "success",
+              "schema": {
+                "headlightStatus": "off"
+              },
+              "description": "Headlights are turned off or set to auto (treated as off)",
+              "when": "mode in ['off', 'auto']"
+            },
+            {
+              "kind": "error",
+              "schema": {
+                "error": "Invalid headlight mode."
+              },
+              "description": "Invalid headlight mode error",
+              "when": "mode not in ['on', 'off', 'auto']"
+            }
+          ],
+          "keep_error_branch": true
+        },
+        "displayCarStatus": {
+          "static_data": {
+            "status": {}
+          },
+          "state_access": "read",
+          "state_effects": [],
+          "behavior_hints": [
+            "canonical runtime field naming",
+            "response-shape caveats such as successful empty objects",
+            "preserving explicit user-provided identifiers/literals when already valid"
+          ],
+          "response_only_fields": [
+            "fuelLevel",
+            "batteryVoltage",
+            "doorStatus",
+            "currentACTemperature",
+            "fanSpeed",
+            "climateMode",
+            "humidityLevel",
+            "headlightStatus",
+            "parkingBrakeStatus",
+            "parkingBrakeForce",
+            "slopeAngle",
+            "brakePedalStatus",
+            "brakePedalForce",
+            "engineState",
+            "metadata",
+            "error"
+          ],
+          "response_variants": [
+            {
+              "kind": "success",
+              "schema": {
+                "fuelLevel": "float"
+              },
+              "description": "Returns the fuel level in gallons",
+              "when": "option == 'fuel'"
+            },
+            {
+              "kind": "success",
+              "schema": {
+                "batteryVoltage": "float"
+              },
+              "description": "Returns the battery voltage in volts",
+              "when": "option == 'battery'"
+            },
+            {
+              "kind": "success",
+              "schema": {
+                "doorStatus": {
+                  "driver": "locked|unlocked",
+                  "passenger": "locked|unlocked",
+                  "rear_left": "locked|unlocked",
+                  "rear_right": "locked|unlocked"
+                }
+              },
+              "description": "Returns the status of each door",
+              "when": "option == 'doors'"
+            },
+            {
+              "kind": "success",
+              "schema": {
+                "currentACTemperature": "float",
+                "fanSpeed": "int",
+                "climateMode": "auto|cool|heat|defrost",
+                "humidityLevel": "float"
+              },
+              "description": "Returns climate control settings",
+              "when": "option == 'climate'"
+            },
+            {
+              "kind": "success",
+              "schema": {
+                "headlightStatus": "on|off"
+              },
+              "description": "Returns the headlight status",
+              "when": "option == 'headlights'"
+            },
+            {
+              "kind": "success",
+              "schema": {
+                "parkingBrakeStatus": "engaged|released",
+                "parkingBrakeForce": "float",
+                "slopeAngle": "float"
+              },
+              "description": "Returns parking brake status and related forces",
+              "when": "option == 'parkingBrake'"
+            },
+            {
+              "kind": "success",
+              "schema": {
+                "brakePedalStatus": "pressed|released",
+                "brakePedalForce": "float"
+              },
+              "description": "Returns brake pedal status and force",
+              "when": "option == 'brakePedal'"
+            },
+            {
+              "kind": "success",
+              "schema": {
+                "engineState": "running|stopped"
+              },
+              "description": "Returns engine state",
+              "when": "option == 'engine'"
+            },
+            {
+              "kind": "error",
+              "schema": {
+                "error": "Invalid option"
+              },
+              "description": "Returns error for invalid option",
+              "when": "option not in [\"fuel\", \"battery\", \"doors\", \"climate\", \"headlights\", \"parkingBrake\", \"brakePedal\", \"engine\"]"
+            }
+          ],
+          "keep_error_branch": true
+        },
+        "activateParkingBrake": {
+          "state_access": "write",
+          "state_effects": [
+            "set parkingBrakeStatus to 'engaged' or 'released'."
+          ],
+          "state_effects_on_success": [
+            "set parkingBrakeStatus to 'engaged' or 'released'."
+          ],
+          "behavior_hints": [
+            "canonical runtime field naming for parkingBrakeStatus",
+            "preserve explicit mode values 'engage' and 'release'"
+          ],
+          "persistent_state_shapes": [
+            {
+              "path": "parkingBrakeStatus",
+              "key_rule": "literal",
+              "fields": {
+                "parkingBrakeStatus": "string"
+              }
+            }
+          ],
+          "response_only_fields": [
+            "parkingBrakeForce",
+            "slopeAngle",
+            "parkingBrakeInstruction"
+          ],
+          "response_variants": [
+            {
+              "kind": "success",
+              "schema": {
+                "parkingBrakeStatus": "engaged",
+                "parkingBrakeForce": 500.0,
+                "slopeAngle": 10.0
+              },
+              "description": "Parking brake engaged",
+              "when": "mode == 'engage'"
+            },
+            {
+              "kind": "success",
+              "schema": {
+                "parkingBrakeStatus": "released",
+                "parkingBrakeForce": 0.0,
+                "slopeAngle": 10.0
+              },
+              "description": "Parking brake released",
+              "when": "mode == 'release'"
+            },
+            {
+              "kind": "error",
+              "schema": {
+                "error": "Invalid mode"
+              },
+              "description": "Invalid mode error",
+              "when": "mode not in ['engage', 'release']"
+            }
+          ],
+          "keep_error_branch": true
+        },
+        "pressBrakePedal": {
+          "state_access": "write",
+          "state_effects": [
+            "set durable public field brakePedalStatus to 'pressed' when pedalPosition > 0, otherwise 'released'."
+          ],
+          "state_effects_on_success": [
+            "set durable public field brakePedalStatus to 'pressed' when pedalPosition > 0, otherwise 'released'."
+          ],
+          "behavior_hints": [
+            "pedalPosition must be explicitly validated to be between 0 and 1 inclusive",
+            "brakePedalStatus is 'pressed' when pedalPosition > 0, 'released' when pedalPosition == 0",
+            "brakePedalForce is returned in the response but is backed by private runtime state and must not be persisted as a public toolkit field",
+            "persistent public state uses brakePedalStatus only"
+          ],
+          "persistent_state_shapes": [
+            {
+              "path": "brakePedalStatus",
+              "key_rule": "static",
+              "fields": {
+                "brakePedalStatus": "string"
+              }
+            }
+          ],
+          "response_only_fields": [
+            "brakePedalForce",
+            "error"
+          ],
+          "response_variants": [
+            {
+              "kind": "success",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "brakePedalStatus": {
+                    "type": "string",
+                    "enum": [
+                      "released"
+                    ]
+                  },
+                  "brakePedalForce": {
+                    "type": "number",
+                    "format": "float",
+                    "enum": [
+                      0.0
+                    ]
+                  }
+                },
+                "required": [
+                  "brakePedalStatus",
+                  "brakePedalForce"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Brake pedal released with zero force",
+              "when": "pedalPosition == 0"
+            },
+            {
+              "kind": "success",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "brakePedalStatus": {
+                    "type": "string",
+                    "enum": [
+                      "pressed"
+                    ]
+                  },
+                  "brakePedalForce": {
+                    "type": "number",
+                    "format": "float",
+                    "minimum": 0.0,
+                    "maximum": 1000.0
+                  }
+                },
+                "required": [
+                  "brakePedalStatus",
+                  "brakePedalForce"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Brake pedal pressed with proportional force",
+              "when": "0 < pedalPosition <= 1"
+            },
+            {
+              "kind": "error",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "error": {
+                    "type": "string",
+                    "enum": [
+                      "Pedal position must be between 0 and 1."
+                    ]
+                  }
+                },
+                "required": [
+                  "error"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Invalid pedal position error",
+              "when": "pedalPosition < 0 or pedalPosition > 1"
+            }
+          ],
+          "keep_error_branch": true
+        },
+        "releaseBrakePedal": {
+          "static_data": {
+            "return_value": {
+              "brakePedalStatus": "released",
+              "brakePedalForce": 0.0
+            }
+          },
+          "state_access": "write",
+          "state_effects": [
+            "set durable public field brakePedalStatus to 'released'."
+          ],
+          "state_effects_on_success": [
+            "set durable public field brakePedalStatus to 'released'."
+          ],
+          "behavior_hints": [
+            "persistent public state uses brakePedalStatus only",
+            "brakePedalForce is returned in the response but is backed by private runtime state and must not be persisted as a public toolkit field"
+          ],
+          "persistent_state_shapes": [
+            {
+              "path": "brakePedalStatus",
+              "key_rule": "fixed",
+              "fields": {
+                "brakePedalStatus": "literal 'released'"
+              }
+            }
+          ],
+          "response_only_fields": [
+            "brakePedalForce"
+          ],
+          "response_variants": [
+            {
+              "kind": "success",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "brakePedalStatus": {
+                    "type": "string",
+                    "enum": [
+                      "released"
+                    ]
+                  },
+                  "brakePedalForce": {
+                    "type": "number",
+                    "format": "float",
+                    "enum": [
+                      0.0
+                    ]
+                  }
+                },
+                "required": [
+                  "brakePedalStatus",
+                  "brakePedalForce"
+                ],
+                "additionalProperties": true
+              },
+              "description": "Returns brake pedal status as 'released' and brake pedal force as 0.0",
+              "when": "method completes without error"
+            }
+          ]
+        },
+        "setCruiseControl": {
+          "state_access": "write",
+          "state_effects": [
+            "set cruiseStatus to 'active' or 'inactive' depending on activate parameter.",
+            "set distanceToNextVehicle to provided distance."
+          ],
+          "state_effects_on_success": [
+            "set cruiseStatus to 'active' or 'inactive' depending on activate parameter.",
+            "set distanceToNextVehicle to provided distance."
+          ],
+          "behavior_hints": [
+            "preserve explicit user-provided speed when valid",
+            "canonical runtime field naming: cruiseStatus, distanceToNextVehicle",
+            "cruiseStatus is an enum with values [\"active\", \"inactive\"]"
+          ],
+          "persistent_state_shapes": [
+            {
+              "path": "root",
+              "key_rule": "static",
+              "fields": {
+                "cruiseStatus": "string",
+                "distanceToNextVehicle": "float"
+              }
+            }
+          ],
+          "response_only_fields": [
+            "currentSpeed"
+          ],
+          "response_variants": [
+            {
+              "kind": "success",
+              "schema": {
+                "cruiseStatus": "active",
+                "currentSpeed": "float",
+                "distanceToNextVehicle": "float"
+              },
+              "description": "Cruise control activated with given speed and distance",
+              "when": "activate == true and engineState != 'stopped' and speed >= 0 and speed <= 120 and speed % 5 == 0"
+            },
+            {
+              "kind": "success",
+              "schema": {
+                "cruiseStatus": "inactive",
+                "currentSpeed": "float",
+                "distanceToNextVehicle": "float"
+              },
+              "description": "Cruise control deactivated with given speed and distance",
+              "when": "activate == false and engineState != 'stopped'"
+            },
+            {
+              "kind": "error",
+              "schema": {
+                "error": "string"
+              },
+              "description": "Error when engine is stopped and cruise control activation is attempted",
+              "when": "engineState == 'stopped'"
+            },
+            {
+              "kind": "error",
+              "schema": {
+                "error": "string"
+              },
+              "description": "Error when speed is invalid while activating cruise control",
+              "when": "activate == true and (speed < 0 or speed > 120 or speed % 5 != 0)"
+            }
+          ],
+          "keep_error_branch": true
+        },
+        "estimate_distance": {
+          "static_data": {
+            "distance": {
+              "83214|74532": {
+                "distance": 750.0
+              },
+              "74532|83214": {
+                "distance": 750.0
+              },
+              "56108|62947": {
+                "distance": 320.0
+              },
+              "62947|56108": {
+                "distance": 320.0
+              },
+              "71354|83462": {
+                "distance": 450.0
+              },
+              "83462|71354": {
+                "distance": 450.0
+              },
+              "47329|52013": {
+                "distance": 290.0
+              },
+              "52013|47329": {
+                "distance": 290.0
+              },
+              "69238|51479": {
+                "distance": 630.0
+              },
+              "51479|69238": {
+                "distance": 630.0
+              },
+              "94016|83214": {
+                "distance": 980.0
+              },
+              "83214|94016": {
+                "distance": 980.0
+              },
+              "94016|94704": {
+                "distance": 600.0
+              },
+              "94704|94016": {
+                "distance": 600.0
+              },
+              "94704|08540": {
+                "distance": 2550.0
+              },
+              "08540|94704": {
+                "distance": 2550.0
+              },
+              "94016|08540": {
+                "distance": 1950.0
+              },
+              "08540|94016": {
+                "distance": 1950.0
+              },
+              "62947|47329": {
+                "distance": 1053.0
+              },
+              "47329|62947": {
+                "distance": 1053.0
+              },
+              "94016|62947": {
+                "distance": 780.0
+              },
+              "62947|94016": {
+                "distance": 780.0
+              },
+              "74532|94016": {
+                "distance": 880.0
+              },
+              "94016|74532": {
+                "distance": 880.0
+              },
+              "_default": {
+                "error": "distance not found in database."
+              }
+            }
+          },
+          "state_access": "read",
+          "state_effects": [],
+          "behavior_hints": [
+            "canonical runtime field naming: distance",
+            "response-shape caveats: error field indicates lookup failure"
+          ],
+          "response_only_fields": [
+            "distance",
+            "error",
+            "intermediaryCities"
+          ],
+          "response_variants": [
+            {
+              "kind": "success",
+              "schema": {
+                "distance": "float",
+                "intermediaryCities": "optional list of strings"
+              },
+              "description": "Returns the distance between the two cities in kilometers",
+              "when": "cityA and cityB form a known city pair"
+            },
+            {
+              "kind": "error",
+              "schema": {
+                "error": "string"
+              },
+              "description": "Returns an error indicating the distance is not found",
+              "when": "cityA and cityB do not form a known city pair"
+            }
+          ],
+          "keep_error_branch": true
+        },
+        "get_zipcode_based_on_city": {
+          "static_data": {
+            "return_lookup": {
+              "Rivermist": {
+                "zipcode": "83214"
+              },
+              "Stonebrook": {
+                "zipcode": "74532"
+              },
+              "Maplecrest": {
+                "zipcode": "56108"
+              },
+              "Silverpine": {
+                "zipcode": "62947"
+              },
+              "Shadowridge": {
+                "zipcode": "71354"
+              },
+              "Sunset Valley": {
+                "zipcode": "83462"
+              },
+              "Oakendale": {
+                "zipcode": "47329"
+              },
+              "Willowbend": {
+                "zipcode": "52013"
+              },
+              "Crescent Hollow": {
+                "zipcode": "69238"
+              },
+              "Autumnville": {
+                "zipcode": "51479"
+              },
+              "San Francisco": {
+                "zipcode": "94016"
+              },
+              "_default": {
+                "zipcode": "00000"
+              }
+            }
+          },
+          "state_access": "read",
+          "state_effects": [],
+          "behavior_hints": [
+            "canonical field naming: zipcode",
+            "returns default zipcode '00000' for unknown cities"
+          ],
+          "response_only_fields": [
+            "zipcode"
+          ],
+          "response_variants": [
+            {
+              "kind": "success",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "zipcode": {
+                    "type": "string",
+                    "enum": [
+                      "83214",
+                      "74532",
+                      "56108",
+                      "62947",
+                      "71354",
+                      "83462",
+                      "47329",
+                      "52013",
+                      "69238",
+                      "51479",
+                      "94016"
+                    ]
+                  }
+                },
+                "required": [
+                  "zipcode"
+                ],
+                "additionalProperties": true
+              },
+              "description": "Returns the zipcode corresponding to the known city",
+              "when": "city is one of the known cities"
+            },
+            {
+              "kind": "success",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "zipcode": {
+                    "type": "string",
+                    "const": "00000"
+                  }
+                },
+                "required": [
+                  "zipcode"
+                ],
+                "additionalProperties": true
+              },
+              "description": "Returns default zipcode '00000' for unknown city",
+              "when": "city is unknown or not listed"
+            }
+          ]
+        },
+        "set_navigation": {
+          "state_access": "write",
+          "state_effects": [
+            "set destination."
+          ],
+          "state_effects_on_success": [
+            "set destination."
+          ],
+          "behavior_hints": [
+            "preserve explicit user-provided destination string",
+            "use a prior returned shopLocation as destination when the user asks to navigate or get directions to that shop",
+            "canonical runtime field naming: destination"
+          ],
+          "persistent_state_shapes": [
+            {
+              "path": "destination",
+              "key_rule": "literal",
+              "fields": {
+                "destination": "source/destination"
+              }
+            }
+          ],
+          "response_only_fields": [
+            "status"
+          ],
+          "response_variants": [
+            {
+              "kind": "success",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "status"
+                ],
+                "additionalProperties": true
+              },
+              "description": "Returns status message confirming navigation to the destination",
+              "when": "always"
+            }
+          ]
+        },
+        "find_nearest_tire_shop": {
+          "static_data": {
+            "return_value": {
+              "shopLocation": "456 Oakwood Avenue, Rivermist, 83214"
+            }
+          },
+          "state_access": "read",
+          "state_effects": [],
+          "behavior_hints": [
+            "returns shopLocation only; call set_navigation with that shopLocation when the user asks to navigate or get directions to the nearest tire shop"
+          ],
+          "response_only_fields": [
+            "shopLocation"
+          ],
+          "response_variants": [
+            {
+              "kind": "success",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "shopLocation": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "shopLocation"
+                ],
+                "additionalProperties": true
+              },
+              "description": "Returns the location of the nearest tire shop.",
+              "when": "always"
+            }
+          ]
+        },
+        "get_outside_temperature_from_google": {
+          "state_access": "read",
+          "validation_rules": [
+            {
+              "condition": "response.outsideTemperature is float and -10.0 <= response.outsideTemperature <= 40.0",
+              "result": {
+                "valid": true
+              }
+            }
+          ],
+          "state_effects": [],
+          "behavior_hints": [
+            "returns outsideTemperature in degree Celsius as a float"
+          ],
+          "response_only_fields": [
+            "outsideTemperature"
+          ],
+          "method_calls": [
+            "uniform"
+          ],
+          "response_variants": [
+            {
+              "kind": "success",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "outsideTemperature": {
+                    "type": "number",
+                    "minimum": -10.0,
+                    "maximum": 40.0
+                  }
+                },
+                "required": [
+                  "outsideTemperature"
+                ],
+                "additionalProperties": true
+              },
+              "description": "Returns the outside temperature in degree Celsius as a float",
+              "when": "always"
+            }
+          ]
+        },
+        "get_current_speed": {
+          "state_access": "read",
+          "validation_rules": [
+            {
+              "condition": "response.currentSpeed is float and 0.0 <= response.currentSpeed <= 120.0",
+              "result": {
+                "valid": true,
+                "error_message": "currentSpeed must be a float between 0.0 and 120.0 inclusive"
+              }
+            }
+          ],
+          "state_effects": [],
+          "behavior_hints": [
+            "canonical runtime field naming: currentSpeed",
+            "response-shape caveats: successful response always includes currentSpeed as float"
+          ],
+          "response_only_fields": [
+            "currentSpeed"
+          ],
+          "method_calls": [
+            "uniform"
+          ],
+          "response_variants": [
+            {
+              "kind": "success",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "currentSpeed": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 120.0
+                  }
+                },
+                "required": [
+                  "currentSpeed"
+                ],
+                "additionalProperties": true
+              },
+              "description": "Returns the current speed of the vehicle in km/h as a float",
+              "when": "always"
+            }
+          ]
+        },
+        "display_log": {
+          "state_access": "read",
+          "validation_rules": [
+            {
+              "condition": "messages is not None and isinstance(messages, list) and all(isinstance(m, str) for m in messages)",
+              "result": {
+                "valid": true
+              }
+            }
+          ],
+          "state_effects": [],
+          "behavior_hints": [
+            "response field 'log' contains the displayed messages",
+            "no durable state mutation",
+            "messages parameter is required user intent"
+          ],
+          "response_only_fields": [
+            "log"
+          ],
+          "response_variants": [
+            {
+              "kind": "success",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "log": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "log"
+                ],
+                "additionalProperties": true
+              },
+              "description": "Returns the list of displayed log messages",
+              "when": "always"
+            }
+          ]
+        },
+        "estimate_drive_feasibility_by_mileage": {
+          "state_access": "read",
+          "validation_rules": [
+            {
+              "condition": "distance >= 0",
+              "result": {
+                "valid": true
+              }
+            }
+          ],
+          "state_effects": [],
+          "behavior_hints": [
+            "canonical field naming: canDrive",
+            "no state mutation",
+            "response is a single boolean field indicating feasibility"
+          ],
+          "response_only_fields": [
+            "canDrive"
+          ],
+          "response_variants": [
+            {
+              "kind": "success",
+              "schema": {
+                "canDrive": true
+              },
+              "description": "Vehicle can drive the requested distance",
+              "when": "fuelLevel * MILE_PER_GALLON >= distance"
+            },
+            {
+              "kind": "success",
+              "schema": {
+                "canDrive": false
+              },
+              "description": "Vehicle cannot drive the requested distance",
+              "when": "fuelLevel * MILE_PER_GALLON < distance"
+            }
+          ]
+        },
+        "liter_to_gallon": {
+          "state_access": "read",
+          "validation_rules": [
+            {
+              "condition": "liter >= 0",
+              "result": {
+                "valid": true
+              }
+            }
+          ],
+          "state_effects": [],
+          "behavior_hints": [
+            "canonical runtime field naming: gallon",
+            "preserves explicit user-provided liter value in calculation"
+          ],
+          "response_only_fields": [
+            "gallon"
+          ],
+          "response_variants": [
+            {
+              "kind": "success",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "gallon": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "gallon"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Returns the converted gallon value from the given liter input",
+              "when": "liter is a non-negative float"
+            }
+          ]
+        },
+        "gallon_to_liter": {
+          "state_access": "read",
+          "validation_rules": [
+            {
+              "condition": "gallon is not None and isinstance(gallon, (int, float)) and gallon >= 0",
+              "result": {
+                "valid": true
+              }
+            }
+          ],
+          "state_effects": [],
+          "behavior_hints": [
+            "canonical runtime field naming: liter",
+            "pure conversion method with no side effects"
+          ],
+          "response_only_fields": [
+            "liter"
+          ],
+          "response_variants": [
+            {
+              "kind": "success",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "liter": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "liter"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Returns the converted amount in liters for the given gallons input.",
+              "when": "always"
+            }
+          ]
+        },
+        "check_tire_pressure": {
+          "state_access": "read",
+          "validation_rules": [
+            {
+              "condition": "average of frontLeftTirePressure, frontRightTirePressure, rearLeftTirePressure, rearRightTirePressure is between 30 and 35 inclusive",
+              "result": {
+                "healthy_tire_pressure": true
+              }
+            },
+            {
+              "condition": "average tire pressure outside 30 to 35 inclusive",
+              "result": {
+                "healthy_tire_pressure": false
+              }
+            }
+          ],
+          "state_effects": [],
+          "behavior_hints": [
+            "canonical runtime field naming for tire pressures",
+            "response includes healthy_tire_pressure boolean indicating overall tire health"
+          ],
+          "response_only_fields": [
+            "frontLeftTirePressure",
+            "frontRightTirePressure",
+            "rearLeftTirePressure",
+            "rearRightTirePressure",
+            "healthy_tire_pressure",
+            "car_info"
+          ],
+          "response_variants": [
+            {
+              "kind": "success",
+              "schema": {
+                "frontLeftTirePressure": "float",
+                "frontRightTirePressure": "float",
+                "rearLeftTirePressure": "float",
+                "rearRightTirePressure": "float",
+                "healthy_tire_pressure": "bool",
+                "car_info": "dict"
+              },
+              "description": "Returns current tire pressures, healthy_tire_pressure boolean, and optional car_info metadata",
+              "when": "always"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000"
+    }
+  ]
+}

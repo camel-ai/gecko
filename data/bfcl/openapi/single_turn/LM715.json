@@ -1,0 +1,422 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM715",
+    "version": "1.0.0",
+    "description": "LM715 is a compact travel API suite for searching and reserving holiday houses and discovering local attractions. Use Hotels_2_SearchHouse to locate available houses, then Hotels_2_BookHouse to reserve a selected property for specified dates and adults, and Travel_1_FindAttractions to browse filtered sights by free entry, category, or child suitability. Designed for straightforward, chainable calls that move from discovery to booking."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM715"
+    }
+  ],
+  "paths": {
+    "/Hotels_2_BookHouse": {
+      "post": {
+        "operationId": "Hotels_2_BookHouse",
+        "summary": "Simulate booking a house and returning a reservation confirmation",
+        "description": "Reserve the selected house for the requested date range and adult count; respond with a reservation confirmation payload when successful.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "where_to": {
+                    "type": "string",
+                    "description": "The location of the house in the format of 'City, State', such as 'Austin, TX' or 'San Francisco, CA'."
+                  },
+                  "number_of_adults": {
+                    "type": "integer",
+                    "description": "The number of adults for the reservation. A value of 0 indicates no preference."
+                  },
+                  "check_in_date": {
+                    "type": "string",
+                    "description": "The start date for the reservation in the format 'MM/DD/YYYY'. For example, '04/23/2023'."
+                  },
+                  "check_out_date": {
+                    "type": "string",
+                    "description": "The end date for the reservation in the format 'MM/DD/YYYY'. For example, '04/27/2023'."
+                  }
+                },
+                "required": [
+                  "where_to",
+                  "number_of_adults",
+                  "check_in_date",
+                  "check_out_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful booking confirmation payload",
+                  "properties": {
+                    "reservation_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the created reservation."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Current booking status.",
+                      "enum": [
+                        "confirmed",
+                        "pending",
+                        "failed"
+                      ]
+                    },
+                    "house_id": {
+                      "type": "string",
+                      "description": "Internal identifier of the reserved house."
+                    },
+                    "reserved_from": {
+                      "type": "string",
+                      "description": "Start date of the confirmed reservation (MM/DD/YYYY)."
+                    },
+                    "reserved_to": {
+                      "type": "string",
+                      "description": "End date of the confirmed reservation (MM/DD/YYYY)."
+                    },
+                    "total_price": {
+                      "type": "number",
+                      "description": "Total price charged for the reservation. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Currency code for total_price, typically ISO 4217 (e.g., 'USD')."
+                    }
+                  },
+                  "required": [
+                    "reservation_id",
+                    "status",
+                    "house_id",
+                    "reserved_from",
+                    "reserved_to",
+                    "total_price",
+                    "currency"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Hotels_2_SearchHouse": {
+      "post": {
+        "operationId": "Hotels_2_SearchHouse",
+        "summary": "Simulate house search results for a location and filters",
+        "description": "Simulate searching for available houses at the provided location ('where_to') and applying the provided filters. Return realistic, paginated result metadata and up to 50 matching house listings.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "where_to": {
+                    "type": "string",
+                    "description": "The location of the desired house, specified in the format 'City, State', such as 'Austin, TX' or 'San Francisco, CA'."
+                  },
+                  "has_laundry_service": {
+                    "type": "string",
+                    "description": "Indicates whether the house should have a laundry service available.",
+                    "enum": [
+                      "True",
+                      "False"
+                    ]
+                  },
+                  "number_of_adults": {
+                    "type": "integer",
+                    "description": "The number of adults for the reservation. Should be a positive integer.",
+                    "default": 1
+                  },
+                  "rating": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The minimum review rating of the house, on a scale from 1.0 (lowest) to 5.0 (highest).. Use float format (e.g., 1.0 not 1).",
+                    "default": 3.0
+                  }
+                },
+                "required": [
+                  "where_to"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful search response payload containing matching house listings and summary metadata.",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "description": "Array of matching house listings (up to a sane maximum).",
+                      "maxItems": 50,
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the house listing."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Listing title or short name."
+                          },
+                          "address": {
+                            "type": "string",
+                            "description": "Full address of the property (e.g., '123 Main St, Austin, TX')."
+                          },
+                          "price_per_night": {
+                            "type": "number",
+                            "description": "Price per night in the listing currency. Provide as a float (e.g., 150.0, not 150).",
+                            "format": "double"
+                          },
+                          "rating": {
+                            "type": "number",
+                            "description": "Average review rating for the listing, typically between 1.0 and 5.0. Provide as a float (e.g., 4.5, not 4).",
+                            "format": "double"
+                          },
+                          "has_laundry_service": {
+                            "type": "string",
+                            "description": "Whether the property offers laundry service; mirrors request parameter semantics where applicable.",
+                            "enum": [
+                              "True",
+                              "False",
+                              "dontcare"
+                            ]
+                          },
+                          "max_guests": {
+                            "type": "integer",
+                            "description": "Maximum number of guests the property can accommodate."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "address",
+                          "price_per_night"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of matching houses across all pages."
+                    }
+                  },
+                  "required": [
+                    "results",
+                    "total_results"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Travel_1_FindAttractions": {
+      "post": {
+        "operationId": "Travel_1_FindAttractions",
+        "summary": "Find attractions in a city with optional filters",
+        "description": "Simulate browsing attractions in a specified city. Use the request filters to narrow results by free entry, category, and child suitability. Returns a list of matching attractions and basic metadata for each.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "The city or town where the attraction is located, in the format of 'City, State' or 'City, Country' if the city does not locate in the United States, such as 'Paris, FR' or 'New York, NY'."
+                  },
+                  "free_entry": {
+                    "type": "string",
+                    "description": "Indicates whether entrance to the attraction is free. True for free entry, False for paid entry, and a value indicating indifference.",
+                    "enum": [
+                      "True",
+                      "False"
+                    ]
+                  },
+                  "category": {
+                    "type": "string",
+                    "description": "The category to which the attraction belongs. This parameter helps in refining the search to specific types of attractions.",
+                    "enum": [
+                      "Place of Worship",
+                      "Theme Park",
+                      "Museum",
+                      "Historical Landmark",
+                      "Park",
+                      "Tourist Attraction",
+                      "Sports Venue",
+                      "Shopping Area",
+                      "Performing Arts Venue",
+                      "Nature Preserve"
+                    ]
+                  },
+                  "good_for_kids": {
+                    "type": "string",
+                    "description": "Indicates whether the attraction is suitable for children. True for suitable, False for not suitable, and a value for no preference.",
+                    "enum": [
+                      "True",
+                      "False"
+                    ]
+                  }
+                },
+                "required": [
+                  "location"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "A successful response containing a list of attractions matching the query.",
+                  "properties": {
+                    "attractions": {
+                      "type": "array",
+                      "description": "Matching attractions, ordered by relevance.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the attraction."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "The name of the attraction."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "A brief description of the attraction."
+                          },
+                          "address": {
+                            "type": "string",
+                            "description": "Street address or short address string for the attraction."
+                          },
+                          "location": {
+                            "type": "string",
+                            "description": "City/town where the attraction is located (same form as the request 'location' field)."
+                          },
+                          "category": {
+                            "type": "string",
+                            "description": "Category or type of the attraction (e.g., Museum, Park, Theme Park)."
+                          },
+                          "free_entry": {
+                            "type": "string",
+                            "description": "Indicates entrance cost status. Typical values: 'True', 'False', or 'dontcare'."
+                          },
+                          "good_for_kids": {
+                            "type": "boolean",
+                            "description": "Whether the attraction is suitable for children."
+                          },
+                          "rating": {
+                            "type": "number",
+                            "description": "Average rating for the attraction. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "coordinates": {
+                            "type": "object",
+                            "description": "Geographic coordinates of the attraction.",
+                            "properties": {
+                              "latitude": {
+                                "type": "number",
+                                "description": "Latitude. Use float format (e.g., 1.0 not 1).",
+                                "format": "double"
+                              },
+                              "longitude": {
+                                "type": "number",
+                                "description": "Longitude. Use float format (e.g., 1.0 not 1).",
+                                "format": "double"
+                              }
+                            },
+                            "required": [
+                              "latitude",
+                              "longitude"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "tags": {
+                            "type": "array",
+                            "description": "Short list of descriptive tags for the attraction.",
+                            "items": {
+                              "type": "string",
+                              "description": "Array item"
+                            }
+                          },
+                          "photo_url": {
+                            "type": "string",
+                            "description": "URL of a representative photo for the attraction, if available."
+                          },
+                          "opening_hours": {
+                            "type": "string",
+                            "description": "Human-readable opening hours or notes if available."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "location"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of matching attractions for the query (may be an estimate)."
+                    },
+                    "returned_count": {
+                      "type": "integer",
+                      "description": "Number of attractions included in this response."
+                    },
+                    "next_page_token": {
+                      "type": "string",
+                      "description": "Token to request the next page of results, if any."
+                    }
+                  },
+                  "required": [
+                    "attractions"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

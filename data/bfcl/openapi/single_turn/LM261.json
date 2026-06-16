@@ -1,0 +1,464 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM261",
+    "version": "1.0.0",
+    "description": "LM261 is an image-processing API collection offering simple, callable actions to flip and rotate images, remove or replace backgrounds, resize while preserving proportions, and retrieve visual recommendations. Designed for programmatic use in pipelines and interactive apps, its function-oriented endpoints accept explicit parameters (direction, angle, target aspect, replacement color/image) and return transformed images or recommendation lists, enabling straightforward chaining of edits and integration into automated workflows."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM261"
+    }
+  ],
+  "paths": {
+    "/flipImageAction": {
+      "post": {
+        "operationId": "flipImageAction",
+        "summary": "Flip an image horizontally or vertically",
+        "description": "Simulate flipping an image in the specified direction ('horizontal' or 'vertical') and return a downloadable result URL plus basic metadata about the flipped image.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "flip_direction": {
+                    "type": "string",
+                    "description": "Specifies the flip direction of the image. Must be either 'horizontal' or 'vertical'.",
+                    "enum": [
+                      "horizontal",
+                      "vertical"
+                    ]
+                  }
+                },
+                "required": [
+                  "flip_direction"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing the flipped image location and basic metadata.",
+                  "properties": {
+                    "flipped_image_url": {
+                      "type": "string",
+                      "description": "URL where the flipped image can be downloaded.",
+                      "format": "uri"
+                    },
+                    "content_type": {
+                      "type": "string",
+                      "description": "MIME type of the flipped image (for example, image/png or image/jpeg)."
+                    },
+                    "size_bytes": {
+                      "type": "integer",
+                      "description": "Size of the flipped image file in bytes.",
+                      "minimum": 0
+                    },
+                    "width": {
+                      "type": "integer",
+                      "description": "Pixel width of the flipped image.",
+                      "minimum": 0
+                    },
+                    "height": {
+                      "type": "integer",
+                      "description": "Pixel height of the flipped image.",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "flipped_image_url"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rotateImageAction": {
+      "post": {
+        "operationId": "rotateImageAction",
+        "summary": "Simulate rotating an image clockwise by a specified angle",
+        "description": "Rotate an image clockwise by the given integer degree amount. This simulation enforces the declared angle range and preserves the original image when requested.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "degrees": {
+                    "type": "integer",
+                    "description": "The degree of clockwise rotation to be applied to the image. Value must be between 0 and 360 degrees.",
+                    "minimum": 0,
+                    "maximum": 360
+                  },
+                  "image_format": {
+                    "type": "string",
+                    "description": "The format of the image to be rotated. For example, 'JPEG', 'PNG', 'BMP', etc.",
+                    "enum": [
+                      "JPEG",
+                      "PNG",
+                      "BMP",
+                      "GIF",
+                      "TIFF"
+                    ],
+                    "default": "JPEG"
+                  },
+                  "keep_original": {
+                    "type": "boolean",
+                    "description": "Indicates whether the original image should be kept unchanged. If set to false, the original image will be overwritten.",
+                    "default": true
+                  }
+                },
+                "required": [
+                  "degrees"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful rotation result",
+                  "properties": {
+                    "rotated_image_url": {
+                      "type": "string",
+                      "description": "A URL where the rotated image file can be retrieved. If the operation returns the file directly, this may be a temporary URL."
+                    },
+                    "mime_type": {
+                      "type": "string",
+                      "description": "The MIME type/format of the returned image (e.g., image/jpeg, image/png)."
+                    },
+                    "width": {
+                      "type": "integer",
+                      "description": "Width of the rotated image in pixels."
+                    },
+                    "height": {
+                      "type": "integer",
+                      "description": "Height of the rotated image in pixels."
+                    },
+                    "overwritten": {
+                      "type": "boolean",
+                      "description": "True if the original image was overwritten; false if the original was kept."
+                    }
+                  },
+                  "required": [
+                    "rotated_image_url",
+                    "mime_type",
+                    "width",
+                    "height",
+                    "overwritten"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/removeBackgroundAction": {
+      "post": {
+        "operationId": "removeBackgroundAction",
+        "summary": "Simulate removing an image background and replacing it with a color or image",
+        "description": "Simulate removing the background from the provided image. Optionally replace the removed background with a specified hex color (literal string values as specified in the request schema) or with another image when the replacement color is set to the literal string 'null'. Return metadata and the path to the resulting image.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "image_path": {
+                    "type": "string",
+                    "description": "The file path to the image from which the background is to be removed."
+                  },
+                  "replacement_color": {
+                    "type": "string",
+                    "description": "The hex code of the color to replace the background with, e.g., '#FFFFFF' for white.",
+                    "enum": [
+                      "#FFFFFF",
+                      "#000000",
+                      "null"
+                    ],
+                    "default": "null"
+                  },
+                  "replacement_image_path": {
+                    "type": "string",
+                    "description": "The file path to an image that will replace the removed background. This is ignored if 'replacement_color' is not 'null'.",
+                    "default": "null"
+                  },
+                  "output_format": {
+                    "type": "string",
+                    "description": "The desired file format of the output image, such as 'PNG' or 'JPEG'.",
+                    "enum": [
+                      "PNG",
+                      "JPEG",
+                      "GIF",
+                      "BMP"
+                    ],
+                    "default": "PNG"
+                  },
+                  "tolerance": {
+                    "type": "integer",
+                    "description": "The tolerance level for background detection, ranging from 0 to 100, where a higher value means more of the background will be considered for removal.",
+                    "default": 50
+                  }
+                },
+                "required": [
+                  "image_path"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing the processed image location and basic metadata.",
+                  "properties": {
+                    "output_image_path": {
+                      "type": "string",
+                      "description": "File path to the processed output image."
+                    },
+                    "width": {
+                      "type": "integer",
+                      "description": "Width of the output image in pixels."
+                    },
+                    "height": {
+                      "type": "integer",
+                      "description": "Height of the output image in pixels."
+                    },
+                    "format": {
+                      "type": "string",
+                      "description": "The file format of the output image.",
+                      "enum": [
+                        "PNG",
+                        "JPEG",
+                        "GIF",
+                        "BMP"
+                      ]
+                    },
+                    "size_bytes": {
+                      "type": "integer",
+                      "description": "Size of the output file in bytes."
+                    },
+                    "background_replaced_with": {
+                      "type": "string",
+                      "description": "Indicates what replaced the background: a hex color (e.g., '#FFFFFF') or a file path to the replacement image, or the literal string 'null' when no replacement was applied."
+                    }
+                  },
+                  "required": [
+                    "output_image_path",
+                    "format"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/getRecommendationsAction": {
+      "post": {
+        "operationId": "getRecommendationsAction",
+        "summary": "Retrieve recommendations for a provided image",
+        "description": "Simulate returning ranked recommendations based on the provided image. The request must include a base64-encoded image. Use threshold, max_results, and include_similar to control filtering and output.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "image_data": {
+                    "type": "string",
+                    "description": "Base64 encoded string of the image for which recommendations are being requested."
+                  },
+                  "threshold": {
+                    "type": "number",
+                    "format": "double",
+                    "description": "The confidence threshold for filtering recommendations, ranging from 0.0 to 1.0.. Use float format (e.g., 1.0 not 1).",
+                    "default": 0.5
+                  },
+                  "max_results": {
+                    "type": "integer",
+                    "description": "The maximum number of recommendations to return.",
+                    "default": 10
+                  },
+                  "include_similar": {
+                    "type": "boolean",
+                    "description": "A flag to determine whether to include similar items in the recommendations.",
+                    "default": true
+                  }
+                },
+                "required": [
+                  "image_data"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing recommended items.",
+                  "properties": {
+                    "recommendations": {
+                      "type": "array",
+                      "description": "List of recommended items, ordered by descending score.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the recommended item."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Human-readable title or name of the recommended item."
+                          },
+                          "score": {
+                            "type": "number",
+                            "description": "Relevance/confidence score for this recommendation, typically between 0.0 and 1.0. Use float format (e.g., 1.0 not 1).",
+                            "format": "double"
+                          },
+                          "thumbnail_url": {
+                            "type": "string",
+                            "description": "Optional URL for a thumbnail representing the item, if available.",
+                            "format": "uri"
+                          },
+                          "is_similar": {
+                            "type": "boolean",
+                            "description": "Indicates whether this item was included because it is similar to the input image."
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "description": "Optional free-form object with additional item-specific metadata.",
+                            "properties": {},
+                            "additionalProperties": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "score"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "returned_count": {
+                      "type": "integer",
+                      "description": "Number of items included in this response (should be <= max_results)."
+                    },
+                    "total_available": {
+                      "type": "integer",
+                      "description": "Total number of recommendations available for the given input (may be greater than returned_count)."
+                    }
+                  },
+                  "required": [
+                    "recommendations"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/resizeImageAction": {
+      "post": {
+        "operationId": "resizeImageAction",
+        "summary": "Resize image to a target aspect ratio",
+        "description": "Simulate resizing an input image to the requested aspect ratio while preserving the original proportions; returns the resized image binary in the requested image_format.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "aspect_ratio_width": {
+                    "type": "integer",
+                    "description": "The width component of the desired aspect ratio for the image. Must be a positive integer.",
+                    "minimum": 1
+                  },
+                  "aspect_ratio_height": {
+                    "type": "integer",
+                    "description": "The height component of the desired aspect ratio for the image. Must be a positive integer.",
+                    "minimum": 1
+                  },
+                  "image_format": {
+                    "type": "string",
+                    "description": "The file format for the output resized image. For example, 'jpeg' for Joint Photographic Experts Group format.",
+                    "enum": [
+                      "jpeg",
+                      "png",
+                      "gif",
+                      "bmp"
+                    ],
+                    "default": "jpeg"
+                  }
+                },
+                "required": [
+                  "aspect_ratio_width",
+                  "aspect_ratio_height"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "description": "Binary payload of the resized image in the requested image_format. Set the response Content-Type to the corresponding MIME type (e.g., image/jpeg, image/png).",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

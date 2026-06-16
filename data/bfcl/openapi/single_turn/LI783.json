@@ -1,0 +1,326 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI783",
+    "version": "1.0.0",
+    "description": "LI783 provides a straightforward token management API for issuing, listing, and sharing authentication tokens across applications and dashboards. Use the endpoints to create new API tokens for service authentication, retrieve all tokens tied to your account, and obtain shareable dashboard tokens for controlled access. Designed for programmatic integration, the collection supports secure token lifecycle operations and easy incorporation into CI/CD pipelines and client services."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI783"
+    }
+  ],
+  "paths": {
+    "/APITokenApi_get_api_tokens": {
+      "post": {
+        "operationId": "APITokenApi_get_api_tokens",
+        "summary": "List API tokens for a user",
+        "description": "Simulate retrieving API tokens for the given user_id. Respect the active_only flag (default true) and return an array of token objects.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "user_id": {
+                    "type": "integer",
+                    "description": "The unique identifier of the user whose API tokens are to be retrieved."
+                  },
+                  "active_only": {
+                    "type": "boolean",
+                    "description": "A flag to determine if only active tokens should be returned.",
+                    "default": true
+                  }
+                },
+                "required": [
+                  "user_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "A collection of API tokens belonging to the user.",
+                  "properties": {
+                    "tokens": {
+                      "type": "array",
+                      "description": "List of API token records.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "description": "Unique identifier of the API token."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Human-readable name for the token, if provided."
+                          },
+                          "active": {
+                            "type": "boolean",
+                            "description": "Whether the token is currently active."
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "description": "Timestamp when the token was created."
+                          },
+                          "last_used_at": {
+                            "type": "string",
+                            "description": "Most recent timestamp when the token was used; may be null.",
+                            "nullable": true
+                          },
+                          "masked_token": {
+                            "type": "string",
+                            "description": "Masked representation of the token value (if returned), e.g., showing only the last few characters; may be omitted for security."
+                          },
+                          "expires_at": {
+                            "type": "string",
+                            "description": "Expiration timestamp for the token, if applicable; may be null.",
+                            "nullable": true
+                          },
+                          "scopes": {
+                            "type": "array",
+                            "description": "Optional list of scopes or permissions associated with the token.",
+                            "items": {
+                              "type": "string",
+                              "description": "Array item"
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "active",
+                          "created_at"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "tokens"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/APITokenApi_post_api_token": {
+      "post": {
+        "operationId": "APITokenApi_post_api_token",
+        "summary": "Create API token",
+        "description": "Simulate creating a new API token for a user. On success, returns an opaque token and metadata (creation time, expiry info, permission level).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "description": "The username associated with the account for which the API token is being created."
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "The password corresponding to the username for authentication."
+                  },
+                  "token_name": {
+                    "type": "string",
+                    "description": "A human-readable name for the API token.",
+                    "default": "default_token"
+                  },
+                  "expires_in": {
+                    "type": "integer",
+                    "description": "The number of days until the API token expires. If not provided, the token will not expire.",
+                    "default": null
+                  },
+                  "permissions": {
+                    "type": "string",
+                    "description": "The level of access the API token will grant, expressed as a role name.",
+                    "enum": [
+                      "read_only",
+                      "read_write",
+                      "admin"
+                    ],
+                    "default": "read_only"
+                  }
+                },
+                "required": [
+                  "username",
+                  "password"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload for a created API token.",
+                  "properties": {
+                    "token": {
+                      "type": "string",
+                      "description": "Opaque API token value to be used for authenticating requests."
+                    },
+                    "token_id": {
+                      "type": "string",
+                      "description": "Unique identifier for this token."
+                    },
+                    "token_name": {
+                      "type": "string",
+                      "description": "Human-readable name for the API token (matches the provided token_name or the default)."
+                    },
+                    "permissions": {
+                      "type": "string",
+                      "description": "Role granted to this token; will match the requested permission."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp when the token was created in RFC 3339 / ISO 8601 format.",
+                      "format": "date-time"
+                    },
+                    "expires_in": {
+                      "type": "integer",
+                      "description": "Number of days until the token expires. Null indicates the token does not expire.",
+                      "nullable": true
+                    },
+                    "expires_at": {
+                      "type": "string",
+                      "description": "Timestamp when the token will expire, or null if the token does not expire.",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "token",
+                    "token_id",
+                    "permissions",
+                    "created_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/CustomDashboardsApi_get_shareable_api_tokens": {
+      "post": {
+        "operationId": "CustomDashboardsApi_get_shareable_api_tokens",
+        "summary": "Simulate retrieving shareable API tokens for a user",
+        "description": "Return the list of shareable API tokens belonging to the specified user. This simulation returns the successful payload only and respects the include_revoked flag when provided.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "user_id": {
+                    "type": "string",
+                    "description": "The unique identifier of the user whose API tokens are to be retrieved."
+                  },
+                  "include_revoked": {
+                    "type": "boolean",
+                    "description": "A flag to indicate whether revoked tokens should be included in the response.",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "user_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload containing the user's shareable API tokens.",
+                  "properties": {
+                    "tokens": {
+                      "type": "array",
+                      "description": "Array of shareable API token descriptors.",
+                      "default": [],
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "token_id": {
+                            "type": "string",
+                            "description": "Unique identifier for the token (opaque string)."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Human-readable name assigned to the token by the user."
+                          },
+                          "revoked": {
+                            "type": "boolean",
+                            "description": "Whether the token has been revoked."
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "description": "Creation timestamp as a string."
+                          },
+                          "expires_at": {
+                            "type": "string",
+                            "description": "Expiration timestamp as a string, or null if the token does not expire."
+                          },
+                          "scopes": {
+                            "type": "array",
+                            "description": "List of scopes or permissions granted to the token.",
+                            "default": [],
+                            "items": {
+                              "type": "string",
+                              "description": "Array item"
+                            }
+                          }
+                        },
+                        "required": [
+                          "token_id",
+                          "revoked",
+                          "created_at"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "tokens"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

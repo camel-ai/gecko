@@ -1,0 +1,314 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI764",
+    "version": "1.0.0",
+    "description": "LI764 is a compact meeting-room management API collection that lets clients list users and available rooms, inspect room capacities and time-bounded schedules, and create bookings with attendee registration. Typical usage is to fetch users and rooms, query a room's schedule for conflicts, then call book_meeting_room to reserve a slot and record attendees, receiving structured schedule and confirmation data."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI764"
+    }
+  ],
+  "paths": {
+    "/get_all_user_list": {
+      "post": {
+        "operationId": "get_all_user_list",
+        "summary": "List all user names (simulation)",
+        "description": "Simulate retrieving a list of user display names. Supports optional inclusion of inactive users and sorting order.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "include_inactive": {
+                    "type": "boolean",
+                    "description": "Whether to include inactive users in the list. If false, only active users are listed.",
+                    "default": false
+                  },
+                  "sort_order": {
+                    "type": "string",
+                    "description": "The order in which the user names should be sorted.",
+                    "enum": [
+                      "asc",
+                      "desc"
+                    ],
+                    "default": "asc"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "description": "An array of user display names.",
+                  "items": {
+                    "type": "string",
+                    "description": "The full display name of a user."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/query_meeting_room_list": {
+      "post": {
+        "operationId": "query_meeting_room_list",
+        "summary": "Simulate listing meeting rooms",
+        "description": "Simulate retrieval of an array of meeting rooms. Each item includes the room's name and its capacity.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "description": "Array of meeting room objects",
+                  "items": {
+                    "type": "object",
+                    "description": "Meeting room",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "Human-readable name of the meeting room"
+                      },
+                      "capacity": {
+                        "type": "integer",
+                        "description": "Maximum number of occupants the room supports; provide as an integer value"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "capacity"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_meeting_room_schedule": {
+      "post": {
+        "operationId": "get_meeting_room_schedule",
+        "summary": "Retrieve meeting room bookings within a time range",
+        "description": "Simulate returning booking details for the specified meeting rooms that intersect the given start_time and end_time.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "room_names": {
+                    "type": "array",
+                    "description": "A list of meeting room names to check the schedule for, such as ['Room A', 'Room B'].",
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    },
+                    "minItems": 1
+                  },
+                  "start_time": {
+                    "type": "string",
+                    "description": "The start time for the schedule query in ISO 8601 format, e.g., '2020-01-01T10:15:30+08:00'."
+                  },
+                  "end_time": {
+                    "type": "string",
+                    "description": "The end time for the schedule query in ISO 8601 format, e.g., '2020-01-01T18:15:30+08:00'."
+                  }
+                },
+                "required": [
+                  "room_names",
+                  "start_time",
+                  "end_time"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload containing schedules for requested rooms.",
+                  "properties": {
+                    "rooms": {
+                      "type": "array",
+                      "description": "Array of meeting rooms and their bookings that intersect the requested time window.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "description": "Meeting room name."
+                          },
+                          "bookings": {
+                            "type": "array",
+                            "description": "Bookings for this room that intersect the requested time window, sorted by start_time ascending.",
+                            "items": {
+                              "type": "object",
+                              "description": "Array item",
+                              "properties": {
+                                "start_time": {
+                                  "type": "string",
+                                  "description": "Booking start time (ISO 8601 string as provided by source)."
+                                },
+                                "end_time": {
+                                  "type": "string",
+                                  "description": "Booking end time (ISO 8601 string as provided by source)."
+                                },
+                                "title": {
+                                  "type": "string",
+                                  "description": "Booking title or subject, if available."
+                                },
+                                "organizer": {
+                                  "type": "string",
+                                  "description": "Organizer name or identifier, if available."
+                                },
+                                "attendees_count": {
+                                  "type": "integer",
+                                  "description": "Number of attendees, if available."
+                                }
+                              },
+                              "required": [
+                                "start_time",
+                                "end_time"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "bookings"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "rooms"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/book_meeting_room": {
+      "post": {
+        "operationId": "book_meeting_room",
+        "summary": "Reserve a meeting room",
+        "description": "Simulate reserving a meeting room. On success, return a reservation identifier and creation timestamp. Validation checks include time ordering and attendee presence.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "meeting_room_name": {
+                    "type": "string",
+                    "description": "The full name of the meeting room to be reserved."
+                  },
+                  "start_time": {
+                    "type": "string",
+                    "description": "The start time of the meeting in ISO 8601 format, for example '2020-01-01T10:15:30+08:00'."
+                  },
+                  "end_time": {
+                    "type": "string",
+                    "description": "The end time of the meeting in ISO 8601 format, for example '2020-01-01T10:15:30+08:00'."
+                  },
+                  "attendees": {
+                    "type": "array",
+                    "description": "A list of attendees' names for the meeting, such as ['User1', 'User2'].",
+                    "items": {
+                      "type": "string",
+                      "description": "Array item"
+                    }
+                  }
+                },
+                "required": [
+                  "meeting_room_name",
+                  "start_time",
+                  "end_time",
+                  "attendees"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful reservation payload",
+                  "properties": {
+                    "reservation_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the created reservation."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp when the reservation was created (ISO 8601 recommended, e.g., '2020-01-01T10:15:30+08:00')."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Reservation status (e.g., 'confirmed'). Do not treat as an exhaustive enum."
+                    }
+                  },
+                  "required": [
+                    "reservation_id",
+                    "created_at",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

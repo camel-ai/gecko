@@ -1,0 +1,290 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LM777",
+    "version": "1.0.0",
+    "description": "LM777 is a compact rental-car API collection that lets applications search available vehicles by city and rental period and complete bookings in a single flow. Designed for simple, REST-style integration, it supports specifying pick-up/drop-off dates, times, and vehicle preferences, returns filtered availability, and creates guaranteed reservations with confirmation details. Ideal for travel apps and booking platforms needing quick availability checks and streamlined reservation creation."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LM777"
+    }
+  ],
+  "paths": {
+    "/RentalCars_3_GetCarsAvailable": {
+      "post": {
+        "operationId": "RentalCars_3_GetCarsAvailable",
+        "summary": "Simulate available rental cars for a city and rental period",
+        "description": "Return a list of rental cars available in the requested city for the specified rental dates and pickup time.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "city": {
+                    "type": "string",
+                    "description": "The city where the rental car will be picked up, in the format of 'City, State', such as 'Los Angeles, CA' or 'New York, NY'."
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "description": "The start date for the car rental in the format YYYY-MM-DD."
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "description": "The end date for the car rental in the format YYYY-MM-DD."
+                  },
+                  "pickup_time": {
+                    "type": "string",
+                    "description": "The pick-up time for the rental car in 24-hour format HH:MM."
+                  },
+                  "car_type": {
+                    "type": "string",
+                    "description": "The desired type of rental car.",
+                    "enum": [
+                      "Hatchback",
+                      "Sedan",
+                      "SUV"
+                    ]
+                  }
+                },
+                "required": [
+                  "city",
+                  "start_date",
+                  "end_date",
+                  "pickup_time"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response payload",
+                  "properties": {
+                    "cars": {
+                      "type": "array",
+                      "description": "Parameter cars",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for this car option."
+                          },
+                          "vendor": {
+                            "type": "string",
+                            "description": "Rental vendor name."
+                          },
+                          "make": {
+                            "type": "string",
+                            "description": "Vehicle manufacturer (e.g., Toyota)."
+                          },
+                          "model": {
+                            "type": "string",
+                            "description": "Vehicle model name (e.g., Camry)."
+                          },
+                          "year": {
+                            "type": "integer",
+                            "description": "Model year of the vehicle.",
+                            "minimum": 1900
+                          },
+                          "car_type": {
+                            "type": "string",
+                            "description": "Car category (matches request car_type values).",
+                            "enum": [
+                              "Hatchback",
+                              "Sedan",
+                              "SUV",
+                              "dontcare"
+                            ]
+                          },
+                          "seats": {
+                            "type": "integer",
+                            "description": "Number of passenger seats.",
+                            "minimum": 1
+                          },
+                          "transmission": {
+                            "type": "string",
+                            "description": "Transmission type.",
+                            "enum": [
+                              "Automatic",
+                              "Manual"
+                            ]
+                          },
+                          "price_per_day": {
+                            "type": "number",
+                            "description": "Daily rental price in the specified currency. Use float format (e.g., 1.0 not 1).",
+                            "format": "double",
+                            "minimum": 0
+                          },
+                          "currency": {
+                            "type": "string",
+                            "description": "Currency code for price (ISO 4217)."
+                          },
+                          "available": {
+                            "type": "boolean",
+                            "description": "Whether this specific car option is available for the requested period."
+                          },
+                          "pickup_location": {
+                            "type": "string",
+                            "description": "Address or named pickup location for this car."
+                          },
+                          "amenities": {
+                            "type": "array",
+                            "description": "List of included amenities for the car (e.g., 'GPS', 'Child seat').",
+                            "items": {
+                              "type": "string",
+                              "description": "Array item"
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "vendor",
+                          "make",
+                          "model",
+                          "year",
+                          "car_type",
+                          "price_per_day",
+                          "currency",
+                          "available"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of matching cars available.",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "cars",
+                    "total_results"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/RentalCars_3_ReserveCar": {
+      "post": {
+        "operationId": "RentalCars_3_ReserveCar",
+        "summary": "Simulate creating a rental car reservation",
+        "description": "Create a reservation and return a confirmation payload. Validate date ordering and time format; compute pricing (base rate by car_type, add insurance if requested) and return a reservation id and status.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "pickup_location": {
+                    "type": "string",
+                    "description": "The location where the car will be picked up, in the format of 'City, State', such as 'Los Angeles, CA'."
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "description": "The start date for the car rental in the format 'YYYY-MM-DD'."
+                  },
+                  "pickup_time": {
+                    "type": "string",
+                    "description": "The time of day when the car will be picked up, in 24-hour format 'HH:MM'."
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "description": "The end date for the car rental in the format 'YYYY-MM-DD'."
+                  },
+                  "car_type": {
+                    "type": "string",
+                    "description": "The preferred type of car for the rental.",
+                    "enum": [
+                      "Hatchback",
+                      "Sedan",
+                      "SUV"
+                    ]
+                  },
+                  "add_insurance": {
+                    "type": "boolean",
+                    "description": "Whether additional insurance should be purchased."
+                  }
+                },
+                "required": [
+                  "pickup_location",
+                  "start_date",
+                  "pickup_time",
+                  "end_date",
+                  "add_insurance"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful reservation confirmation",
+                  "properties": {
+                    "reservation_id": {
+                      "type": "string",
+                      "description": "Unique reservation identifier (for example, a UUID)."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Current reservation status (for example, 'confirmed' or 'pending')."
+                    },
+                    "total_price": {
+                      "type": "number",
+                      "description": "Total price charged for the reservation. Use float format (e.g., 1.0 not 1).",
+                      "format": "double"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Currency code in ISO 4217 (for example, 'USD')."
+                    },
+                    "pickup_instructions": {
+                      "type": "string",
+                      "description": "Optional pickup instructions or location-specific notes, if any."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp when the reservation was created (ISO 8601).",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "reservation_id",
+                    "status",
+                    "total_price",
+                    "currency",
+                    "created_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

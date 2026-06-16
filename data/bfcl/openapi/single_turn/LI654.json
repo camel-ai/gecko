@@ -1,0 +1,616 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LI654",
+    "version": "1.0.0",
+    "description": "LI654 provides unified endpoints for discovery, booking, and scheduling across entertainment and personal care: search movies by location/genre/show type, retrieve showtimes, and purchase tickets for specific theater showings, plus find hair stylists by city (optionally unisex) and book salon appointments for specific providers, dates, and times. Use straightforward request parameters to filter results, then call dedicated purchase or booking endpoints to complete transactions."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/LI654"
+    }
+  ],
+  "paths": {
+    "/Movies_1_BuyMovieTickets": {
+      "post": {
+        "operationId": "Movies_1_BuyMovieTickets",
+        "summary": "Simulate purchasing movie tickets for a specific showtime",
+        "description": "Simulate a full-ticket-purchase flow: validate inputs, reserve seats (if applicable), compute total, and return a booking confirmation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "movie_name": {
+                    "type": "string",
+                    "description": "The title of the movie for which tickets are being purchased."
+                  },
+                  "number_of_tickets": {
+                    "type": "integer",
+                    "description": "The quantity of tickets to buy.",
+                    "enum": [
+                      1,
+                      2,
+                      3,
+                      4,
+                      5,
+                      6,
+                      7,
+                      8,
+                      9
+                    ]
+                  },
+                  "show_date": {
+                    "type": "string",
+                    "description": "The date of the movie show, in the format 'MM/DD/YYYY'."
+                  },
+                  "location": {
+                    "type": "string",
+                    "description": "The city of the theater, in the format of 'City, State', such as 'Los Angeles, CA'."
+                  },
+                  "show_time": {
+                    "type": "string",
+                    "description": "The start time of the movie, in 24-hour format 'HH:MM'."
+                  },
+                  "show_type": {
+                    "type": "string",
+                    "description": "The format of the movie showing.",
+                    "enum": [
+                      "regular",
+                      "3d",
+                      "imax"
+                    ],
+                    "default": "regular"
+                  }
+                },
+                "required": [
+                  "movie_name",
+                  "number_of_tickets",
+                  "show_date",
+                  "location",
+                  "show_time"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful ticket purchase payload",
+                  "properties": {
+                    "confirmation_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the completed booking/confirmation."
+                    },
+                    "movie_name": {
+                      "type": "string",
+                      "description": "The title of the movie for which tickets are being purchased."
+                    },
+                    "number_of_tickets": {
+                      "type": "integer",
+                      "description": "The quantity of tickets purchased."
+                    },
+                    "show_date": {
+                      "type": "string",
+                      "description": "The date of the movie show, in the format 'MM/DD/YYYY'."
+                    },
+                    "location": {
+                      "type": "string",
+                      "description": "The city of the theater, in the format of 'City, State', such as 'Los Angeles, CA'."
+                    },
+                    "show_time": {
+                      "type": "string",
+                      "description": "The start time of the movie, in 24-hour format 'HH:MM'."
+                    },
+                    "show_type": {
+                      "type": "string",
+                      "description": "The format of the movie showing.",
+                      "enum": [
+                        "regular",
+                        "3d",
+                        "imax"
+                      ],
+                      "default": "regular"
+                    },
+                    "total_price": {
+                      "type": "number",
+                      "description": "Total charge for this purchase. Provide as a float when applicable (e.g., 12.50)."
+                    },
+                    "assigned_seats": {
+                      "type": "array",
+                      "description": "List of assigned seat identifiers, if seats were allocated. May be empty or omitted when seat assignment is not part of the flow.",
+                      "items": {
+                        "type": "string",
+                        "description": "Array item"
+                      }
+                    }
+                  },
+                  "required": [
+                    "confirmation_id",
+                    "movie_name",
+                    "number_of_tickets",
+                    "show_date",
+                    "location",
+                    "show_time",
+                    "show_type",
+                    "total_price"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Movies_1_FindMovies": {
+      "post": {
+        "operationId": "Movies_1_FindMovies",
+        "summary": "Simulate movie search results for given location and optional filters",
+        "description": "Generate a plausible list of movies playing in the specified location, honoring provided theater, genre, and show type filters. Use defaults when optional fields are omitted.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "The city where the theater is located, in the format of 'City, State' such as 'Los Angeles, CA'."
+                  },
+                  "theater_name": {
+                    "type": "string",
+                    "description": "The name of the theater. If unspecified, all theaters are considered.",
+                    "default": "All Theaters"
+                  },
+                  "genre": {
+                    "type": "string",
+                    "description": "The genre of the movie. If unspecified, all genres are considered.",
+                    "enum": [
+                      "World",
+                      "Offbeat",
+                      "Mystery",
+                      "Supernatural",
+                      "Horror",
+                      "Animation",
+                      "Sci-fi",
+                      "Documentary",
+                      "Drama",
+                      "War",
+                      "Family",
+                      "Action"
+                    ],
+                    "default": "All Genres"
+                  },
+                  "show_type": {
+                    "type": "string",
+                    "description": "The type of movie show such as regular, 3D, or IMAX. If unspecified, all types are considered.",
+                    "enum": [
+                      "regular",
+                      "3d",
+                      "imax"
+                    ],
+                    "default": "All Show Types"
+                  }
+                },
+                "required": [
+                  "location"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful search response containing matching movies",
+                  "properties": {
+                    "total_results": {
+                      "type": "integer",
+                      "description": "Total number of matching movies found"
+                    },
+                    "movies": {
+                      "type": "array",
+                      "description": "List of matching movies (may be empty)",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the movie result"
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Movie title"
+                          },
+                          "genre": {
+                            "type": "string",
+                            "description": "Movie genre (as provided by the data source)"
+                          },
+                          "theater_name": {
+                            "type": "string",
+                            "description": "Name of the theater where this showing is available"
+                          },
+                          "location": {
+                            "type": "string",
+                            "description": "The city/state or venue location associated with this showing"
+                          },
+                          "show_type": {
+                            "type": "string",
+                            "description": "Type of the showing (e.g., regular, 3d, imax) as provided by the data source"
+                          },
+                          "show_times": {
+                            "type": "array",
+                            "description": "List of show times as displayed (free-text, e.g., '7:30 PM')",
+                            "items": {
+                              "type": "string",
+                              "description": "Array item"
+                            }
+                          },
+                          "duration": {
+                            "type": "integer",
+                            "description": "Runtime value as provided by the data source (unit not specified by the API)"
+                          },
+                          "rating": {
+                            "type": "number",
+                            "description": "Optional numeric rating or score provided by the data source"
+                          },
+                          "language": {
+                            "type": "string",
+                            "description": "Language of the movie if available"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "theater_name",
+                          "show_times"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "total_results",
+                    "movies"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Movies_1_GetTimesForMovie": {
+      "post": {
+        "operationId": "Movies_1_GetTimesForMovie",
+        "summary": "Retrieve showtimes for a movie at a theater on a given date",
+        "description": "Simulate returning a list of showtime entries for the requested movie, location, and date. If theater_name is omitted, return showtimes from one or more theaters in the specified location.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "movie_name": {
+                    "type": "string",
+                    "description": "The title of the movie for which showtimes are requested."
+                  },
+                  "location": {
+                    "type": "string",
+                    "description": "The city where the theater is located, in the format of 'City, State' such as 'Berkeley, CA' and 'New York, NY'."
+                  },
+                  "show_date": {
+                    "type": "string",
+                    "description": "The date for which to find showtimes, formatted as 'MM/DD/YYYY'."
+                  },
+                  "theater_name": {
+                    "type": "string",
+                    "description": "The name of the theater. If unspecified, any theater is considered.",
+                    "default": "Any"
+                  },
+                  "show_type": {
+                    "type": "string",
+                    "description": "The format of the show (e.g., standard, 3D, IMAX).",
+                    "enum": [
+                      "regular",
+                      "3d",
+                      "imax"
+                    ],
+                    "default": "regular"
+                  }
+                },
+                "required": [
+                  "movie_name",
+                  "location",
+                  "show_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful response containing showtimes for the requested movie/date/location.",
+                  "properties": {
+                    "movie_name": {
+                      "type": "string",
+                      "description": "The movie title for which these showtimes apply."
+                    },
+                    "location": {
+                      "type": "string",
+                      "description": "City and state of the theater(s) where these showtimes are available (e.g., \"Berkeley, CA\")."
+                    },
+                    "show_date": {
+                      "type": "string",
+                      "description": "Date for the listed showtimes, in 'MM/DD/YYYY' as requested."
+                    },
+                    "theater_name": {
+                      "type": "string",
+                      "description": "Name of the theater for these showtimes. When multiple theaters are returned, this may be the specific theater for each showtime entry or a primary theater name."
+                    },
+                    "showtimes": {
+                      "type": "array",
+                      "description": "Array of showtime entries for the specified movie at the theater(s) on the given date.",
+                      "items": {
+                        "type": "object",
+                        "description": "Array item",
+                        "properties": {
+                          "start_time": {
+                            "type": "string",
+                            "description": "Start time of the show in local theater time (examples: '19:30', '7:30 PM')."
+                          },
+                          "auditorium": {
+                            "type": "string",
+                            "description": "Identifier or name of the auditorium/screen where the show plays."
+                          },
+                          "show_type": {
+                            "type": "string",
+                            "description": "Format of the show.",
+                            "enum": [
+                              "regular",
+                              "3d",
+                              "imax"
+                            ]
+                          },
+                          "language": {
+                            "type": "string",
+                            "description": "Language or audio track of the show, if available (e.g., 'English')."
+                          },
+                          "seats_available": {
+                            "type": "integer",
+                            "description": "Estimated number of seats currently available for this showtime."
+                          },
+                          "ticket_price": {
+                            "type": "number",
+                            "description": "Ticket price for this showtime. Do not assume any particular currency unless provided by the theater."
+                          }
+                        },
+                        "required": [
+                          "start_time"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "movie_name",
+                    "location",
+                    "show_date",
+                    "showtimes"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Services_1_BookAppointment": {
+      "post": {
+        "operationId": "Services_1_BookAppointment",
+        "summary": "Book an appointment with a stylist or salon",
+        "description": "Simulate booking an appointment for a specified stylist or salon on a given date and time. Validate date/time and availability, then return a booking record.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "stylist_name": {
+                    "type": "string",
+                    "description": "The full name of the hair stylist or the name of the salon."
+                  },
+                  "appointment_time": {
+                    "type": "string",
+                    "description": "The time for the appointment in 24-hour format, e.g., '14:00' for 2 PM."
+                  },
+                  "appointment_date": {
+                    "type": "string",
+                    "description": "The date for the appointment in the format 'YYYY-MM-DD', e.g., '2023-04-15'."
+                  }
+                },
+                "required": [
+                  "stylist_name",
+                  "appointment_time",
+                  "appointment_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Successful appointment booking response",
+                  "properties": {
+                    "appointment_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the booked appointment."
+                    },
+                    "stylist_name": {
+                      "type": "string",
+                      "description": "The full name of the hair stylist or the name of the salon."
+                    },
+                    "appointment_date": {
+                      "type": "string",
+                      "description": "The date for the appointment in the format 'YYYY-MM-DD', e.g., '2023-04-15'."
+                    },
+                    "appointment_time": {
+                      "type": "string",
+                      "description": "The time for the appointment in 24-hour format, e.g., '14:00' for 2 PM."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Status of the booking (for example, confirmed)."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "Timestamp when the booking was created."
+                    }
+                  },
+                  "required": [
+                    "appointment_id",
+                    "stylist_name",
+                    "appointment_date",
+                    "appointment_time",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Services_1_FindProvider": {
+      "post": {
+        "operationId": "Services_1_FindProvider",
+        "summary": "Find hair stylists by city",
+        "description": "Simulate searching for hair stylists located in a specified city; optionally filter results by the salon's unisex status.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Request payload",
+                "properties": {
+                  "city": {
+                    "type": "string",
+                    "description": "The city where the salon is located, in the format of 'City, State', such as 'Berkeley, CA' or 'New York, NY'."
+                  },
+                  "is_unisex": {
+                    "type": "boolean",
+                    "description": "Flag indicating if the salon is unisex. A value of 'True' means the salon is unisex, 'False' means it is not, and 'dontcare' indicates no preference.",
+                    "enum": [
+                      "True",
+                      "False"
+                    ]
+                  }
+                },
+                "required": [
+                  "city"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "description": "Array of matching provider records.",
+                  "items": {
+                    "type": "object",
+                    "description": "Array item",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "Unique identifier for the provider."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Full name of the stylist."
+                      },
+                      "salon_name": {
+                        "type": "string",
+                        "description": "Name of the salon where the stylist works."
+                      },
+                      "address": {
+                        "type": "string",
+                        "description": "Street address of the salon."
+                      },
+                      "city": {
+                        "type": "string",
+                        "description": "City and state for the salon, e.g. 'Berkeley, CA' or 'New York, NY'."
+                      },
+                      "is_unisex": {
+                        "type": "string",
+                        "description": "Indicates whether the salon is unisex. One of 'True', 'False', or 'dontcare'."
+                      },
+                      "phone": {
+                        "type": "string",
+                        "description": "Contact phone number for the salon or stylist, if available."
+                      },
+                      "rating": {
+                        "type": "number",
+                        "description": "Average customer rating for the provider, if available (scale and precision may vary)."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "salon_name",
+                      "city"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
