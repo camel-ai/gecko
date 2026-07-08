@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var jumpLinks = Array.prototype.slice.call(
     document.querySelectorAll('.side-jump a, .mobile-jump a')
   );
-  var jumpSectionIds = ['top', 'gecko', 'gats', 'experiments', 'discussion', 'conclusion', 'citation'];
+  var jumpSectionIds = ['top', 'motivation', 'gecko', 'gats', 'results', 'tts', 'faq', 'citation'];
   var jumpSections = jumpSectionIds
     .map(function (id) { return document.getElementById(id); })
     .filter(Boolean);
@@ -108,6 +108,9 @@ document.addEventListener('DOMContentLoaded', function () {
   var pinchStartScale = 1;
   var touchMode = '';
   var lastInteractionAt = 0;
+  var imageMouseMoved = false;
+  var imageMouseStartX = 0;
+  var imageMouseStartY = 0;
 
   function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
@@ -214,6 +217,9 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
     isDragging = true;
+    imageMouseMoved = false;
+    imageMouseStartX = event.clientX;
+    imageMouseStartY = event.clientY;
     pointerX = event.clientX;
     pointerY = event.clientY;
     updateCursor();
@@ -223,6 +229,9 @@ document.addEventListener('DOMContentLoaded', function () {
   window.addEventListener('mousemove', function (event) {
     if (!isDragging || !isViewerOpen()) {
       return;
+    }
+    if (Math.abs(event.clientX - imageMouseStartX) > 3 || Math.abs(event.clientY - imageMouseStartY) > 3) {
+      imageMouseMoved = true;
     }
     translateX += event.clientX - pointerX;
     translateY += event.clientY - pointerY;
@@ -238,7 +247,23 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     isDragging = false;
     updateCursor();
-    lastInteractionAt = Date.now();
+    if (imageMouseMoved) {
+      lastInteractionAt = Date.now();
+    }
+  });
+
+  viewerImage.addEventListener('click', function (event) {
+    if (!isViewerOpen()) {
+      return;
+    }
+    event.stopPropagation();
+    if (imageMouseMoved) {
+      return;
+    }
+    if (Date.now() - lastInteractionAt < 220) {
+      return;
+    }
+    closeViewer();
   });
 
   viewer.addEventListener('touchstart', function (event) {
